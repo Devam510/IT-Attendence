@@ -47,12 +47,13 @@ async function handleHistory(
     });
 
     // Build calendar summary
+    type AttendanceRecord = (typeof records)[number];
     const daysInMonth = new Date(year, mon, 0).getDate();
     const calendar: Record<string, unknown>[] = [];
 
     for (let day = 1; day <= daysInMonth; day++) {
         const dateStr = `${month}-${String(day).padStart(2, "0")}`;
-        const dayRecords = records.filter((r) => {
+        const dayRecords = records.filter((r: AttendanceRecord) => {
             const d = new Date(r.date);
             return d.getDate() === day;
         });
@@ -87,10 +88,11 @@ async function handleHistory(
     }
 
     // Calculate summary
+    type AttendanceRec = (typeof records)[number];
     const totalPresent = records.length;
-    const totalHours = records.reduce((sum, r) => sum + (r.totalHours || 0), 0);
-    const totalOvertime = records.reduce((sum, r) => sum + (r.overtimeHours || 0), 0);
-    const flaggedDays = records.filter((r) => r.status === "FLAGGED").length;
+    const totalHours = records.reduce((sum: number, r: AttendanceRec) => sum + (r.totalHours || 0), 0);
+    const totalOvertime = records.reduce((sum: number, r: AttendanceRec) => sum + (r.overtimeHours || 0), 0);
+    const flaggedDays = records.filter((r: AttendanceRec) => r.status === "FLAGGED").length;
 
     return success({
         month,
