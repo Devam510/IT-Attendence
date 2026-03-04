@@ -1,0 +1,154 @@
+/* NEXUS Design System — CSS Custom Properties
+   Generated from Stitch MCP designs (Project: 11278046875338724592)
+   Supports light/dark mode via [data-theme] attribute */
+
+/* ─── Light Mode (Default) ─────────────────────── */
+:root,
+[data-theme="light"] {
+  /* Brand */
+  --color-primary: #1A56DB;
+  --color-primary-hover: #1E40AF;
+  --color-primary-light: #DBEAFE;
+  --color-secondary: #0E9F6E;
+  --color-secondary-hover: #057A55;
+  --color-secondary-light: #DEF7EC;
+
+  /* Status */
+  --color-danger: #E02424;
+  --color-danger-hover: #C81E1E;
+  --color-danger-light: #FDE8E8;
+  --color-warning: #FF8A4C;
+  --color-warning-light: #FFF3E0;
+  --color-info: #3F83F8;
+  --color-info-light: #E1EFFE;
+
+  /* Surfaces */
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F9FAFB;
+  --bg-tertiary: #F3F4F6;
+  --bg-elevated: #FFFFFF;
+
+  /* Text */
+  --text-primary: #111827;
+  --text-secondary: #6B7280;
+  --text-tertiary: #9CA3AF;
+  --text-inverse: #FFFFFF;
+
+  /* Borders */
+  --border-primary: #E5E7EB;
+  --border-secondary: #D1D5DB;
+  --border-focus: #1A56DB;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+  /* Glass */
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --glass-blur: 12px;
+}
+
+/* ─── Dark Mode ────────────────────────────────── */
+[data-theme="dark"] {
+  --color-primary: #3F83F8;
+  --color-primary-hover: #1C64F2;
+  --color-primary-light: #1E3A5F;
+  --color-secondary: #31C48D;
+  --color-secondary-hover: #0E9F6E;
+  --color-secondary-light: #14352A;
+
+  --color-danger: #F05252;
+  --color-danger-hover: #E02424;
+  --color-danger-light: #3B1B1B;
+  --color-warning: #FF8A4C;
+  --color-warning-light: #3B2A1B;
+  --color-info: #76A9FA;
+  --color-info-light: #1E3A5F;
+
+  --bg-primary: #111827;
+  --bg-secondary: #1F2937;
+  --bg-tertiary: #374151;
+  --bg-elevated: #1F2937;
+
+  --text-primary: #F9FAFB;
+  --text-secondary: #D1D5DB;
+  --text-tertiary: #9CA3AF;
+  --text-inverse: #111827;
+
+  --border-primary: #374151;
+  --border-secondary: #4B5563;
+  --border-focus: #3F83F8;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.5);
+
+  --glass-bg: rgba(31, 41, 55, 0.8);
+  --glass-border: rgba(55, 65, 81, 0.5);
+}
+
+/* ─── Spacing & Layout ────────────────────────── */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  /* Typography */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+
+  /* Transitions */
+  --transition-fast: 150ms ease-out;
+  --transition-base: 200ms ease-out;
+  --transition-slow: 300ms ease-out;
+  --transition-spring: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Layout */
+  --sidebar-width: 240px;
+  --sidebar-collapsed: 64px;
+  --navbar-height: 64px;
+  --bottomnav-height: 72px;
+  --max-content-width: 1200px;
+
+  /* Z-index */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-modal-backdrop: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+}

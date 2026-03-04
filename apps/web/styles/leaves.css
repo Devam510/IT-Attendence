@@ -1,0 +1,402 @@
+/* NEXUS — Leave Management + Approvals Styles
+   Based on Stitch MCP screens:
+   - Leave Balance Dashboard (97231ad2e35e425bae2348f04b46541e)
+   - Apply Leave Form (3f46056086574c33a3e556edfabf51f5)
+   - Manager Approval Queue (0f7f351dffea4cd597aef6a6e363c8de) */
+
+/* ─── Leave Balance ──────────────────────────── */
+.leave-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-6);
+}
+
+.leave-balance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+}
+
+.leave-balance-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+
+.leave-balance-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.leave-balance-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.leave-balance-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+.leave-balance-icon.annual {
+    background: var(--color-primary-light);
+}
+
+.leave-balance-icon.sick {
+    background: var(--color-danger-light);
+}
+
+.leave-balance-icon.casual {
+    background: var(--color-warning-light);
+}
+
+.leave-balance-icon.comp {
+    background: var(--color-secondary-light);
+}
+
+.leave-balance-remaining {
+    font-size: var(--text-3xl);
+    font-weight: var(--font-bold);
+}
+
+.leave-balance-type {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+.leave-balance-bar-container {
+    height: 6px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+}
+
+.leave-balance-bar {
+    height: 100%;
+    border-radius: var(--radius-full);
+    transition: width 0.6s ease-out;
+}
+
+.leave-balance-bar.annual {
+    background: var(--color-primary);
+}
+
+.leave-balance-bar.sick {
+    background: var(--color-danger);
+}
+
+.leave-balance-bar.casual {
+    background: var(--color-warning);
+}
+
+.leave-balance-bar.comp {
+    background: var(--color-secondary);
+}
+
+.leave-balance-footer {
+    display: flex;
+    justify-content: space-between;
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+}
+
+/* Leave History List */
+.leave-history-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    background: var(--bg-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--space-3);
+    transition: box-shadow var(--transition-fast);
+}
+
+.leave-history-item:hover {
+    box-shadow: var(--shadow-sm);
+}
+
+.leave-history-color-bar {
+    width: 4px;
+    height: 48px;
+    border-radius: var(--radius-full);
+    flex-shrink: 0;
+}
+
+.leave-history-color-bar.approved {
+    background: var(--color-secondary);
+}
+
+.leave-history-color-bar.pending {
+    background: var(--color-warning);
+}
+
+.leave-history-color-bar.rejected {
+    background: var(--color-danger);
+}
+
+.leave-history-info {
+    flex: 1;
+}
+
+.leave-history-title {
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+}
+
+.leave-history-meta {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+
+/* ─── Apply Leave Form ────────────────────────── */
+.apply-form-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
+}
+
+.apply-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-5);
+}
+
+@media (max-width: 767px) {
+    .apply-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.date-range-wrapper {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+}
+
+@media (max-width: 767px) {
+    .date-range-wrapper {
+        grid-template-columns: 1fr;
+    }
+}
+
+.leave-days-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    border-radius: var(--radius-full);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+}
+
+/* Team overlap warning banner */
+.overlap-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--color-warning-light);
+    border: 1px solid var(--color-warning);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+}
+
+.overlap-warning-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.apply-form-actions {
+    display: flex;
+    gap: var(--space-4);
+    justify-content: flex-end;
+    padding-top: var(--space-6);
+    border-top: 1px solid var(--border-primary);
+    margin-top: var(--space-6);
+}
+
+/* ─── Approvals ───────────────────────────────── */
+.approval-filters {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-5);
+}
+
+.filter-chip {
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-full);
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+    cursor: pointer;
+    border: 1px solid var(--border-primary);
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+}
+
+.filter-chip:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.filter-chip.active {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+}
+
+.approval-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    margin-bottom: var(--space-4);
+    transition: box-shadow var(--transition-fast);
+}
+
+.approval-card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.approval-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+}
+
+.approval-card-employee {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.approval-card-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: var(--font-semibold);
+    font-size: var(--text-sm);
+    flex-shrink: 0;
+}
+
+.approval-card-name {
+    font-weight: var(--font-semibold);
+    font-size: var(--text-sm);
+}
+
+.approval-card-role {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+}
+
+.approval-card-body {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    margin-bottom: var(--space-4);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: var(--space-3);
+}
+
+.approval-card-field {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.approval-card-label {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.approval-card-value {
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+}
+
+.approval-card-reason {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    padding: var(--space-3) var(--space-4);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-4);
+    border-left: 3px solid var(--border-secondary);
+}
+
+.approval-card-actions {
+    display: flex;
+    gap: var(--space-3);
+    justify-content: flex-end;
+}
+
+.approval-bulk-bar {
+    position: sticky;
+    top: calc(var(--navbar-height) + var(--space-4));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-5);
+    background: var(--color-primary);
+    color: white;
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--space-5);
+    z-index: 50;
+    box-shadow: var(--shadow-lg);
+    animation: slideDown var(--transition-base) forwards;
+}
+
+.approval-empty {
+    text-align: center;
+    padding: var(--space-16) var(--space-6);
+    color: var(--text-tertiary);
+}
+
+.approval-empty-icon {
+    font-size: 3rem;
+    margin-bottom: var(--space-4);
+    display: block;
+}
+
+.approval-empty-text {
+    font-size: var(--text-lg);
+    font-weight: var(--font-semibold);
+    color: var(--text-secondary);
+}
+
+.approval-empty-sub {
+    font-size: var(--text-sm);
+    margin-top: var(--space-2);
+}
