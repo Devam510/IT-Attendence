@@ -222,41 +222,8 @@ async function main() {
     }
     console.log("✅ Leave Balances: 18 records (6 users × 3 types)");
 
-    // ─── 8. Sample Attendance (last 5 days) ─────────────
-    const today = new Date();
-    for (let d = 1; d <= 5; d++) {
-        const date = new Date(today);
-        date.setDate(today.getDate() - d);
-        // Skip weekends
-        if (date.getDay() === 0 || date.getDay() === 6) continue;
-
-        const dateOnly = new Date(date.toISOString().split("T")[0] + "T00:00:00.000Z");
-        const checkIn = new Date(date);
-        checkIn.setHours(9, Math.floor(Math.random() * 15), 0, 0);
-        const checkOut = new Date(date);
-        checkOut.setHours(18, Math.floor(Math.random() * 30), 0, 0);
-
-        for (const emp of [emp1, emp2, emp3]) {
-            await prisma.attendanceRecord.create({
-                data: {
-                    userId: emp.id,
-                    date: dateOnly,
-                    checkInAt: checkIn,
-                    checkOutAt: checkOut,
-                    checkInLat: 19.0596 + (Math.random() - 0.5) * 0.001,
-                    checkInLng: 72.8656 + (Math.random() - 0.5) * 0.001,
-                    checkInMethod: "GEO_BIO",
-                    verificationScore: 85 + Math.floor(Math.random() * 15),
-                    locationId: location.id,
-                    shiftId: shift.id,
-                    status: "VERIFIED",
-                    totalHours: +(8 + Math.random() * 1.5).toFixed(1),
-                    overtimeHours: +(Math.random() * 1).toFixed(1),
-                },
-            });
-        }
-    }
-    console.log("✅ Attendance: Sample records for last 5 weekdays");
+    // No sample attendance data — only real check-ins will be shown
+    console.log("✅ Attendance: No seed data (real check-ins only)");
 
     // ─── Summary ────────────────────────────────────────
     console.log("\n" + "═".repeat(50));
