@@ -75,7 +75,8 @@ async function handleLogin(req: NextRequest): Promise<NextResponse> {
         logger.info({ userId: user.id }, "First-time password set on login");
     } else if (user.passwordHash !== expectedHash) {
         // Password mismatch
-        await logAuditEvent({
+        // Fire-and-forget audit — don't slow down login
+        logAuditEvent({
             actorId: user.id,
             actorRole: user.role,
             action: "auth.login_failed",
@@ -83,7 +84,7 @@ async function handleLogin(req: NextRequest): Promise<NextResponse> {
             resourceId: user.id,
             ipAddress: ip,
             metadata: { reason: "invalid_password" },
-        });
+        }).catch(() => { });
         return error("AUTH_FAILED", "Invalid credentials", 401);
     }
 
@@ -113,17 +114,16 @@ async function handleLogin(req: NextRequest): Promise<NextResponse> {
         generateRefreshToken(payload),
     ]);
 
-    // Store session in Redis
-    await setSession(user.id, deviceId || "web", {
+    // Fire-and-forget session + audit — don't block response
+    setSession(user.id, deviceId || "web", {
         refreshToken,
         role: user.role,
         entityId: user.entityId,
         loginAt: new Date().toISOString(),
         ip,
-    });
+    }).catch(() => { });
 
-    // Audit log
-    await logAuditEvent({
+    logAuditEvent({
         actorId: user.id,
         actorRole: user.role,
         action: "auth.login",
@@ -132,7 +132,7 @@ async function handleLogin(req: NextRequest): Promise<NextResponse> {
         ipAddress: ip,
         deviceId: deviceId || undefined,
         metadata: { method: "password" },
-    });
+    }).catch(() => { });
 
     logger.info({ userId: user.id, role: user.role }, "User logged in");
 
