@@ -1,23 +1,16 @@
-// Quick cleanup: Delete fake seeded attendance records from past dates
-// Keep today's real check-in records
+// Cleanup: Delete ALL attendance records so each user starts fresh
+// This removes stale UTC-midnight records that were causing cross-midnight IST display bugs
 
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
 async function cleanup() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    // Delete all attendance records BEFORE today (the seeded fake ones)
-    const result = await prisma.attendanceRecord.deleteMany({
-        where: {
-            date: { lt: today },
-        },
-    });
-
-    console.log(`🧹 Deleted ${result.count} fake past attendance records`);
-    console.log("✅ Only today's real check-ins remain");
+    // Delete ALL attendance records - they were created with wrong UTC-midnight date
+    // Users will check in fresh going forward with the fixed IST-aware routes
+    const result = await prisma.attendanceRecord.deleteMany({});
+    console.log(`🧹 Deleted ${result.count} attendance records`);
+    console.log("✅ Database clean — all users can check in fresh");
 }
 
 cleanup()

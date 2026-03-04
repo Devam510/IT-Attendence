@@ -19,6 +19,7 @@ export async function GET() {
 
     try {
         const redis = await getRedis();
+        if (!redis) throw new Error("Redis unavailable");
         await redis.ping();
         checks.redis = "ok";
     } catch {

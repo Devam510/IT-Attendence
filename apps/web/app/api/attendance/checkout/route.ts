@@ -25,12 +25,11 @@ async function handleCheckOut(
     const todayStart = new Date(Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - istOffsetMs);
     const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
-    // Find today's check-in record
+    // Find today's check-in record — use checkInAt timestamp range (IST) not date field
     const record = await prisma.attendanceRecord.findFirst({
         where: {
             userId: auth.sub,
-            date: { gte: todayStart, lt: tomorrowStart },
-            checkInAt: { not: null },
+            checkInAt: { gte: todayStart, lt: tomorrowStart },
             checkOutAt: null,
         },
     });

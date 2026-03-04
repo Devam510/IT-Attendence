@@ -43,9 +43,13 @@ async function handleCheckIn(
     const todayStart = new Date(Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - istOffsetMs);
     const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
-    // 1. Check if already checked in today
+    // 1. Check if already checked in TODAY in IST — use checkInAt timestamp, not date field
+    //    date field was stored as UTC midnight which causes cross-midnight IST issues
     const existingRecord = await prisma.attendanceRecord.findFirst({
-        where: { userId: auth.sub, date: { gte: todayStart, lt: tomorrowStart } },
+        where: {
+            userId: auth.sub,
+            checkInAt: { gte: todayStart, lt: tomorrowStart },
+        },
     });
 
     if (existingRecord) {

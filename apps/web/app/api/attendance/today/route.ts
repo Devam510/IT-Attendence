@@ -24,7 +24,8 @@ async function handleToday(
     const record = await prisma.attendanceRecord.findFirst({
         where: {
             userId: auth.sub,
-            date: { gte: todayStart, lt: tomorrowStart },
+            // Use checkInAt timestamp range in IST — avoids UTC-midnight date storage mismatch
+            checkInAt: { gte: todayStart, lt: tomorrowStart },
         },
         include: {
             location: { select: { name: true } },
