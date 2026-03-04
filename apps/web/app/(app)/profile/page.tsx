@@ -3,22 +3,19 @@
 import { useState, useEffect } from "react";
 import { apiGet } from "@/lib/api-client";
 import { useAuth } from "@/context/AuthContext";
-import { useTheme } from "@/context/ThemeContext";
 import "@/styles/admin.css";
 
-interface ProfileData {
-    fullName: string;
-    email: string;
-    phone?: string;
-    department: string;
-    role: string;
-    employeeId: string;
-    designation?: string;
-    manager?: string;
-    joinDate: string;
-    workLocation?: string;
-    mfaEnabled: boolean;
-    activeSessions: number;
+// Helper: safely convert any value to a string for rendering
+function str(val: unknown): string {
+    if (val === null || val === undefined) return "–";
+    if (typeof val === "string") return val;
+    if (typeof val === "number" || typeof val === "boolean") return String(val);
+    if (typeof val === "object") {
+        // Handle { name: "..." } objects from the API
+        if ("name" in (val as Record<string, unknown>)) return String((val as Record<string, unknown>).name);
+        return JSON.stringify(val);
+    }
+    return String(val);
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -31,34 +28,48 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function ProfilePage() {
     const { user } = useAuth();
-    const { theme, toggleTheme } = useTheme();
-    const [profile, setProfile] = useState<ProfileData | null>(null);
+    const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
     const [loading, setLoading] = useState(true);
+    const [darkMode, setDarkMode] = useState(false);
 
     useEffect(() => {
+        // Check current theme
+        setDarkMode(document.documentElement.getAttribute("data-theme") === "dark");
+
         async function load() {
-            const res = await apiGet<{ profile: ProfileData }>("/api/profile");
-            if (res.data?.profile) setProfile(res.data.profile);
+            try {
+                const res = await apiGet<{ profile: Record<string, unknown> }>("/api/profile");
+                if (res.data?.profile) setProfile(res.data.profile);
+            } catch {
+                // Profile API failed — use fallback from auth context
+            }
             setLoading(false);
         }
         load();
     }, []);
 
-    const data = profile || {
-        fullName: user?.fullName || "NEXUS User",
-        email: user?.email || "",
-        phone: "",
-        department: "–",
-        role: user?.role || "EMP",
-        employeeId: "–",
-        manager: "–",
-        joinDate: "–",
-        workLocation: "–",
-        mfaEnabled: false,
-        activeSessions: 1,
+    const data = {
+        fullName: str(profile?.fullName || user?.fullName || "NEXUS User"),
+        email: str(profile?.email || user?.email || ""),
+        phone: str(profile?.phone || "Not set"),
+        department: str(profile?.department || "–"),
+        role: str(profile?.role || user?.role || "EMP"),
+        employeeId: str(profile?.employeeId || "–"),
+        manager: str(profile?.manager || "–"),
+        joinDate: str(profile?.joinDate || "–"),
+        workLocation: str(profile?.workLocation || "–"),
+        mfaEnabled: Boolean(profile?.mfaEnabled),
+        activeSessions: Number(profile?.activeSessions || 1),
     };
 
-    const initials = data.fullName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
+    const initials = data.fullName.split(" ").map(n => n[0] || "").join("").slice(0, 2).toUpperCase() || "U";
+
+    function toggleTheme() {
+        const next = darkMode ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", next);
+        localStorage.setItem("nexus-theme", next);
+        setDarkMode(!darkMode);
+    }
 
     if (loading) {
         return (
@@ -69,6 +80,10 @@ export default function ProfilePage() {
             </div>
         );
     }
+
+    const joinDateDisplay = data.joinDate !== "–"
+        ? (() => { try { return new Date(data.joinDate).toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" }); } catch { return data.joinDate; } })()
+        : "–";
 
     return (
         <div>
@@ -85,11 +100,11 @@ export default function ProfilePage() {
                 <div className="profile-section-title">Information</div>
                 {[
                     { icon: "📧", label: "Email", value: data.email },
-                    { icon: "📱", label: "Phone", value: data.phone || "Not set" },
+                    { icon: "📱", label: "Phone", value: data.phone },
                     { icon: "🏢", label: "Department", value: data.department },
-                    { icon: "👤", label: "Manager", value: data.manager || "–" },
-                    { icon: "📅", label: "Join Date", value: data.joinDate !== "–" ? new Date(data.joinDate).toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" }) : "–" },
-                    { icon: "📍", label: "Work Location", value: data.workLocation || "–" },
+                    { icon: "👤", label: "Manager", value: data.manager },
+                    { icon: "📅", label: "Join Date", value: joinDateDisplay },
+                    { icon: "📍", label: "Work Location", value: data.workLocation },
                 ].map(row => (
                     <div key={row.label} className="profile-row">
                         <div className="profile-row-left">
@@ -106,14 +121,14 @@ export default function ProfilePage() {
                 <div className="profile-section-title">Appearance</div>
                 <div className="profile-row">
                     <div className="profile-row-left">
-                        <span className="profile-row-icon">{theme === "dark" ? "🌙" : "☀️"}</span>
+                        <span className="profile-row-icon">{darkMode ? "🌙" : "☀️"}</span>
                         <span className="profile-row-label">Dark Mode</span>
                     </div>
                     <div
-                        className={`toggle-track ${theme === "dark" ? "on" : ""}`}
+                        className={`toggle-track ${darkMode ? "on" : ""}`}
                         onClick={toggleTheme}
                         role="switch"
-                        aria-checked={theme === "dark"}
+                        aria-checked={darkMode}
                         aria-label="Toggle dark mode"
                         tabIndex={0}
                         onKeyDown={(e) => e.key === "Enter" && toggleTheme()}
