@@ -29,10 +29,11 @@ async function handleCheckIn(
         return error("INVALID_JSON", "Request body must be valid JSON", 400);
     }
 
-    const lat = Number(body.lat);
-    const lng = Number(body.lng);
-    if (isNaN(lat) || isNaN(lng)) {
-        return error("VALIDATION_ERROR", "lat and lng are required", 422);
+    // Accept both lat/lng and latitude/longitude field names
+    const lat = Number(body.lat ?? body.latitude);
+    const lng = Number(body.lng ?? body.longitude);
+    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
+        return error("VALIDATION_ERROR", "Location coordinates are required for check-in", 422);
     }
 
     const now = new Date();
