@@ -18,10 +18,12 @@ async function handleCheckOut(
 
     const sessionToken = body.sessionToken as string | undefined;
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const tomorrowStart = new Date(todayStart);
-    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+    const now = new Date();
+    // Calculate "today" in IST (UTC+5:30), not in server's UTC timezone
+    const istOffsetMs = 5.5 * 60 * 60 * 1000;
+    const nowIst = new Date(now.getTime() + istOffsetMs);
+    const todayStart = new Date(Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - istOffsetMs);
+    const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
     // Find today's check-in record
     const record = await prisma.attendanceRecord.findFirst({

@@ -37,10 +37,11 @@ async function handleCheckIn(
     }
 
     const now = new Date();
-    const todayStart = new Date(now);
-    todayStart.setHours(0, 0, 0, 0);
-    const tomorrowStart = new Date(todayStart);
-    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+    // Calculate "today" in IST (UTC+5:30), not in server's UTC timezone
+    const istOffsetMs = 5.5 * 60 * 60 * 1000;
+    const nowIst = new Date(now.getTime() + istOffsetMs);
+    const todayStart = new Date(Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - istOffsetMs);
+    const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
     // 1. Check if already checked in today
     const existingRecord = await prisma.attendanceRecord.findFirst({
