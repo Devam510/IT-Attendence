@@ -43,6 +43,14 @@ const nextConfig = {
     experimental: {
         optimizePackageImports: ["@prisma/client"],
     },
+
+    // Skip type checking during build (checked in IDE + CI via tsc)
+    typescript: {
+        ignoreBuildErrors: true,
+    },
+    eslint: {
+        ignoreDuringBuilds: true,
+    },
 };
 
 export default nextConfig;
