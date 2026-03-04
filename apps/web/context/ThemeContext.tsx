@@ -42,11 +42,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         setThemeState(t);
     }, []);
 
-    // Prevent flash of wrong theme
-    if (!mounted) {
-        return <>{children}</>;
-    }
-
+    // Don't return without context — wrap with default values to avoid useTheme() crash
+    // (mounted=false just means theme may not be fully initialized yet)
     return (
         <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
             {children}
@@ -56,6 +53,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
 export function useTheme(): ThemeContextType {
     const context = useContext(ThemeContext);
-    if (!context) throw new Error("useTheme must be used within ThemeProvider");
+    // Safe fallback — never crash, return noop defaults
+    if (!context) {
+        return {
+            theme: "light",
+            toggleTheme: () => { },
+            setTheme: () => { },
+        };
+    }
     return context;
 }
