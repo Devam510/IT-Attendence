@@ -51,7 +51,7 @@ async function main() {
             address: "SG Highway, Ahmedabad, Gujarat 380054",
             latitude: 23.0225,
             longitude: 72.5714,
-            radiusM: 5000,
+            radiusM: 100,
             wifiBssids: ["AA:BB:CC:DD:EE:01", "AA:BB:CC:DD:EE:02"],
             entityId: entity.id,
         },
