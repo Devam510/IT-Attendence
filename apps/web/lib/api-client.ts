@@ -75,8 +75,9 @@ export async function api<T = unknown>(
             headers,
         });
 
-        // If 401, try refresh and retry once
-        if (res.status === 401 && token) {
+        // If 401, try refresh and retry once — but NOT for auth endpoints
+        const isAuthEndpoint = path.includes("/api/auth/login") || path.includes("/api/auth/token");
+        if (res.status === 401 && token && !isAuthEndpoint) {
             const refreshed = await refreshToken();
             if (refreshed) {
                 headers["Authorization"] = `Bearer ${getAccessToken()}`;
@@ -88,7 +89,7 @@ export async function api<T = unknown>(
                 // Clear tokens and redirect to login
                 setAccessToken(null);
                 localStorage.removeItem("nexus-refresh-token");
-                if (typeof window !== "undefined") {
+                if (typeof window !== "undefined" && !path.includes("/api/auth/")) {
                     window.location.href = "/login";
                 }
                 return { error: "Session expired", code: "UNAUTHORIZED" };
