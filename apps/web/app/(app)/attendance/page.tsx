@@ -12,20 +12,51 @@ interface TodayData {
     totalMinutes?: number;
 }
 
-interface HistoryDay {
+interface CalendarDay {
     date: string;
-    status: "verified" | "flagged" | "absent" | "leave" | "weekend" | "future";
+    status: string;
+    checkInAt: string | null;
+    checkOutAt: string | null;
+    totalHours: number | null;
+    overtimeHours?: number | null;
+    verificationScore?: number | null;
+    checkInMethod?: string;
+}
+
+interface HistoryResponse {
+    calendar: CalendarDay[];
+    summary: {
+        totalPresent: number;
+        totalHours: number;
+        totalOvertime: number;
+        flaggedDays: number;
+        daysInMonth: number;
+    };
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+// Format an ISO date string to IST time
+function formatTime(isoStr: string | null): string {
+    if (!isoStr) return "--:--";
+    try {
+        return new Date(isoStr).toLocaleTimeString("en-US", {
+            hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata",
+        });
+    } catch {
+        return "--:--";
+    }
+}
 
 export default function AttendancePage() {
     const now = new Date();
     const [month, setMonth] = useState(now.getMonth());
     const [year, setYear] = useState(now.getFullYear());
     const [today, setToday] = useState<TodayData>({ checkedIn: false });
-    const [history, setHistory] = useState<HistoryDay[]>([]);
+    const [calendar, setCalendar] = useState<CalendarDay[]>([]);
+    const [summary, setSummary] = useState<HistoryResponse["summary"] | null>(null);
+    const [selectedDate, setSelectedDate] = useState<string | null>(null); // "2026-03-04" or null = today
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
     const [elapsed, setElapsed] = useState(0);
@@ -44,12 +75,17 @@ export default function AttendancePage() {
     useEffect(() => {
         async function load() {
             setLoading(true);
+            // API expects ?month=2026-03 format
+            const monthStr = `${year}-${String(month + 1).padStart(2, "0")}`;
             const [todayRes, historyRes] = await Promise.all([
                 apiGet<TodayData>("/api/attendance/today"),
-                apiGet<{ records: HistoryDay[] }>(`/api/attendance/history?month=${month + 1}&year=${year}`),
+                apiGet<HistoryResponse>(`/api/attendance/history?month=${monthStr}`),
             ]);
             if (todayRes.data) setToday(todayRes.data);
-            if (historyRes.data?.records) setHistory(historyRes.data.records);
+            if (historyRes.data) {
+                setCalendar(historyRes.data.calendar || []);
+                setSummary(historyRes.data.summary || null);
+            }
             setLoading(false);
         }
         load();
@@ -78,50 +114,35 @@ export default function AttendancePage() {
         setToast(null);
 
         // Get real browser location
+        let latitude = 0, longitude = 0;
         try {
-            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-                if (!navigator.geolocation) {
-                    reject(new Error("Geolocation is not supported by your browser"));
-                    return;
-                }
-                navigator.geolocation.getCurrentPosition(resolve, reject, {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 0,
-                });
-            });
+            const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+                navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000 })
+            );
+            latitude = pos.coords.latitude;
+            longitude = pos.coords.longitude;
+        } catch {
+            setToast({ message: "📍 Location access required for check-in", type: "error" });
+            setActionLoading(false);
+            return;
+        }
 
-            const res = await apiPost<{ sessionToken?: string; officeName?: string }>("/api/attendance/checkin", {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude,
-            });
-
-            if (res.data) {
-                // Store session token — required for checkout device verification
-                if (res.data.sessionToken) {
-                    localStorage.setItem("nexus-checkin-token", res.data.sessionToken);
-                }
-                setToday(prev => ({
-                    ...prev,
-                    checkedIn: true,
-                    checkInTime: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-                    totalMinutes: 0,
-                }));
-                setToast({ message: `✅ Checked in at ${res.data.officeName || "office"}!`, type: "success" });
-            } else {
-                // Show the geofence or other error from backend
-                setToast({ message: res.error || "Check-in failed", type: "error" });
+        const res = await apiPost<TodayData & { sessionToken?: string }>("/api/attendance/checkin", { latitude, longitude });
+        if (res.data) {
+            setToday(prev => ({
+                ...prev,
+                checkedIn: true,
+                checkInTime: res.data!.checkInTime || new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }),
+                location: res.data!.location || "Office",
+            }));
+            // Store session token for device binding
+            if (res.data.sessionToken) {
+                localStorage.setItem("nexus-checkin-token", res.data.sessionToken);
             }
-        } catch (err: any) {
-            if (err.code === 1) {
-                setToast({ message: "📍 Location permission denied. Please enable location access to check in.", type: "error" });
-            } else if (err.code === 2) {
-                setToast({ message: "📍 Location unavailable. Please try again.", type: "error" });
-            } else if (err.code === 3) {
-                setToast({ message: "📍 Location request timed out. Please try again.", type: "error" });
-            } else {
-                setToast({ message: err.message || "Failed to get location", type: "error" });
-            }
+            setToast({ message: "✅ Checked in successfully!", type: "success" });
+            setSelectedDate(null); // Show today
+        } else {
+            setToast({ message: res.error || "Check-in failed", type: "error" });
         }
         setActionLoading(false);
     }, []);
@@ -129,16 +150,17 @@ export default function AttendancePage() {
     const handleCheckOut = useCallback(async () => {
         setActionLoading(true);
         setToast(null);
-        // Retrieve the session token stored at check-in time
-        const sessionToken = localStorage.getItem("nexus-checkin-token") || undefined;
-        const res = await apiPost("/api/attendance/checkout", { sessionToken });
+
+        const sessionToken = localStorage.getItem("nexus-checkin-token") || "";
+
+        const res = await apiPost<TodayData>("/api/attendance/checkout", { sessionToken });
         if (res.data) {
-            localStorage.removeItem("nexus-checkin-token");
             setToday(prev => ({
                 ...prev,
                 checkedIn: false,
-                checkOutTime: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+                checkOutTime: res.data!.checkOutTime || new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }),
             }));
+            localStorage.removeItem("nexus-checkin-token");
             if (intervalRef.current) clearInterval(intervalRef.current);
             setToast({ message: "✅ Checked out successfully!", type: "success" });
         } else {
@@ -154,25 +176,67 @@ export default function AttendancePage() {
     const todayMonth = now.getMonth();
     const todayYear = now.getFullYear();
 
-    function getDotClass(day: number): string {
+    // Build today's date string for comparison
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+    function getCalendarDay(day: number): CalendarDay | undefined {
         const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-        const record = history.find(h => h.date === dateStr);
-        if (record) return record.status;
-        const d = new Date(year, month, day);
-        if (d > now) return "future";
-        if (d.getDay() === 0 || d.getDay() === 6) return "future";
+        return calendar.find(c => c.date === dateStr);
+    }
+
+    function getDotClass(day: number): string {
+        const calDay = getCalendarDay(day);
+        if (!calDay) return "";
+        const s = calDay.status;
+        if (s === "VERIFIED" || s === "PRESENT" || s === "REGULARIZED") return "verified";
+        if (s === "FLAGGED") return "flagged";
+        if (s === "ABSENT") return "absent";
+        if (s === "LEAVE") return "leave";
+        if (s === "WEEKEND") return "future";
+        if (s === "UPCOMING") return "future";
+        // If has check-in, show as verified
+        if (calDay.checkInAt) return "verified";
         return "";
+    }
+
+    function handleDateClick(day: number) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        const d = new Date(year, month, day);
+        // Don't select future dates
+        if (d > now) return;
+        // Toggle: click same date = go back to today
+        if (selectedDate === dateStr) {
+            setSelectedDate(null);
+        } else {
+            setSelectedDate(dateStr);
+        }
     }
 
     function prevMonth() {
         if (month === 0) { setMonth(11); setYear(y => y - 1); }
         else setMonth(m => m - 1);
+        setSelectedDate(null);
     }
 
     function nextMonth() {
         if (month === 11) { setMonth(0); setYear(y => y + 1); }
         else setMonth(m => m + 1);
+        setSelectedDate(null);
     }
+
+    // Get data for the selected day
+    const isShowingToday = !selectedDate || selectedDate === todayStr;
+    const selectedCalDay = selectedDate ? calendar.find(c => c.date === selectedDate) : null;
+
+    // Format the selected date label
+    const selectedLabel = isShowingToday
+        ? "Today"
+        : (() => {
+            try {
+                const d = new Date(selectedDate + "T12:00:00");
+                return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+            } catch { return selectedDate; }
+        })();
 
     if (loading) {
         return (
@@ -199,9 +263,9 @@ export default function AttendancePage() {
                         borderRadius: "12px",
                         background: toast.type === "error" ? "#dc2626" : "#16a34a",
                         color: "white",
-                        fontSize: "14px",
-                        fontWeight: 500,
-                        boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+                        fontSize: "var(--text-sm)",
+                        fontWeight: "var(--font-medium)",
+                        boxShadow: "0 8px 30px rgba(0,0,0,0.3)",
                         maxWidth: 420,
                         textAlign: "center",
                         animation: "slideDown 0.3s ease-out",
@@ -239,9 +303,22 @@ export default function AttendancePage() {
                     {Array.from({ length: daysInMonth }).map((_, i) => {
                         const day = i + 1;
                         const isToday = day === todayDate && month === todayMonth && year === todayYear;
+                        const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                        const isSelected = selectedDate === dateStr;
+                        const isPast = new Date(year, month, day) <= now;
                         const dotClass = getDotClass(day);
                         return (
-                            <div key={day} className={`att-calendar-day ${isToday ? "today" : ""}`}>
+                            <div
+                                key={day}
+                                className={`att-calendar-day ${isToday ? "today" : ""} ${isSelected ? "selected" : ""}`}
+                                onClick={() => isPast && handleDateClick(day)}
+                                style={{
+                                    cursor: isPast ? "pointer" : "default",
+                                    outline: isSelected ? "2px solid var(--color-primary, #6366f1)" : undefined,
+                                    borderRadius: isSelected ? 10 : undefined,
+                                    opacity: !isPast && !isToday ? 0.4 : 1,
+                                }}
+                            >
                                 {day}
                                 {dotClass && <span className={`att-dot ${dotClass}`} />}
                             </div>
@@ -250,65 +327,140 @@ export default function AttendancePage() {
                 </div>
             </div>
 
-            {/* Today Card */}
+            {/* Day Detail Card */}
             <div className="att-today-card animate-slideUp">
-                <h3 style={{ fontWeight: "var(--font-semibold)", marginBottom: "var(--space-4)" }}>Today</h3>
-
-                <div className="att-today-row">
-                    <span className="att-today-label">🟢 Check In</span>
-                    <span className="att-today-value">{today.checkInTime || "--:--"}</span>
-                </div>
-                <div className="att-today-row">
-                    <span className="att-today-label">🔴 Check Out</span>
-                    <span className="att-today-value">{today.checkOutTime || "--:--"}</span>
-                </div>
-                <div className="att-today-row">
-                    <span className="att-today-label">📍 Location</span>
-                    <span className="att-today-value">{today.location || "—"}</span>
-                </div>
-                <div className="att-today-row">
-                    <span className="att-today-label">⏱️ Working Time</span>
-                    <span className="att-today-value" style={{ color: "var(--color-primary)", fontFamily: "var(--font-mono)" }}>
-                        {today.checkedIn ? formatElapsed(elapsed) : (today.totalMinutes ? `${(today.totalMinutes / 60).toFixed(1)}h` : "—")}
-                    </span>
-                </div>
-                <div className="att-today-row">
-                    <span className="att-today-label">🛡️ Verification</span>
-                    <span className="att-today-value">
-                        {today.verificationScore !== undefined && today.verificationScore !== null ? (
-                            <span className={`badge ${today.verificationScore >= 80 ? "badge-success" : today.verificationScore >= 50 ? "badge-warning" : "badge-danger"}`}>
-                                {today.verificationScore}/100
-                            </span>
-                        ) : "—"}
-                    </span>
-                </div>
-
-                <div style={{ marginTop: "var(--space-6)" }}>
-                    {today.checkedIn ? (
+                <h3 style={{ fontWeight: "var(--font-semibold)", marginBottom: "var(--space-4)", display: "flex", alignItems: "center", gap: 8 }}>
+                    {selectedLabel}
+                    {!isShowingToday && (
                         <button
-                            className="btn btn-danger btn-full"
-                            onClick={handleCheckOut}
-                            disabled={actionLoading}
+                            onClick={() => setSelectedDate(null)}
+                            style={{
+                                background: "none", border: "none", cursor: "pointer",
+                                color: "var(--color-primary)", fontSize: "var(--text-xs)",
+                                padding: "2px 8px", borderRadius: 6,
+                                backgroundColor: "var(--color-primary-light, rgba(99,102,241,0.1))",
+                            }}
                         >
-                            {actionLoading ? <><span className="spinner" /> Checking out...</> : "Check Out"}
-                        </button>
-                    ) : (
-                        <button
-                            className="btn btn-primary btn-full"
-                            onClick={handleCheckIn}
-                            disabled={actionLoading}
-                        >
-                            {actionLoading ? <><span className="spinner" /> Checking in...</> : "Check In"}
+                            ← Back to Today
                         </button>
                     )}
-                </div>
+                </h3>
+
+                {isShowingToday ? (
+                    <>
+                        {/* Today's live data */}
+                        <div className="att-today-row">
+                            <span className="att-today-label">🟢 Check In</span>
+                            <span className="att-today-value">{today.checkInTime || "--:--"}</span>
+                        </div>
+                        <div className="att-today-row">
+                            <span className="att-today-label">🔴 Check Out</span>
+                            <span className="att-today-value">{today.checkOutTime || "--:--"}</span>
+                        </div>
+                        <div className="att-today-row">
+                            <span className="att-today-label">📍 Location</span>
+                            <span className="att-today-value">{today.location || "—"}</span>
+                        </div>
+                        <div className="att-today-row">
+                            <span className="att-today-label">⏱️ Working Time</span>
+                            <span className="att-today-value" style={{ color: "var(--color-primary)", fontFamily: "var(--font-mono)" }}>
+                                {today.checkedIn ? formatElapsed(elapsed) : (today.totalMinutes ? `${(today.totalMinutes / 60).toFixed(1)}h` : "—")}
+                            </span>
+                        </div>
+                        <div className="att-today-row">
+                            <span className="att-today-label">🛡️ Verification</span>
+                            <span className="att-today-value">
+                                {today.verificationScore !== undefined && today.verificationScore !== null ? (
+                                    <span className={`badge ${today.verificationScore >= 80 ? "badge-success" : today.verificationScore >= 50 ? "badge-warning" : "badge-danger"}`}>
+                                        {today.verificationScore}/100
+                                    </span>
+                                ) : "—"}
+                            </span>
+                        </div>
+
+                        <div style={{ marginTop: "var(--space-6)" }}>
+                            {today.checkedIn ? (
+                                <button className="btn btn-danger btn-full" onClick={handleCheckOut} disabled={actionLoading}>
+                                    {actionLoading ? <><span className="spinner" /> Checking out...</> : "Check Out"}
+                                </button>
+                            ) : (
+                                <button className="btn btn-primary btn-full" onClick={handleCheckIn} disabled={actionLoading}>
+                                    {actionLoading ? <><span className="spinner" /> Checking in...</> : "Check In"}
+                                </button>
+                            )}
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        {/* Selected past day data */}
+                        {selectedCalDay ? (
+                            <>
+                                <div className="att-today-row">
+                                    <span className="att-today-label">📋 Status</span>
+                                    <span className="att-today-value">
+                                        <span className={`badge ${selectedCalDay.status === "PRESENT" || selectedCalDay.status === "VERIFIED" || selectedCalDay.status === "REGULARIZED" ? "badge-success" :
+                                                selectedCalDay.status === "ABSENT" ? "badge-danger" :
+                                                    selectedCalDay.status === "LEAVE" ? "badge-warning" :
+                                                        selectedCalDay.status === "WEEKEND" ? "badge-warning" : ""
+                                            }`}>
+                                            {selectedCalDay.status}
+                                        </span>
+                                    </span>
+                                </div>
+                                <div className="att-today-row">
+                                    <span className="att-today-label">🟢 Check In</span>
+                                    <span className="att-today-value">{formatTime(selectedCalDay.checkInAt)}</span>
+                                </div>
+                                <div className="att-today-row">
+                                    <span className="att-today-label">🔴 Check Out</span>
+                                    <span className="att-today-value">{formatTime(selectedCalDay.checkOutAt)}</span>
+                                </div>
+                                <div className="att-today-row">
+                                    <span className="att-today-label">⏱️ Working Time</span>
+                                    <span className="att-today-value" style={{ color: "var(--color-primary)", fontFamily: "var(--font-mono)" }}>
+                                        {selectedCalDay.totalHours != null ? `${selectedCalDay.totalHours.toFixed(1)}h` : "—"}
+                                    </span>
+                                </div>
+                                {selectedCalDay.overtimeHours != null && selectedCalDay.overtimeHours > 0 && (
+                                    <div className="att-today-row">
+                                        <span className="att-today-label">⚡ Overtime</span>
+                                        <span className="att-today-value" style={{ color: "#f59e0b" }}>
+                                            {selectedCalDay.overtimeHours.toFixed(1)}h
+                                        </span>
+                                    </div>
+                                )}
+                                {selectedCalDay.verificationScore != null && (
+                                    <div className="att-today-row">
+                                        <span className="att-today-label">🛡️ Verification</span>
+                                        <span className="att-today-value">
+                                            <span className={`badge ${selectedCalDay.verificationScore >= 80 ? "badge-success" : selectedCalDay.verificationScore >= 50 ? "badge-warning" : "badge-danger"}`}>
+                                                {selectedCalDay.verificationScore}/100
+                                            </span>
+                                        </span>
+                                    </div>
+                                )}
+                                {selectedCalDay.checkInMethod && (
+                                    <div className="att-today-row">
+                                        <span className="att-today-label">📱 Method</span>
+                                        <span className="att-today-value">{selectedCalDay.checkInMethod}</span>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <div style={{ textAlign: "center", padding: "var(--space-6)", color: "var(--text-secondary)" }}>
+                                <div style={{ fontSize: "2rem", marginBottom: 8 }}>📋</div>
+                                No attendance record for this day
+                            </div>
+                        )}
+                    </>
+                )}
             </div>
 
             {/* Summary */}
             <div className="att-summary">
-                <span>Present: <strong>—</strong></span>
-                <span>Late: <strong>—</strong></span>
-                <span>Overtime: <strong>—</strong></span>
+                <span>Present: <strong>{summary?.totalPresent ?? "—"}</strong></span>
+                <span>Hours: <strong>{summary?.totalHours ? `${summary.totalHours.toFixed(1)}h` : "—"}</strong></span>
+                <span>Overtime: <strong>{summary?.totalOvertime ? `${summary.totalOvertime.toFixed(1)}h` : "—"}</strong></span>
             </div>
         </div>
     );
