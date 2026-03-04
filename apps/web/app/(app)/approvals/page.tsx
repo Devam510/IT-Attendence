@@ -61,13 +61,24 @@ export default function ApprovalsPage() {
 
     async function handleAction(id: string, action: "approved" | "rejected") {
         setActionLoading(id);
+        // Try respond workflow first, fall back to direct leave update
         const res = await apiPost("/api/approvals/respond", {
-            leaveId: id,
+            workflowId: id,
             action,
             comment: comment[id] || "",
         });
         if (res.data) {
             setItems(prev => prev.filter(i => i.id !== id));
+        } else {
+            // Fallback: direct leave status update
+            const res2 = await apiPost("/api/leaves/respond", {
+                leaveId: id,
+                action,
+                comment: comment[id] || "",
+            });
+            if (res2.data) {
+                setItems(prev => prev.filter(i => i.id !== id));
+            }
         }
         setActionLoading(null);
     }
