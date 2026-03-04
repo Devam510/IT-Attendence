@@ -37,33 +37,34 @@ async function handleCheckOut(
         return error("NO_CHECKIN", "No active check-in found for today", 404);
     }
 
-    // ── Device session verification ──────────────────────────────
-    // Retrieve stored session token and device info from anomalyFlags
+    // ── Strict device session verification ──────────────────────
     const flags = record.anomalyFlags as Record<string, string> | null;
     const storedToken = flags?.sessionToken;
 
-    if (storedToken && sessionToken) {
-        // Both tokens present — enforce match
-        if (sessionToken !== storedToken) {
-            const checkInDevice = flags?.checkInDevice || "another device";
-            logger.warn({
-                userId: auth.sub,
-                recordId: record.id,
-                expected: storedToken.slice(0, 8) + "...",
-                received: sessionToken.slice(0, 8) + "...",
-            }, "Checkout device mismatch — possible buddy checkout attempt");
-
-            return error(
-                "DEVICE_MISMATCH",
-                `You must check out from the same device used for check-in (${checkInDevice}). This incident has been logged.`,
-                403,
-                { checkInDevice }
-            );
-        }
+    // Token is REQUIRED — no token = rejected regardless
+    if (!sessionToken) {
+        return error(
+            "SESSION_TOKEN_REQUIRED",
+            "Check-out must be done from the same device used for check-in. Please use the device you checked in with.",
+            403
+        );
     }
-    // If sessionToken is missing (older records or first deploy), allow but log warning
-    if (storedToken && !sessionToken) {
-        logger.warn({ userId: auth.sub, recordId: record.id }, "Checkout without session token — consider enforcing on client");
+
+    if (storedToken && sessionToken !== storedToken) {
+        const checkInDevice = flags?.checkInDevice || "another device";
+        logger.warn({
+            userId: auth.sub,
+            recordId: record.id,
+            expected: storedToken.slice(0, 8) + "...",
+            received: sessionToken.slice(0, 8) + "...",
+        }, "Checkout device mismatch — buddy checkout attempt blocked");
+
+        return error(
+            "DEVICE_MISMATCH",
+            `You must check out from the same device used for check-in (${checkInDevice}). This incident has been logged.`,
+            403,
+            { checkInDevice }
+        );
     }
 
     // ── Capture checkout device info ─────────────────────────────
