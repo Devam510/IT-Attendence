@@ -54,8 +54,9 @@ async function handleHistory(
     for (let day = 1; day <= daysInMonth; day++) {
         const dateStr = `${month}-${String(day).padStart(2, "0")}`;
         const dayRecords = records.filter((r: AttendanceRecord) => {
-            const d = new Date(r.date);
-            return d.getDate() === day;
+            // date is stored as IST calendar date at UTC midnight (2026-03-05T00:00Z)
+            // so getUTCDate() returns the correct IST day
+            return new Date(r.date).getUTCDate() === day;
         });
 
         if (dayRecords.length > 0) {
@@ -72,11 +73,13 @@ async function handleHistory(
                 hasAnomaly: rec.anomalyFlags != null,
             });
         } else {
-            const dayDate = new Date(year, mon - 1, day);
-            const isWeekend = dayDate.getDay() === 0 || dayDate.getDay() === 6;
-            const todayMidnight = new Date();
-            todayMidnight.setHours(0, 0, 0, 0);
-            const isPast = dayDate < todayMidnight;
+            const dayDate = new Date(Date.UTC(year, mon - 1, day)); // treat as UTC date
+            const isWeekend = dayDate.getUTCDay() === 0 || dayDate.getUTCDay() === 6;
+            // IST today: shift now by +5:30, get the UTC date components
+            const istOffsetMs = 5.5 * 60 * 60 * 1000;
+            const nowIstDate = new Date(Date.now() + istOffsetMs);
+            const istTodayUtc = new Date(Date.UTC(nowIstDate.getUTCFullYear(), nowIstDate.getUTCMonth(), nowIstDate.getUTCDate()));
+            const isPast = dayDate < istTodayUtc;
             calendar.push({
                 date: dateStr,
                 status: isWeekend ? "WEEKEND" : (isPast ? "ABSENT" : "UPCOMING"),

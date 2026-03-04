@@ -96,7 +96,9 @@ async function handleCheckIn(
     const record = await prisma.attendanceRecord.create({
         data: {
             userId: auth.sub,
-            date: todayStart,
+            // Store date as "IST calendar date at UTC midnight" e.g. 2026-03-05T00:00:00Z
+            // This ensures history route's .getDate() returns the IST day (5), not UTC day (4)
+            date: new Date(`${nowIst.toISOString().split("T")[0]}T00:00:00.000Z`),
             locationId: user.locationId!,
             checkInAt: now,
             checkInLat: lat,
