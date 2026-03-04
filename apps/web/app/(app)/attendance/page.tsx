@@ -91,21 +91,25 @@ export default function AttendancePage() {
                 });
             });
 
-            const res = await apiPost("/api/attendance/checkin", {
+            const res = await apiPost<{ sessionToken?: string; officeName?: string }>("/api/attendance/checkin", {
                 lat: position.coords.latitude,
                 lng: position.coords.longitude,
             });
 
             if (res.data) {
+                // Store session token — required for checkout device verification
+                if (res.data.sessionToken) {
+                    localStorage.setItem("nexus-checkin-token", res.data.sessionToken);
+                }
                 setToday(prev => ({
                     ...prev,
                     checkedIn: true,
                     checkInTime: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
                     totalMinutes: 0,
                 }));
-                setToast({ message: "✅ Checked in successfully!", type: "success" });
+                setToast({ message: `✅ Checked in at ${res.data.officeName || "office"}!`, type: "success" });
             } else {
-                // Show the geofence error from backend
+                // Show the geofence or other error from backend
                 setToast({ message: res.error || "Check-in failed", type: "error" });
             }
         } catch (err: any) {
@@ -125,8 +129,11 @@ export default function AttendancePage() {
     const handleCheckOut = useCallback(async () => {
         setActionLoading(true);
         setToast(null);
-        const res = await apiPost("/api/attendance/checkout", {});
+        // Retrieve the session token stored at check-in time
+        const sessionToken = localStorage.getItem("nexus-checkin-token") || undefined;
+        const res = await apiPost("/api/attendance/checkout", { sessionToken });
         if (res.data) {
+            localStorage.removeItem("nexus-checkin-token");
             setToday(prev => ({
                 ...prev,
                 checkedIn: false,

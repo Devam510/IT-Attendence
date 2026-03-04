@@ -1,5 +1,5 @@
 // NEXUS — POST /api/attendance/checkin
-// Web-friendly check-in with geofence enforcement (no device required)
+// Geofence-enforced check-in with device session token to prevent buddy check-out
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@nexus/db";
@@ -64,7 +64,7 @@ async function handleCheckIn(
 
     // 3. Geofence check — must be within office radius
     const distanceM = haversineM(lat, lng, office.latitude, office.longitude);
-    const maxRadius = office.radiusM || 500; // default 500m if not set
+    const maxRadius = office.radiusM || 500;
 
     if (distanceM > maxRadius) {
         return error("GEOFENCE_FAILED",
@@ -74,7 +74,19 @@ async function handleCheckIn(
         );
     }
 
-    // 4. Create attendance record
+    // 4. Generate unique session token for this check-in (device binding)
+    const sessionToken = crypto.randomUUID();
+
+    // Capture device info from request headers
+    const userAgent = req.headers.get("user-agent") || "Unknown device";
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+        || req.headers.get("x-real-ip")
+        || "Unknown IP";
+
+    // Detect device type from user agent
+    const deviceType = /mobile|android|iphone|ipad/i.test(userAgent) ? "Mobile" : "Desktop/Browser";
+
+    // 5. Create attendance record — store session token + device info in anomalyFlags JSON
     const record = await prisma.attendanceRecord.create({
         data: {
             userId: auth.sub,
@@ -86,10 +98,23 @@ async function handleCheckIn(
             checkInMethod: "GEO_BIO",
             verificationScore: Math.max(0, 100 - Math.round(distanceM / maxRadius * 50)),
             status: "VERIFIED",
+            // Use anomalyFlags JSON to store session token + device info (no schema change needed)
+            anomalyFlags: JSON.parse(JSON.stringify({
+                sessionToken,
+                checkInDevice: deviceType,
+                checkInUserAgent: userAgent,
+                checkInIp: ip,
+            })),
         },
     });
 
-    logger.info({ userId: auth.sub, recordId: record.id, distanceM: Math.round(distanceM) }, "Check-in recorded");
+    logger.info({
+        userId: auth.sub,
+        recordId: record.id,
+        distanceM: Math.round(distanceM),
+        device: deviceType,
+        ip,
+    }, "Check-in recorded");
 
     return success({
         recordId: record.id,
@@ -97,6 +122,9 @@ async function handleCheckIn(
         checkInAt: now.toISOString(),
         distanceM: Math.round(distanceM),
         officeName: office.name,
+        // Return session token — client must store this and send on check-out
+        sessionToken,
+        deviceInfo: { type: deviceType, ip },
     }, 201);
 }
 
