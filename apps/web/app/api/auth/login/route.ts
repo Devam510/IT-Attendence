@@ -10,8 +10,8 @@ import { logAuditEvent } from "@/lib/audit";
 import { verifyTotp } from "@/lib/mfa";
 import { success, error, withErrorHandler, logger } from "@/lib/errors";
 
-function hashPassword(password: string, salt: string): string {
-    return createHash("sha256").update(`${salt}:${password}`).digest("hex");
+function hashPassword(password: string): string {
+    return createHash("sha256").update(password).digest("hex");
 }
 
 async function handleLogin(req: NextRequest): Promise<NextResponse> {
@@ -65,7 +65,7 @@ async function handleLogin(req: NextRequest): Promise<NextResponse> {
     // SECURITY: If passwordHash is null (first login / SSO-only user),
     // set the hash from the provided password (first-time password setup).
     // In production, this would be a separate /set-password endpoint.
-    const expectedHash = hashPassword(password, user.id);
+    const expectedHash = hashPassword(password);
     if (!user.passwordHash) {
         // First login: set the password hash
         await prisma.user.update({

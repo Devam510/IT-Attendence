@@ -1,29 +1,37 @@
 // NEXUS — Redis Client
 // Used for: session store, rate limiting, QR nonces, caching
+// Gracefully degrades when Redis is unavailable (e.g. Vercel)
 
 import { createClient, type RedisClientType } from "redis";
 
 let redisClient: RedisClientType | null = null;
+let redisAvailable = true;
 
-export async function getRedis(): Promise<RedisClientType> {
+export async function getRedis(): Promise<RedisClientType | null> {
+    if (!redisAvailable) return null;
+
     if (redisClient && redisClient.isOpen) {
         return redisClient;
     }
 
-    redisClient = createClient({
-        url: process.env.REDIS_URL || "redis://localhost:6379",
-    });
+    try {
+        redisClient = createClient({
+            url: process.env.REDIS_URL || "redis://localhost:6379",
+        });
 
-    redisClient.on("error", (err) => {
-        console.error("[Redis] Connection error:", err);
-    });
+        redisClient.on("error", (err) => {
+            console.error("[Redis] Connection error:", err.message);
+            redisAvailable = false;
+        });
 
-    redisClient.on("connect", () => {
+        await redisClient.connect();
         console.log("[Redis] Connected");
-    });
-
-    await redisClient.connect();
-    return redisClient;
+        return redisClient;
+    } catch {
+        console.warn("[Redis] Not available — running without Redis");
+        redisAvailable = false;
+        return null;
+    }
 }
 
 // ─── Session Helpers ────────────────────────────────────
@@ -35,6 +43,7 @@ export async function setSession(
     ttlSeconds: number = 7 * 24 * 60 * 60 // 7 days
 ): Promise<void> {
     const redis = await getRedis();
+    if (!redis) return; // Skip if Redis unavailable
     const key = `session:${userId}:${deviceId}`;
     await redis.set(key, JSON.stringify(data), { EX: ttlSeconds });
 }
@@ -44,6 +53,7 @@ export async function getSession(
     deviceId: string
 ): Promise<Record<string, unknown> | null> {
     const redis = await getRedis();
+    if (!redis) return null;
     const key = `session:${userId}:${deviceId}`;
     const raw = await redis.get(key);
     return raw ? JSON.parse(raw) : null;
@@ -54,6 +64,7 @@ export async function deleteSession(
     deviceId: string
 ): Promise<void> {
     const redis = await getRedis();
+    if (!redis) return;
     await redis.del(`session:${userId}:${deviceId}`);
 }
 
@@ -65,6 +76,11 @@ export async function checkRateLimit(
     windowSeconds: number
 ): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
     const redis = await getRedis();
+    if (!redis) {
+        // No Redis = no rate limiting, always allow
+        return { allowed: true, remaining: maxRequests, resetAt: 0 };
+    }
+
     const now = Math.floor(Date.now() / 1000);
     const windowKey = `rl:${key}:${Math.floor(now / windowSeconds)}`;
 
@@ -87,11 +103,13 @@ export async function checkRateLimit(
 
 export async function storeQrNonce(nonce: string, ttlSeconds: number = 60): Promise<void> {
     const redis = await getRedis();
+    if (!redis) return;
     await redis.set(`qr:nonce:${nonce}`, "1", { EX: ttlSeconds, NX: true });
 }
 
 export async function isQrNonceUsed(nonce: string): Promise<boolean> {
     const redis = await getRedis();
+    if (!redis) return false;
     const exists = await redis.exists(`qr:nonce:${nonce}`);
     return exists === 1;
 }
