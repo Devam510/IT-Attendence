@@ -18,11 +18,24 @@ interface AuditLog {
     details?: string;
 }
 
-interface AuditResponse {
-    logs: AuditLog[];
+// API returns this shape
+interface AuditApiEvent {
+    id: string;
+    timestamp: string;
+    actorId: string;
+    actorRole: string;
+    action: string;
+    resourceType: string;
+    resourceId: string;
+    ipAddress: string;
+    riskScore: number;
+    metadata: Record<string, unknown>;
+}
+
+interface AuditApiResponse {
+    events: AuditApiEvent[];
     total: number;
     page: number;
-    pageSize: number;
 }
 
 const PAGE_SIZE = 15;
@@ -39,27 +52,44 @@ export default function AdminAuditLogsPage() {
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
     const [loading, setLoading] = useState(true);
+    const [accessDenied, setAccessDenied] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true);
         const params = new URLSearchParams({
             page: String(page),
-            pageSize: String(PAGE_SIZE),
-            ...(search && { search }),
+            limit: String(PAGE_SIZE),
+            ...(search && { action: search }),
             ...(actionFilter !== "all" && { action: actionFilter }),
-            ...(startDate && { startDate }),
-            ...(endDate && { endDate }),
+            ...(startDate && { from: startDate }),
+            ...(endDate && { to: endDate }),
         });
-        const res = await apiGet<AuditResponse>(`/api/audit-logs?${params}`);
+        const res = await apiGet<AuditApiResponse>(`/api/audit-logs?${params}`);
         if (res.data) {
-            setLogs(res.data.logs || []);
+            // Map API shape → display shape
+            const mapped: AuditLog[] = (res.data.events || []).map((e: AuditApiEvent) => ({
+                id: e.id,
+                timestamp: e.timestamp,
+                userName: e.actorId || "System",
+                userEmail: e.actorRole || "",
+                action: e.action,
+                resource: e.resourceType + (e.resourceId ? ` (${e.resourceId.slice(0, 8)}…)` : ""),
+                ipAddress: e.ipAddress || "—",
+                status: (e.riskScore ?? 0) > 60 ? "failed" : "success",
+                details: JSON.stringify(e.metadata),
+            }));
+            setLogs(mapped);
             setTotal(res.data.total || 0);
+            setAccessDenied(false);
+        } else if (res.code === "FORBIDDEN") {
+            setAccessDenied(true);
         }
         setLoading(false);
     }, [page, search, actionFilter, startDate, endDate]);
 
     useEffect(() => { load(); }, [load]);
     useEffect(() => { setPage(1); }, [search, actionFilter, startDate, endDate]);
+
 
     function exportCSV() {
         const header = "Timestamp,User,Action,Resource,IP Address,Status";
@@ -73,6 +103,18 @@ export default function AdminAuditLogsPage() {
     }
 
     const totalPages = Math.ceil(total / PAGE_SIZE);
+
+    if (accessDenied) {
+        return (
+            <div style={{ textAlign: "center", padding: "80px 20px" }}>
+                <div style={{ fontSize: "3rem", marginBottom: 16 }}>🔒</div>
+                <h2 style={{ fontSize: "var(--text-xl)", fontWeight: "var(--font-bold)", marginBottom: 8 }}>Access Restricted</h2>
+                <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)" }}>
+                    Audit Logs are restricted to HR Admin and Super Admin roles.
+                </p>
+            </div>
+        );
+    }
 
     return (
         <div>
