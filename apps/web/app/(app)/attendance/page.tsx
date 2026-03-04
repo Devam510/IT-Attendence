@@ -29,7 +29,16 @@ export default function AttendancePage() {
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
     const [elapsed, setElapsed] = useState(0);
+    const [toast, setToast] = useState<{ message: string; type: "error" | "success" } | null>(null);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Auto-dismiss toast
+    useEffect(() => {
+        if (toast) {
+            const t = setTimeout(() => setToast(null), 5000);
+            return () => clearTimeout(t);
+        }
+    }, [toast]);
 
     // Load data
     useEffect(() => {
@@ -66,28 +75,67 @@ export default function AttendancePage() {
 
     const handleCheckIn = useCallback(async () => {
         setActionLoading(true);
-        const res = await apiPost("/api/attendance/checkin", {
-            latitude: 19.076,
-            longitude: 72.8777,
-            deviceId: "web-browser",
-        });
-        if (res.data) {
-            setToday(prev => ({
-                ...prev,
-                checkedIn: true,
-                checkInTime: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-                totalMinutes: 0,
-            }));
+        setToast(null);
+
+        // Get real browser location
+        try {
+            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error("Geolocation is not supported by your browser"));
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0,
+                });
+            });
+
+            const res = await apiPost("/api/attendance/checkin", {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+            });
+
+            if (res.data) {
+                setToday(prev => ({
+                    ...prev,
+                    checkedIn: true,
+                    checkInTime: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+                    totalMinutes: 0,
+                }));
+                setToast({ message: "✅ Checked in successfully!", type: "success" });
+            } else {
+                // Show the geofence error from backend
+                setToast({ message: res.error || "Check-in failed", type: "error" });
+            }
+        } catch (err: any) {
+            if (err.code === 1) {
+                setToast({ message: "📍 Location permission denied. Please enable location access to check in.", type: "error" });
+            } else if (err.code === 2) {
+                setToast({ message: "📍 Location unavailable. Please try again.", type: "error" });
+            } else if (err.code === 3) {
+                setToast({ message: "📍 Location request timed out. Please try again.", type: "error" });
+            } else {
+                setToast({ message: err.message || "Failed to get location", type: "error" });
+            }
         }
         setActionLoading(false);
     }, []);
 
     const handleCheckOut = useCallback(async () => {
         setActionLoading(true);
+        setToast(null);
         const res = await apiPost("/api/attendance/checkout", {});
         if (res.data) {
-            setToday(prev => ({ ...prev, checkedIn: false, checkOutTime: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) }));
+            setToday(prev => ({
+                ...prev,
+                checkedIn: false,
+                checkOutTime: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+            }));
             if (intervalRef.current) clearInterval(intervalRef.current);
+            setToast({ message: "✅ Checked out successfully!", type: "success" });
+        } else {
+            setToast({ message: res.error || "Check-out failed", type: "error" });
         }
         setActionLoading(false);
     }, []);
@@ -131,6 +179,31 @@ export default function AttendancePage() {
 
     return (
         <div>
+            {/* Toast Notification */}
+            {toast && (
+                <div
+                    style={{
+                        position: "fixed",
+                        top: 20,
+                        right: 20,
+                        zIndex: 9999,
+                        padding: "var(--space-4) var(--space-6)",
+                        borderRadius: "var(--radius-lg)",
+                        background: toast.type === "error" ? "#dc2626" : "#16a34a",
+                        color: "white",
+                        fontSize: "var(--text-sm)",
+                        fontWeight: "var(--font-medium)",
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.2)",
+                        maxWidth: 400,
+                        animation: "slideDown 0.3s ease-out",
+                        cursor: "pointer",
+                    }}
+                    onClick={() => setToast(null)}
+                >
+                    {toast.message}
+                </div>
+            )}
+
             {/* Header */}
             <div className="att-header">
                 <h1 style={{ fontSize: "var(--text-2xl)", fontWeight: "var(--font-bold)" }}>Attendance</h1>
@@ -151,22 +224,15 @@ export default function AttendancePage() {
                     {WEEKDAYS.map(d => (
                         <div key={d} className="att-calendar-header">{d}</div>
                     ))}
-
-                    {/* Empty cells before first day */}
                     {Array.from({ length: firstDay }).map((_, i) => (
                         <div key={`e${i}`} className="att-calendar-day empty" />
                     ))}
-
-                    {/* Day cells */}
                     {Array.from({ length: daysInMonth }).map((_, i) => {
                         const day = i + 1;
                         const isToday = day === todayDate && month === todayMonth && year === todayYear;
                         const dotClass = getDotClass(day);
                         return (
-                            <div
-                                key={day}
-                                className={`att-calendar-day ${isToday ? "today" : ""}`}
-                            >
+                            <div key={day} className={`att-calendar-day ${isToday ? "today" : ""}`}>
                                 {day}
                                 {dotClass && <span className={`att-dot ${dotClass}`} />}
                             </div>
@@ -200,7 +266,7 @@ export default function AttendancePage() {
                 <div className="att-today-row">
                     <span className="att-today-label">🛡️ Verification</span>
                     <span className="att-today-value">
-                        {today.verificationScore !== undefined ? (
+                        {today.verificationScore !== undefined && today.verificationScore !== null ? (
                             <span className={`badge ${today.verificationScore >= 80 ? "badge-success" : today.verificationScore >= 50 ? "badge-warning" : "badge-danger"}`}>
                                 {today.verificationScore}/100
                             </span>

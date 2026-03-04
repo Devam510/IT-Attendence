@@ -1,5 +1,5 @@
 // NEXUS — GET /api/attendance/today
-// Returns today's attendance status for the current user
+// Returns today's attendance status matching frontend TodayData interface
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@nexus/db";
@@ -28,27 +28,32 @@ async function handleToday(
         },
     });
 
-    if (!record) {
+    if (!record || !record.checkInAt) {
+        // Frontend expects: { checkedIn: boolean, ... }
         return success({
-            status: "NOT_CHECKED_IN",
-            record: null,
+            checkedIn: false,
+            checkInTime: null,
+            checkOutTime: null,
+            location: null,
+            verificationScore: null,
+            totalMinutes: null,
         });
     }
 
+    const now = new Date();
+    const checkedOut = !!record.checkOutAt;
+    const totalMs = checkedOut
+        ? record.checkOutAt!.getTime() - record.checkInAt.getTime()
+        : now.getTime() - record.checkInAt.getTime();
+    const totalMinutes = Math.floor(totalMs / 60000);
+
     return success({
-        status: record.checkOutAt ? "CHECKED_OUT" : (record.checkInAt ? "CHECKED_IN" : "NOT_CHECKED_IN"),
-        record: {
-            id: record.id,
-            checkInAt: record.checkInAt?.toISOString() || null,
-            checkOutAt: record.checkOutAt?.toISOString() || null,
-            checkInMethod: record.checkInMethod,
-            verificationScore: record.verificationScore,
-            locationName: record.location?.name,
-            status: record.status,
-            totalHours: record.totalHours,
-            overtimeHours: record.overtimeHours,
-            anomalyFlags: record.anomalyFlags,
-        },
+        checkedIn: !checkedOut, // still checked in (no checkout yet)
+        checkInTime: record.checkInAt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }),
+        checkOutTime: record.checkOutAt?.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) || null,
+        location: record.location?.name || null,
+        verificationScore: record.verificationScore,
+        totalMinutes,
     });
 }
 

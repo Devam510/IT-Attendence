@@ -39,11 +39,55 @@ export default function LeavesPage() {
         async function load() {
             setLoading(true);
             const [balRes, histRes] = await Promise.all([
-                apiGet<{ balance: LeaveBalance }>("/api/leaves/balance"),
-                apiGet<{ records: LeaveRecord[] }>("/api/leaves/history"),
+                apiGet<any>("/api/leaves/balance"),
+                apiGet<any>("/api/leaves/history"),
             ]);
-            if (balRes.data?.balance) setBalance(balRes.data.balance);
-            if (histRes.data?.records) setHistory(histRes.data.records);
+
+            // Map API balances array to frontend LeaveBalance object
+            if (balRes.data) {
+                const balArr = balRes.data.balances || balRes.data.balance || [];
+                const codeMap: Record<string, string> = { EL: "annual", SL: "sick", CL: "casual", CO: "comp" };
+                const nameMap: Record<string, string> = { "Annual Leave": "annual", "Earned Leave": "annual", "Sick Leave": "sick", "Casual Leave": "casual", "Comp Off": "comp" };
+
+                const mapped: Record<string, { remaining: number; total: number }> = {
+                    annual: { remaining: 0, total: 0 },
+                    sick: { remaining: 0, total: 0 },
+                    casual: { remaining: 0, total: 0 },
+                    comp: { remaining: 0, total: 0 },
+                };
+
+                if (Array.isArray(balArr)) {
+                    for (const b of balArr) {
+                        const key = codeMap[b.code] || nameMap[b.name] || b.code?.toLowerCase();
+                        if (key && mapped[key]) {
+                            mapped[key] = {
+                                remaining: b.available ?? (b.opening + b.accrued - b.used - b.pending),
+                                total: b.entitlement ?? b.opening ?? 0,
+                            };
+                        }
+                    }
+                } else if (typeof balArr === "object") {
+                    // Already in the right shape
+                    Object.assign(mapped, balArr);
+                }
+                setBalance(mapped as unknown as LeaveBalance);
+            }
+
+            // Map history response
+            if (histRes.data) {
+                const records = histRes.data.records || histRes.data || [];
+                if (Array.isArray(records)) {
+                    setHistory(records.map((r: any) => ({
+                        id: r.id,
+                        type: r.leaveType?.name?.toLowerCase() || r.type || "casual",
+                        startDate: r.startDate,
+                        endDate: r.endDate,
+                        days: r.days ?? 1,
+                        status: (r.status || "pending").toLowerCase() as "approved" | "pending" | "rejected",
+                        reason: r.reason,
+                    })));
+                }
+            }
             setLoading(false);
         }
         load();

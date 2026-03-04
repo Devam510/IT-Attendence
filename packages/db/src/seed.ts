@@ -47,11 +47,11 @@ async function main() {
     // ─── 2. Location ────────────────────────────────────
     const location = await prisma.location.create({
         data: {
-            name: "Nexus HQ - Mumbai",
-            address: "Bandra Kurla Complex, Mumbai, Maharashtra 400051",
-            latitude: 19.0596,
-            longitude: 72.8656,
-            radiusM: 200,
+            name: "Nexus HQ - Ahmedabad",
+            address: "SG Highway, Ahmedabad, Gujarat 380054",
+            latitude: 23.0225,
+            longitude: 72.5714,
+            radiusM: 5000,
             wifiBssids: ["AA:BB:CC:DD:EE:01", "AA:BB:CC:DD:EE:02"],
             entityId: entity.id,
         },

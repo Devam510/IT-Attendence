@@ -35,11 +35,34 @@ export default function DashboardPage() {
     useEffect(() => {
         async function load() {
             if (isManager) {
-                const res = await apiGet<ManagerData>("/api/dashboard/manager");
-                if (res.data) setManagerData(res.data);
+                const res = await apiGet<any>("/api/dashboard/manager");
+                if (res.data) {
+                    const d = res.data;
+                    setManagerData({
+                        present: d.teamSummary?.present ?? d.present ?? 0,
+                        onLeave: d.teamSummary?.onLeave ?? d.onLeave ?? 0,
+                        absent: d.teamSummary?.absent ?? d.absent ?? 0,
+                        remote: d.teamSummary?.remote ?? d.remote ?? 0,
+                        pendingApprovals: d.approvals?.pending ?? d.pendingApprovals ?? 0,
+                    });
+                }
             }
-            const res = await apiGet<DashboardData>("/api/dashboard/employee");
-            if (res.data) setData(res.data);
+            const res = await apiGet<any>("/api/dashboard/employee");
+            if (res.data) {
+                const d = res.data;
+                const todayInfo = d.today || {};
+                const checkedIn = todayInfo.status === "CHECKED_IN";
+                const checkInAt = todayInfo.checkInAt ? new Date(todayInfo.checkInAt) : null;
+                setData({
+                    checkedIn,
+                    checkInTime: checkInAt ? checkInAt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : undefined,
+                    workingHours: todayInfo.totalHours ?? 0,
+                    location: d.user?.department || undefined,
+                    pendingCount: d.pendingApprovals ?? 0,
+                    // Also handle direct flat shape if API already returns it
+                    ...(d.checkedIn !== undefined ? { checkedIn: d.checkedIn, checkInTime: d.checkInTime, workingHours: d.workingHours, location: d.location } : {}),
+                });
+            }
             setLoading(false);
         }
         load();

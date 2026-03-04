@@ -75,13 +75,36 @@ export default function ApplyLeavePage() {
         setError("");
         setSubmitting(true);
 
+        // First, look up the leaveTypeId from the balance API
+        const balRes = await apiGet<any>("/api/leaves/balance");
+        const codeMap: Record<string, string[]> = {
+            annual: ["EL", "AL"],
+            sick: ["SL"],
+            casual: ["CL"],
+            comp: ["CO"],
+        };
+        const validCodes = codeMap[formData.leaveType] || [formData.leaveType.toUpperCase()];
+        let leaveTypeId = "";
+
+        if (balRes.data?.balances) {
+            const match = balRes.data.balances.find((b: any) =>
+                validCodes.includes(b.code) || b.name?.toLowerCase().includes(formData.leaveType)
+            );
+            if (match) leaveTypeId = match.leaveTypeId;
+        }
+
+        if (!leaveTypeId) {
+            setError("Could not find leave type. Please try again.");
+            setSubmitting(false);
+            return;
+        }
+
         const res = await apiPost("/api/leaves/apply", {
-            leaveType: formData.leaveType,
+            leaveTypeId,
             startDate: formData.startDate,
             endDate: formData.endDate,
             reason: formData.reason,
-            halfDay: formData.halfDay,
-            halfDayPeriod: formData.halfDayPeriod,
+            halfDay: formData.halfDay ? (formData.halfDayPeriod === "am" ? "FIRST_HALF" : "SECOND_HALF") : "NONE",
         });
 
         if (res.data) {
