@@ -49,8 +49,8 @@ async function main() {
         data: {
             name: "Nexus HQ - Ahmedabad",
             address: "SG Highway, Ahmedabad, Gujarat 380054",
-            latitude: 23.0225,
-            longitude: 72.5714,
+            latitude: 23.007610,
+            longitude: 72.527308,
             radiusM: 100,
             wifiBssids: ["AA:BB:CC:DD:EE:01", "AA:BB:CC:DD:EE:02"],
             entityId: entity.id,
