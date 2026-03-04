@@ -1,12 +1,7 @@
 {
     "version": 2,
     "framework": "nextjs",
-    "buildCommand": "cd ../.. && npm run build --workspace=apps/web",
-    "outputDirectory": ".next",
-    "installCommand": "npm install",
-    "env": {
-        "NEXT_PUBLIC_APP_URL": "https://nexus.vercel.app"
-    },
+    "installCommand": "cd ../.. && npm install",
     "headers": [
         {
             "source": "/api/(.*)",
@@ -27,7 +22,6 @@
             ]
         }
     ],
-    "rewrites": [],
     "regions": [
         "bom1"
     ]
