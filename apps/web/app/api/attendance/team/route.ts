@@ -52,7 +52,8 @@ async function handleTeamView(
     });
 
     // Build team view
-    const recordMap = new Map(records.map((r) => [r.userId, r]));
+    type AttendanceRec = (typeof records)[number];
+    const recordMap = new Map<string, AttendanceRec>(records.map((r) => [r.userId, r]));
 
     const teamStatus = reports.map((member) => {
         const record = recordMap.get(member.id);

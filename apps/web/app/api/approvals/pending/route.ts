@@ -29,7 +29,7 @@ async function handlePending(
         where: { id: { in: requesterIds } },
         select: { id: true, fullName: true, employeeId: true, designation: true },
     });
-    const requesterMap = new Map(requesters.map((r: RequesterInfo) => [r.id, r]));
+    const requesterMap = new Map<string, RequesterInfo>(requesters.map((r: RequesterInfo) => [r.id, r]));
 
     const enriched = pending.map((p) => {
         const requester = requesterMap.get(p.requesterId);
