@@ -74,6 +74,7 @@ export default function SecurityPage() {
     const { user } = useAuth();
     const [data, setData] = useState<SecurityData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -81,7 +82,15 @@ export default function SecurityPage() {
         if (!silent) setLoading(true);
         else setRefreshing(true);
         const res = await apiGet<SecurityData>("/api/audit-logs?view=security&limit=20");
-        if (res.data) setData(res.data);
+        if (res.data) {
+            setData(res.data);
+            setError(null);
+        } else if (res.code === "FORBIDDEN") {
+            setError("Access denied. This page is restricted to HR and Admin roles.");
+        } else {
+            // Other API error — show empty state, don't crash
+            setError(null);
+        }
         setLoading(false);
         setRefreshing(false);
     }
@@ -99,12 +108,12 @@ export default function SecurityPage() {
     }
 
     const metrics = data?.metrics || {
-        riskScore: 42,
-        activeThreats: 3,
-        trustedDevices: 18,
-        failedLoginsToday: 7,
+        riskScore: 0,
+        activeThreats: 0,
+        trustedDevices: 0,
+        failedLoginsToday: 0,
     };
-    const events = (data?.events || []).sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
+    const events = [...(data?.events || [])].sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
     const anomalies = data?.anomalies || [];
 
     if (loading) {
@@ -114,6 +123,16 @@ export default function SecurityPage() {
                 <div className="security-grid">
                     {[1, 2, 3, 4].map(i => <div key={i} className="skeleton" style={{ height: 110, borderRadius: 12 }} />)}
                 </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div style={{ textAlign: "center", padding: "80px 20px" }}>
+                <div style={{ fontSize: "3rem", marginBottom: 16 }}>🔒</div>
+                <h2 style={{ fontSize: "var(--text-xl)", fontWeight: "var(--font-bold)", marginBottom: 8 }}>Access Restricted</h2>
+                <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)" }}>{error}</p>
             </div>
         );
     }

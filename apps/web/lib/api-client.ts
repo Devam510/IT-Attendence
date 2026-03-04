@@ -96,12 +96,14 @@ export async function api<T = unknown>(
             }
         }
 
-        const json = await res.json();
+        const json = await res.json().catch(() => ({}));
 
         if (!res.ok) {
+            // 403 = Forbidden (role-based) — return error to caller, never redirect
+            // 401 = handled above with token refresh
             return {
-                error: json.error?.message || json.message || "Request failed",
-                code: json.error?.code || "UNKNOWN",
+                error: json.error?.message || json.message || `Request failed (${res.status})`,
+                code: json.error?.code || (res.status === 403 ? "FORBIDDEN" : res.status === 401 ? "UNAUTHORIZED" : "UNKNOWN"),
             };
         }
 
