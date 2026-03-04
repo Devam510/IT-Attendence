@@ -61,37 +61,28 @@ export default function ApprovalsPage() {
 
     async function handleAction(id: string, action: "approved" | "rejected") {
         setActionLoading(id);
-        // Try respond workflow first, fall back to direct leave update
-        const res = await apiPost("/api/approvals/respond", {
-            workflowId: id,
+        // Use direct leave respond API — reliable, doesn't depend on workflow chain
+        const res = await apiPost("/api/leaves/respond", {
+            leaveId: id,
             action,
             comment: comment[id] || "",
         });
-        if (res.data) {
-            setItems(prev => prev.filter(i => i.id !== id));
-        } else {
-            // Fallback: direct leave status update
-            const res2 = await apiPost("/api/leaves/respond", {
-                leaveId: id,
-                action,
-                comment: comment[id] || "",
-            });
-            if (res2.data) {
-                setItems(prev => prev.filter(i => i.id !== id));
-            }
-        }
         setActionLoading(null);
+        // Always reload from server to reflect true DB state
+        await load();
     }
 
     async function handleBulkAction(action: "approved" | "rejected") {
         setActionLoading("bulk");
-        await apiPost("/api/approvals/bulk", {
-            ids: Array.from(selected),
-            action,
-        });
-        setItems(prev => prev.filter(i => !selected.has(i.id)));
+        // Process each one via the reliable direct API
+        await Promise.all(
+            Array.from(selected).map(id =>
+                apiPost("/api/leaves/respond", { leaveId: id, action, comment: "" })
+            )
+        );
         setSelected(new Set());
         setActionLoading(null);
+        await load();
     }
 
     function toggleSelect(id: string) {
@@ -166,32 +157,28 @@ export default function ApprovalsPage() {
                 </div>
             )}
 
-            {/* Filters */}
-            <div style={{ display: "flex", gap: "var(--space-4)", flexWrap: "wrap", marginBottom: "var(--space-5)" }}>
-                {/* Status filters */}
-                <div className="approval-filters">
-                    {(["pending", "approved", "rejected"] as FilterStatus[]).map(s => (
-                        <button
-                            key={s}
-                            className={`filter-chip ${filterStatus === s ? "active" : ""}`}
-                            onClick={() => setFilterStatus(s)}
-                        >
-                            {s === "pending" ? "⏳" : s === "approved" ? "✅" : "❌"} {s.charAt(0).toUpperCase() + s.slice(1)}
-                        </button>
-                    ))}
-                </div>
-                {/* Type filters */}
-                <div className="approval-filters">
-                    {(["all", "leave", "wfh", "overtime"] as FilterType[]).map(t => (
-                        <button
-                            key={t}
-                            className={`filter-chip ${filterType === t ? "active" : ""}`}
-                            onClick={() => setFilterType(t)}
-                        >
-                            {t === "all" ? "All Types" : TYPE_ICONS[t] + " " + t.toUpperCase()}
-                        </button>
-                    ))}
-                </div>
+            {/* Filters — single row with divider */}
+            <div className="approval-filters" style={{ marginBottom: "var(--space-5)", flexWrap: "wrap" }}>
+                {(["pending", "approved", "rejected"] as FilterStatus[]).map(s => (
+                    <button
+                        key={s}
+                        className={`filter-chip ${filterStatus === s ? "active" : ""}`}
+                        onClick={() => setFilterStatus(s)}
+                    >
+                        {s === "pending" ? "⏳" : s === "approved" ? "✅" : "❌"} {s.charAt(0).toUpperCase() + s.slice(1)}
+                    </button>
+                ))}
+                <span style={{ width: 1, height: 24, background: "var(--border-color, #e5e7eb)", alignSelf: "center" }} />
+                {(["all", "leave", "wfh", "overtime"] as FilterType[]).map(t => (
+                    <button
+                        key={t}
+                        className={`filter-chip ${filterType === t ? "active" : ""}`}
+                        onClick={() => setFilterType(t)}
+                        style={{ background: filterType === t ? "var(--color-secondary, #6366f1)" : undefined }}
+                    >
+                        {t === "all" ? "All Types" : TYPE_ICONS[t] + " " + t.toUpperCase()}
+                    </button>
+                ))}
             </div>
 
             {/* Cards */}

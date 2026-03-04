@@ -105,7 +105,7 @@ async function handleRespond(
     if (workflow) {
         await prisma.approvalWorkflow.update({
             where: { id: workflow.id },
-            data: { status: newStatus, comment: comment || undefined },
+            data: { status: newStatus },
         }).catch(() => { }); // non-critical
     }
 
