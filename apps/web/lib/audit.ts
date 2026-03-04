@@ -1,8 +1,8 @@
 // NEXUS — Audit Event Logger
 // Immutable event log with SHA-256 hash chain integrity
+// When Redis/BullMQ unavailable, writes directly to DB
 
 import { prisma } from "@nexus/db";
-import { publishAuditEvent, type NexusEvent } from "./queue";
 import { createHash } from "crypto";
 
 let lastHash: string | null = null;
@@ -49,42 +49,32 @@ export interface AuditInput {
 }
 
 export async function logAuditEvent(input: AuditInput): Promise<void> {
-    const eventJson = JSON.stringify(input);
-    const previousHash = await getLastHash();
-    const hashChain = computeHashChain(eventJson, previousHash);
-    lastHash = hashChain;
+    try {
+        const eventJson = JSON.stringify(input);
+        const previousHash = await getLastHash();
+        const hashChain = computeHashChain(eventJson, previousHash);
+        lastHash = hashChain;
 
-    const event: NexusEvent = {
-        type: `audit.${input.action}`,
-        actorId: input.actorId,
-        actorRole: input.actorRole,
-        resourceType: input.resourceType,
-        resourceId: input.resourceId,
-        data: { ...input, hashChain },
-        timestamp: new Date().toISOString(),
-    };
-
-    await publishAuditEvent(event);
-}
-
-// ─── Direct Write (for audit consumer) ──────────────────
-
-export async function writeAuditEvent(input: AuditInput & { hashChain: string }): Promise<void> {
-    await prisma.auditEvent.create({
-        data: {
-            actorId: input.actorId,
-            actorRole: input.actorRole,
-            action: input.action,
-            resourceType: input.resourceType,
-            resourceId: input.resourceId ?? null,
-            beforeState: input.beforeState ? JSON.parse(JSON.stringify(input.beforeState)) : undefined,
-            afterState: input.afterState ? JSON.parse(JSON.stringify(input.afterState)) : undefined,
-            ipAddress: input.ipAddress ?? null,
-            deviceId: input.deviceId ?? null,
-            geoLocation: input.geoLocation ? JSON.parse(JSON.stringify(input.geoLocation)) : undefined,
-            riskScore: input.riskScore ?? null,
-            hashChain: input.hashChain,
-            metadata: input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : undefined,
-        },
-    });
+        // Write directly to DB (no queue dependency)
+        await prisma.auditEvent.create({
+            data: {
+                actorId: input.actorId,
+                actorRole: input.actorRole,
+                action: input.action,
+                resourceType: input.resourceType,
+                resourceId: input.resourceId ?? null,
+                beforeState: input.beforeState ? JSON.parse(JSON.stringify(input.beforeState)) : undefined,
+                afterState: input.afterState ? JSON.parse(JSON.stringify(input.afterState)) : undefined,
+                ipAddress: input.ipAddress ?? null,
+                deviceId: input.deviceId ?? null,
+                geoLocation: input.geoLocation ? JSON.parse(JSON.stringify(input.geoLocation)) : undefined,
+                riskScore: input.riskScore ?? null,
+                hashChain,
+                metadata: input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : undefined,
+            },
+        });
+    } catch (err) {
+        // Never let audit logging break the main flow
+        console.error("[Audit] Failed to log event:", (err as Error).message);
+    }
 }
