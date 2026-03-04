@@ -13,6 +13,7 @@ interface ProfileData {
     department: string;
     role: string;
     employeeId: string;
+    designation?: string;
     manager?: string;
     joinDate: string;
     workLocation?: string;

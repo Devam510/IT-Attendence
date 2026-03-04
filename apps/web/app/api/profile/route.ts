@@ -41,18 +41,19 @@ async function handleGetProfile(
     return success({
         profile: {
             id: user.id,
-            employeeId: user.employeeId,
+            employeeId: user.employeeId || "—",
             email: user.email,
             fullName: user.fullName,
-            designation: user.designation,
+            designation: user.designation || "—",
             role: user.role,
             status: user.status,
-            dateOfJoining: user.dateOfJoining.toISOString().split("T")[0],
+            // Flatten nested objects → strings (profile page expects strings)
+            department: user.department?.name || "—",
+            workLocation: user.location?.name || "—",
+            manager: user.manager?.fullName || "—",
+            joinDate: user.dateOfJoining.toISOString().split("T")[0],
             mfaEnabled: user.mfaEnabled,
-            department: user.department,
-            entity: user.entity,
-            manager: user.manager,
-            location: user.location,
+            activeSessions: 1,
             memberSince: user.createdAt.toISOString(),
         },
     });
