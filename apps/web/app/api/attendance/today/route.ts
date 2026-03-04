@@ -13,10 +13,13 @@ async function handleToday(
 ): Promise<NextResponse> {
     const { auth } = context;
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const tomorrowStart = new Date(todayStart);
-    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+    // Calculate "today" in IST (UTC+5:30), not in server's UTC timezone
+    const nowUtc = new Date();
+    const istOffsetMs = 5.5 * 60 * 60 * 1000; // IST = UTC + 5:30
+    const nowIst = new Date(nowUtc.getTime() + istOffsetMs);
+    // IST midnight today
+    const todayStart = new Date(Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - istOffsetMs);
+    const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
     const record = await prisma.attendanceRecord.findFirst({
         where: {
@@ -47,10 +50,15 @@ async function handleToday(
         : now.getTime() - record.checkInAt.getTime();
     const totalMinutes = Math.floor(totalMs / 60000);
 
+    // Format times in IST (server runs in UTC on Vercel, so we must specify timezone)
+    const timeOpts: Intl.DateTimeFormatOptions = {
+        hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata",
+    };
+
     return success({
         checkedIn: !checkedOut, // still checked in (no checkout yet)
-        checkInTime: record.checkInAt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }),
-        checkOutTime: record.checkOutAt?.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) || null,
+        checkInTime: record.checkInAt.toLocaleTimeString("en-US", timeOpts),
+        checkOutTime: record.checkOutAt?.toLocaleTimeString("en-US", timeOpts) || null,
         location: record.location?.name || null,
         verificationScore: record.verificationScore,
         totalMinutes,
