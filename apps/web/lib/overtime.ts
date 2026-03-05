@@ -1,4 +1,4 @@
-// NEXUS — Shift & Overtime Rules Engine
+// Vibe Tech Labs — Shift & Overtime Rules Engine
 // Jurisdiction-aware overtime calculation with configurable shift definitions
 
 export interface ShiftDefinition {

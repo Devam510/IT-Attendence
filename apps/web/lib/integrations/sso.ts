@@ -1,4 +1,4 @@
-// NEXUS — SSO Adapter (SAML 2.0 / OIDC)
+// Vibe Tech Labs — SSO Adapter (SAML 2.0 / OIDC)
 // Pluggable identity provider integration
 
 // ─── Types ──────────────────────────────────────────────

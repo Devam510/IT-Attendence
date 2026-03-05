@@ -1,4 +1,4 @@
-// NEXUS — Anomaly Detection Engine
+// Vibe Tech Labs — Anomaly Detection Engine
 // Flags impossible travel, pattern deviations, and suspicious check-ins
 
 import { haversineDistance } from "./geofence";

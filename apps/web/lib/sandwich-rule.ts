@@ -1,4 +1,4 @@
-// NEXUS — Sandwich Rule Checker
+// Vibe Tech Labs — Sandwich Rule Checker
 // Detects "sandwich" leaves (leave around weekends/holidays)
 // Example: Friday leave + Monday leave = 4 days total (Fri + Sat + Sun + Mon)
 

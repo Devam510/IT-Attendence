@@ -1,4 +1,4 @@
-// NEXUS — POST /api/admin/gdpr/erase
+// Vibe Tech Labs — POST /api/admin/gdpr/erase
 // Execute GDPR right-to-erasure for a user
 
 import { NextRequest, NextResponse } from "next/server";

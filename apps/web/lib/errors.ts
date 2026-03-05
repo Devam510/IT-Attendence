@@ -1,4 +1,4 @@
-// NEXUS — API Error Handler & Response Helpers
+// Vibe Tech Labs — API Error Handler & Response Helpers
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";

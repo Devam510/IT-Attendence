@@ -1,4 +1,4 @@
-// NEXUS — Geofence Engine
+// Vibe Tech Labs — Geofence Engine
 // Point-in-polygon, accuracy gate, altitude, Wi-Fi, mock location detection
 // Produces a composite location confidence score (0–100)
 

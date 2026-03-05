@@ -1,4 +1,4 @@
-// NEXUS — Device Trust Score Calculator
+// Vibe Tech Labs — Device Trust Score Calculator
 // Computes a 0–100 trust score based on device security posture
 
 export interface DeviceTrustInput {

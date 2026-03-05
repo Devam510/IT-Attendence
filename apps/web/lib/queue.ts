@@ -1,4 +1,4 @@
-// NEXUS — Event Queue
+// Vibe Tech Labs — Event Queue
 // Gracefully degrades without Redis (e.g. on Vercel)
 // When Redis unavailable, events are written directly to DB
 

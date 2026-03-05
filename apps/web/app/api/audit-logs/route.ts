@@ -1,4 +1,4 @@
-// NEXUS — GET /api/audit-logs
+// Vibe Tech Labs — GET /api/audit-logs
 // Filterable, exportable audit log query API
 
 import { NextRequest, NextResponse } from "next/server";

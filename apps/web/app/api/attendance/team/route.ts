@@ -1,4 +1,4 @@
-// NEXUS — GET /api/attendance/team
+// Vibe Tech Labs — GET /api/attendance/team
 // Manager-scoped team attendance view for today
 
 import { NextRequest, NextResponse } from "next/server";

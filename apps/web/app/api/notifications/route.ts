@@ -1,4 +1,4 @@
-// NEXUS — GET /api/notifications
+// Vibe Tech Labs — GET /api/notifications
 // Returns paginated notifications for the current user
 
 import { NextRequest, NextResponse } from "next/server";

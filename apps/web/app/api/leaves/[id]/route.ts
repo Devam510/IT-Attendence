@@ -1,4 +1,4 @@
-// NEXUS — DELETE /api/leaves/[id]
+// Vibe Tech Labs — DELETE /api/leaves/[id]
 // Cancel a pending leave request and release reserved balance
 
 import { NextRequest, NextResponse } from "next/server";

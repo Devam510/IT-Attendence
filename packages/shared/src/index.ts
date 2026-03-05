@@ -1,4 +1,4 @@
-// NEXUS Shared — Zod Validation Schemas
+// Vibe Tech Labs Shared — Zod Validation Schemas
 // Used across web API routes for request/response validation
 
 import { z } from "zod";

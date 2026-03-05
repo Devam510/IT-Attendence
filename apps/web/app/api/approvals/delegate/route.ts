@@ -1,4 +1,4 @@
-// NEXUS — POST /api/approvals/delegate
+// Vibe Tech Labs — POST /api/approvals/delegate
 // Delegate current approval step to another user
 
 import { NextRequest, NextResponse } from "next/server";

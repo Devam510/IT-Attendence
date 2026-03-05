@@ -1,4 +1,4 @@
-// NEXUS — POST /api/auth/device/register
+// Vibe Tech Labs — POST /api/auth/device/register
 // Registers a mobile device and calculates trust score
 
 import { NextRequest, NextResponse } from "next/server";

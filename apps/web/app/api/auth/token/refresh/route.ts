@@ -1,4 +1,4 @@
-// NEXUS — POST /api/auth/token/refresh
+// Vibe Tech Labs — POST /api/auth/token/refresh
 // Rotates access token using a valid refresh token
 
 import { NextRequest, NextResponse } from "next/server";

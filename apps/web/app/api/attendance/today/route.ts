@@ -1,4 +1,4 @@
-// NEXUS — GET /api/attendance/today
+// Vibe Tech Labs — GET /api/attendance/today
 // Returns today's attendance status matching frontend TodayData interface
 
 import { NextRequest, NextResponse } from "next/server";

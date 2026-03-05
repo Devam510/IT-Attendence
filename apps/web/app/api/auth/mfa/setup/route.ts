@@ -1,5 +1,5 @@
-// NEXUS — POST /api/auth/mfa/setup — Start MFA enrollment
-// NEXUS — DELETE /api/auth/mfa/setup — Disable MFA
+// Vibe Tech Labs — POST /api/auth/mfa/setup — Start MFA enrollment
+// Vibe Tech Labs — DELETE /api/auth/mfa/setup — Disable MFA
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@nexus/db";

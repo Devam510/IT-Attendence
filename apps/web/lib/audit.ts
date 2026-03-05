@@ -1,4 +1,4 @@
-// NEXUS — Audit Event Logger
+// Vibe Tech Labs — Audit Event Logger
 // Immutable event log with SHA-256 hash chain integrity
 // When Redis/BullMQ unavailable, writes directly to DB
 

@@ -1,4 +1,4 @@
-// NEXUS — GET /api/dashboard/employee
+// Vibe Tech Labs — GET /api/dashboard/employee
 // Comprehensive employee dashboard with attendance, leaves, and notifications
 
 import { NextRequest, NextResponse } from "next/server";

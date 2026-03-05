@@ -1,4 +1,4 @@
-// NEXUS — GET /api/ai/insights
+// Vibe Tech Labs — GET /api/ai/insights
 // AI-powered insights endpoint: anomaly detection, burnout risk, demand forecast
 
 import { NextRequest, NextResponse } from "next/server";

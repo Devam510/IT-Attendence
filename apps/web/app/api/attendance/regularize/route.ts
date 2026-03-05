@@ -1,4 +1,4 @@
-// NEXUS — POST /api/attendance/regularize
+// Vibe Tech Labs — POST /api/attendance/regularize
 // Allows employees to request regularization for missed/incorrect check-ins
 // Creates an ApprovalWorkflow entry
 

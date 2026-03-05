@@ -1,4 +1,4 @@
-// NEXUS — API Client
+// Vibe Tech Labs — API Client
 // Fetch wrapper with auto-auth, error handling, and token refresh
 
 const BASE_URL = typeof window !== "undefined" ? "" : (process.env.NEXT_PUBLIC_APP_URL || "");

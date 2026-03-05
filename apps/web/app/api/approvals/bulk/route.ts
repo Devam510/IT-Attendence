@@ -1,4 +1,4 @@
-// NEXUS — POST /api/approvals/bulk
+// Vibe Tech Labs — POST /api/approvals/bulk
 // Bulk approve or reject multiple workflows
 
 import { NextRequest, NextResponse } from "next/server";

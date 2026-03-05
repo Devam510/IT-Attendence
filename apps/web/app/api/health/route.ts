@@ -1,4 +1,4 @@
-// NEXUS — Health Check Endpoint
+// Vibe Tech Labs — Health Check Endpoint
 // GET /api/health → 200 OK with service status
 
 import { NextResponse } from "next/server";

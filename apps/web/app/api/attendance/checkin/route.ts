@@ -1,4 +1,4 @@
-// NEXUS — POST /api/attendance/checkin
+// Vibe Tech Labs — POST /api/attendance/checkin
 // Geofence-enforced check-in with device session token to prevent buddy check-out
 
 import { NextRequest, NextResponse } from "next/server";

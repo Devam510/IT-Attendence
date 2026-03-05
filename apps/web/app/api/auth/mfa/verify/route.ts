@@ -1,4 +1,4 @@
-// NEXUS — POST /api/auth/mfa/verify — Confirm MFA enrollment
+// Vibe Tech Labs — POST /api/auth/mfa/verify — Confirm MFA enrollment
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@nexus/db";

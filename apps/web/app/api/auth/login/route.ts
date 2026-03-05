@@ -1,4 +1,4 @@
-// NEXUS — POST /api/auth/login
+// Vibe Tech Labs — POST /api/auth/login
 // Authenticates user via email/password, returns JWT pair
 
 import { NextRequest, NextResponse } from "next/server";

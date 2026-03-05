@@ -1,4 +1,4 @@
-// NEXUS — GET /api/leaves/team-calendar
+// Vibe Tech Labs — GET /api/leaves/team-calendar
 // Manager view of team leave calendar
 
 import { NextRequest, NextResponse } from "next/server";

@@ -1,4 +1,4 @@
-// NEXUS — Integration Framework
+// Vibe Tech Labs — Integration Framework
 // Pluggable adapters for external HR systems
 
 // ─── Base Integration Interface ─────────────────────────

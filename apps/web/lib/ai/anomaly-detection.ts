@@ -1,4 +1,4 @@
-// NEXUS — AI Anomaly Detection Engine
+// Vibe Tech Labs — AI Anomaly Detection Engine
 // Statistical anomaly detection for attendance patterns
 
 import { prisma } from "@nexus/db";

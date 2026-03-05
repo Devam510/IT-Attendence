@@ -1,4 +1,4 @@
-// NEXUS — QR TOTP Generator & Verifier
+// Vibe Tech Labs — QR TOTP Generator & Verifier
 // Location-bound, 30-second rotating QR codes with Redis nonce replay protection
 
 import * as speakeasy from "speakeasy";

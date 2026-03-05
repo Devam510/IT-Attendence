@@ -1,4 +1,4 @@
-// NEXUS — Risk Scoring Engine
+// Vibe Tech Labs — Risk Scoring Engine
 // Composite 0–100 risk score for user sessions and requests
 
 export interface RiskFactors {

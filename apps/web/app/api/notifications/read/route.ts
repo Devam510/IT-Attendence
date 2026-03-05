@@ -1,4 +1,4 @@
-// NEXUS — PATCH /api/notifications
+// Vibe Tech Labs — PATCH /api/notifications
 // Mark notifications as read
 
 import { NextRequest, NextResponse } from "next/server";

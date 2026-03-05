@@ -1,4 +1,4 @@
-// NEXUS — POST /api/approvals/respond
+// Vibe Tech Labs — POST /api/approvals/respond
 // Approve or reject a single approval workflow
 
 import { NextRequest, NextResponse } from "next/server";

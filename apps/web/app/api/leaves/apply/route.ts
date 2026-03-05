@@ -1,4 +1,4 @@
-// NEXUS — POST /api/leaves/apply
+// Vibe Tech Labs — POST /api/leaves/apply
 // Submit a leave request with balance validation, sandwich rule, and team overlap detection
 
 import { NextRequest, NextResponse } from "next/server";

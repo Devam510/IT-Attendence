@@ -1,4 +1,4 @@
-// NEXUS — MFA (TOTP) Service
+// Vibe Tech Labs — MFA (TOTP) Service
 // Generates and verifies time-based one-time passwords
 
 import * as speakeasy from "speakeasy";

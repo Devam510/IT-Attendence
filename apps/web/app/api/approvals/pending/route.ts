@@ -1,4 +1,4 @@
-// NEXUS — GET /api/approvals/pending
+// Vibe Tech Labs — GET /api/approvals/pending
 // Returns leave requests pending approval for manager/HR/admin
 
 import { NextRequest, NextResponse } from "next/server";

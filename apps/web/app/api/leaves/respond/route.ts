@@ -1,4 +1,4 @@
-// NEXUS — POST /api/leaves/respond
+// Vibe Tech Labs — POST /api/leaves/respond
 // Direct leave approval/rejection by manager, HR, or admin
 
 import { NextRequest, NextResponse } from "next/server";

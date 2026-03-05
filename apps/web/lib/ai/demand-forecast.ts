@@ -1,4 +1,4 @@
-// NEXUS — AI Demand Forecasting Engine
+// Vibe Tech Labs — AI Demand Forecasting Engine
 // Predict staffing needs based on historical attendance and leave patterns
 
 import { prisma } from "@nexus/db";

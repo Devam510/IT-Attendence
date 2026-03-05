@@ -1,4 +1,4 @@
-// NEXUS — Redis Client
+// Vibe Tech Labs — Redis Client
 // Used for: session store, rate limiting, QR nonces, caching
 // Gracefully degrades when Redis is unavailable (e.g. Vercel)
 

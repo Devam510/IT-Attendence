@@ -1,4 +1,4 @@
-// NEXUS — JWT Auth Middleware
+// Vibe Tech Labs — JWT Auth Middleware
 // Extracts and verifies JWT, attaches user context to request
 
 import { NextRequest, NextResponse } from "next/server";

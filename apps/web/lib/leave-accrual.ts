@@ -1,4 +1,4 @@
-// NEXUS — Leave Accrual Engine
+// Vibe Tech Labs — Leave Accrual Engine
 // Monthly pro-rata accrual, yearly reset, carry-forward with cap
 
 import { prisma } from "@nexus/db";

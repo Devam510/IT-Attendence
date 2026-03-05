@@ -1,4 +1,4 @@
-// NEXUS — GDPR & Data Retention Utilities
+// Vibe Tech Labs — GDPR & Data Retention Utilities
 // Right-to-erasure, data export, and automated retention cleanup
 
 import { prisma } from "@nexus/db";

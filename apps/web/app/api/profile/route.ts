@@ -1,4 +1,4 @@
-// NEXUS — GET /api/profile
+// Vibe Tech Labs — GET /api/profile
 // User profile view and update
 
 import { NextRequest, NextResponse } from "next/server";

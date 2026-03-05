@@ -1,4 +1,4 @@
-// NEXUS — GET /api/attendance/history
+// Vibe Tech Labs — GET /api/attendance/history
 // Returns monthly attendance calendar data
 // Query: ?month=2026-03
 

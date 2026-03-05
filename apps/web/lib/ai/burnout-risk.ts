@@ -1,4 +1,4 @@
-// NEXUS — AI Burnout Risk Predictor
+// Vibe Tech Labs — AI Burnout Risk Predictor
 // Multi-signal burnout risk assessment for employees
 
 import { prisma } from "@nexus/db";

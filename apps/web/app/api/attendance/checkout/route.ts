@@ -1,4 +1,4 @@
-// NEXUS — POST /api/attendance/checkout
+// Vibe Tech Labs — POST /api/attendance/checkout
 // Verifies session token matches check-in device — prevents buddy check-out
 
 import { NextRequest, NextResponse } from "next/server";

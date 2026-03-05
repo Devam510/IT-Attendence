@@ -1,5 +1,5 @@
-// NEXUS — GET /api/auth/session — Session status + risk score
-// NEXUS — DELETE /api/auth/session — Logout
+// Vibe Tech Labs — GET /api/auth/session — Session status + risk score
+// Vibe Tech Labs — DELETE /api/auth/session — Logout
 // Works without Redis — falls back to JWT-only validation
 
 import { NextRequest, NextResponse } from "next/server";

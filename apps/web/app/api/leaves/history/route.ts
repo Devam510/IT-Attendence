@@ -1,4 +1,4 @@
-// NEXUS — GET /api/leaves/history
+// Vibe Tech Labs — GET /api/leaves/history
 // Returns leave request history with status filters
 
 import { NextRequest, NextResponse } from "next/server";

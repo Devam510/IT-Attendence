@@ -1,4 +1,4 @@
-// NEXUS — Security Headers Middleware
+// Vibe Tech Labs — Security Headers Middleware
 // CORS, CSP, HSTS, and security headers for Next.js
 
 import { NextRequest, NextResponse } from "next/server";

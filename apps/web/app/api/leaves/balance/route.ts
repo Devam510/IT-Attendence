@@ -1,4 +1,4 @@
-// NEXUS — GET /api/leaves/balance
+// Vibe Tech Labs — GET /api/leaves/balance
 // Returns all leave type balances for the current user
 
 import { NextRequest, NextResponse } from "next/server";

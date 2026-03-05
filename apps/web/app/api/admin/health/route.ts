@@ -1,4 +1,4 @@
-// NEXUS — GET /api/admin/health
+// Vibe Tech Labs — GET /api/admin/health
 // System health check and readiness probe
 
 import { NextRequest, NextResponse } from "next/server";

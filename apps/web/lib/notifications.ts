@@ -1,4 +1,4 @@
-// NEXUS — Notification Dispatcher
+// Vibe Tech Labs — Notification Dispatcher
 // Template-based notification creation and dispatch
 
 import { prisma } from "@nexus/db";
