@@ -83,7 +83,7 @@ async function main() {
     console.log("✅ Shift:", shift.name);
 
     // ─── 5. Users ───────────────────────────────────────
-    const password = hashPassword("Nexus@123");
+    const password = hashPassword("VibeTech@1234");
 
     const admin = await prisma.user.create({
         data: {
@@ -228,7 +228,7 @@ async function main() {
     // ─── Summary ────────────────────────────────────────
     console.log("\n" + "═".repeat(50));
     console.log("🎉 NEXUS database seeded successfully!\n");
-    console.log("📋 Test Accounts (all passwords: Nexus@123):\n");
+    console.log("📋 Test Accounts (all passwords: VibeTech@1234):\n");
     console.log("   Role       Email              Name");
     console.log("   ─────────  ─────────────────  ──────────────");
     console.log("   SADM       admin@nexus.dev     Arjun Mehta");
