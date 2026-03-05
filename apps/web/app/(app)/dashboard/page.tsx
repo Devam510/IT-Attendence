@@ -8,7 +8,9 @@ import { apiGet } from "@/lib/api-client";
 interface DashboardData {
     greeting?: string;
     checkedIn?: boolean;
+    checkedOut?: boolean;
     checkInTime?: string;
+    checkOutTime?: string;
     workingHours?: number;
     location?: string;
     pendingCount?: number;
@@ -51,16 +53,24 @@ export default function DashboardPage() {
             if (res.data) {
                 const d = res.data;
                 const todayInfo = d.today || {};
-                const checkedIn = todayInfo.status === "CHECKED_IN";
+                const todayStatus = todayInfo.status; // "NOT_CHECKED_IN" | "CHECKED_IN" | "CHECKED_OUT"
+                const checkedIn = todayStatus === "CHECKED_IN";
+                const checkedOut = todayStatus === "CHECKED_OUT";
                 const checkInAt = todayInfo.checkInAt ? new Date(todayInfo.checkInAt) : null;
+                const checkOutAt = todayInfo.checkOutAt ? new Date(todayInfo.checkOutAt) : null;
+                // Compute total hours from timestamps if DB value is 0 and we have both times
+                let workingHours = todayInfo.totalHours ?? 0;
+                if (workingHours === 0 && checkInAt && checkOutAt) {
+                    workingHours = +((checkOutAt.getTime() - checkInAt.getTime()) / 3600000).toFixed(2);
+                }
                 setData({
                     checkedIn,
-                    checkInTime: checkInAt ? checkInAt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : undefined,
-                    workingHours: todayInfo.totalHours ?? 0,
+                    checkedOut,
+                    checkInTime: checkInAt ? checkInAt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }) : undefined,
+                    checkOutTime: checkOutAt ? checkOutAt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }) : undefined,
+                    workingHours,
                     location: d.user?.department || undefined,
                     pendingCount: d.pendingApprovals ?? 0,
-                    // Also handle direct flat shape if API already returns it
-                    ...(d.checkedIn !== undefined ? { checkedIn: d.checkedIn, checkInTime: d.checkInTime, workingHours: d.workingHours, location: d.location } : {}),
                 });
             }
             setLoading(false);
@@ -127,25 +137,51 @@ export default function DashboardPage() {
             )}
 
             {/* Check-In Status Card */}
-            <div className="dash-checkin-card animate-slideUp">
+            <div className="dash-checkin-card animate-slideUp"
+                style={{
+                    background: data.checkedOut
+                        ? "linear-gradient(135deg, #0f766e, #0d9488)"
+                        : data.checkedIn
+                            ? "linear-gradient(135deg, #15803d, #16a34a)"
+                            : "linear-gradient(135deg, #1d4ed8, #2563eb)",
+                }}
+            >
                 <div className="dash-checkin-status">
-                    {data.checkedIn ? "✅ CHECKED IN" : "⬜ NOT CHECKED IN"}
+                    {data.checkedOut ? "✅ DAY COMPLETE" : data.checkedIn ? "🟢 CHECKED IN" : "⬜ NOT CHECKED IN"}
                 </div>
                 <div className="dash-checkin-time">
-                    {data.checkInTime || "--:--"} {data.checkedIn && data.location && `· ${data.location}`}
+                    {data.checkedOut
+                        ? `${data.checkInTime || "--:--"} → ${data.checkOutTime || "--:--"}`
+                        : data.checkedIn
+                            ? `Since ${data.checkInTime || "--:--"}`
+                            : new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })
+                    }
                 </div>
                 <div className="dash-checkin-location">
-                    {data.checkedIn
-                        ? `Working: ${data.workingHours?.toFixed(1) || 0}h`
-                        : "Tap below to check in"}
+                    {data.checkedOut
+                        ? `Total: ${data.workingHours && data.workingHours > 0 ? `${(data.workingHours * 60).toFixed(0)} min (${data.workingHours.toFixed(2)}h)` : "—"}`
+                        : data.checkedIn
+                            ? `Working: ${data.workingHours?.toFixed(1) || 0}h`
+                            : "Tap below to check in"}
                 </div>
-                <Link
-                    href="/attendance"
-                    className="btn btn-primary"
-                    style={{ background: "rgba(255,255,255,0.2)", color: "white", borderColor: "rgba(255,255,255,0.3)" }}
-                >
-                    {data.checkedIn ? "View Attendance" : "Check In Now"}
-                </Link>
+                {!data.checkedOut && (
+                    <Link
+                        href="/attendance"
+                        className="btn btn-primary"
+                        style={{ background: "rgba(255,255,255,0.2)", color: "white", borderColor: "rgba(255,255,255,0.3)" }}
+                    >
+                        {data.checkedIn ? "View Attendance" : "Check In Now"}
+                    </Link>
+                )}
+                {data.checkedOut && (
+                    <Link
+                        href="/attendance"
+                        className="btn btn-primary"
+                        style={{ background: "rgba(255,255,255,0.15)", color: "white", borderColor: "rgba(255,255,255,0.3)" }}
+                    >
+                        View Details
+                    </Link>
+                )}
             </div>
 
             {/* Quick Actions */}

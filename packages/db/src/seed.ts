@@ -47,8 +47,8 @@ async function main() {
     // ─── 2. Location ────────────────────────────────────
     const location = await prisma.location.create({
         data: {
-            name: "Vibe Tech Labs HQ - Ahmedabad",
-            address: "SG Highway, Ahmedabad, Gujarat 380054",
+            name: "Vibe Tech Labs",
+            address: "Maradia Plaza, B-913, Chimanlal Girdharlal Rd, Ellisbridge, Ahmedabad, Gujarat 380006",
             latitude: 23.026127,
             longitude: 72.557264,
             radiusM: 100,

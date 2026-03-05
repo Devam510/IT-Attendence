@@ -4,19 +4,30 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import {
+    LayoutDashboard,
+    Clock,
+    CalendarDays,
+    CheckSquare,
+    Bell,
+    User,
+    ClipboardList,
+    HeartPulse,
+    ShieldCheck,
+} from "lucide-react";
 
 const NAV_ITEMS = [
-    { href: "/dashboard", icon: "📊", label: "Dashboard" },
-    { href: "/attendance", icon: "⏱️", label: "Attendance" },
-    { href: "/leaves", icon: "🗓️", label: "Leaves" },
-    { href: "/approvals", icon: "✅", label: "Approvals" },
-    { href: "/notifications", icon: "🔔", label: "Notifications" },
+    { href: "/dashboard", Icon: LayoutDashboard, label: "Dashboard" },
+    { href: "/attendance", Icon: Clock, label: "Attendance" },
+    { href: "/leaves", Icon: CalendarDays, label: "Leaves" },
+    { href: "/approvals", Icon: CheckSquare, label: "Approvals" },
+    { href: "/notifications", Icon: Bell, label: "Notifications" },
 ];
 
 const ADMIN_ITEMS = [
-    { href: "/admin/audit-logs", icon: "📋", label: "Audit Logs" },
-    { href: "/admin/health", icon: "🏥", label: "System Health" },
-    { href: "/security", icon: "🛡️", label: "Security" },
+    { href: "/admin/audit-logs", Icon: ClipboardList, label: "Audit Logs" },
+    { href: "/admin/health", Icon: HeartPulse, label: "System Health" },
+    { href: "/security", Icon: ShieldCheck, label: "Security" },
 ];
 
 export default function Sidebar() {
@@ -42,14 +53,16 @@ export default function Sidebar() {
 
             <nav className="sidebar-nav">
                 <div className="sidebar-section">Main</div>
-                {NAV_ITEMS.map(item => (
+                {NAV_ITEMS.map(({ href, Icon, label }) => (
                     <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`sidebar-link ${pathname === item.href || pathname.startsWith(item.href + "/") ? "active" : ""}`}
+                        key={href}
+                        href={href}
+                        className={`sidebar-link ${pathname === href || pathname.startsWith(href + "/") ? "active" : ""}`}
                     >
-                        <span className="sidebar-link-icon">{item.icon}</span>
-                        {item.label}
+                        <span className="sidebar-link-icon">
+                            <Icon size={18} strokeWidth={1.8} />
+                        </span>
+                        {label}
                     </Link>
                 ))}
 
@@ -57,21 +70,25 @@ export default function Sidebar() {
                     href="/profile"
                     className={`sidebar-link ${pathname === "/profile" ? "active" : ""}`}
                 >
-                    <span className="sidebar-link-icon">👤</span>
+                    <span className="sidebar-link-icon">
+                        <User size={18} strokeWidth={1.8} />
+                    </span>
                     Profile
                 </Link>
 
                 {isAdmin && (
                     <>
                         <div className="sidebar-section">Admin</div>
-                        {ADMIN_ITEMS.map(item => (
+                        {ADMIN_ITEMS.map(({ href, Icon, label }) => (
                             <Link
-                                key={item.href}
-                                href={item.href}
-                                className={`sidebar-link ${pathname === item.href ? "active" : ""}`}
+                                key={href}
+                                href={href}
+                                className={`sidebar-link ${pathname === href ? "active" : ""}`}
                             >
-                                <span className="sidebar-link-icon">{item.icon}</span>
-                                {item.label}
+                                <span className="sidebar-link-icon">
+                                    <Icon size={18} strokeWidth={1.8} />
+                                </span>
+                                {label}
                             </Link>
                         ))}
                     </>

@@ -14,12 +14,13 @@ async function handleEmployeeDashboard(
 ): Promise<NextResponse> {
     const { auth } = context;
     const now = new Date();
-    const todayStart = new Date(now);
-    todayStart.setHours(0, 0, 0, 0);
-    const tomorrowStart = new Date(todayStart);
-    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
-    const year = now.getFullYear();
-    const monthStart = new Date(year, now.getMonth(), 1);
+    // ── IST-based today range (same as checkin/checkout/today routes) ──
+    const istOffsetMs = 5.5 * 60 * 60 * 1000;
+    const nowIst = new Date(now.getTime() + istOffsetMs);
+    const todayStart = new Date(Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - istOffsetMs);
+    const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+    const year = nowIst.getUTCFullYear();
+    const monthStart = new Date(Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), 1) - istOffsetMs);
 
     // Parallel fetch all dashboard data
     const [
@@ -37,14 +38,14 @@ async function handleEmployeeDashboard(
             where: { id: auth.sub },
             select: { fullName: true, employeeId: true, designation: true, department: { select: { name: true } }, entity: { select: { name: true } } },
         }),
-        // Today's attendance
+        // Today's attendance — use checkInAt IST range (not date field)
         prisma.attendanceRecord.findFirst({
-            where: { userId: auth.sub, date: { gte: todayStart, lt: tomorrowStart } },
+            where: { userId: auth.sub, checkInAt: { gte: todayStart, lt: tomorrowStart } },
             select: { checkInAt: true, checkOutAt: true, status: true, totalHours: true, verificationScore: true },
         }),
         // Month attendance summary
         prisma.attendanceRecord.findMany({
-            where: { userId: auth.sub, date: { gte: monthStart, lt: tomorrowStart } },
+            where: { userId: auth.sub, checkInAt: { gte: monthStart, lt: tomorrowStart } },
             select: { date: true, status: true, totalHours: true },
         }),
         // Pending leave requests
