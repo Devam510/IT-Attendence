@@ -104,62 +104,79 @@ export default function TeamAttendancePage() {
             <div style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 12,
+                gap: 10,
                 margin: "20px 0 16px",
-                padding: "12px 16px",
-                background: "var(--bg-secondary)",
-                borderRadius: 12,
-                border: "1px solid var(--border)",
                 flexWrap: "wrap",
             }}>
-                <button
-                    onClick={() => changeDate(-1)}
-                    style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", cursor: "pointer", display: "flex", alignItems: "center" }}
-                >
-                    <ChevronLeft size={18} />
-                </button>
-
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 200 }}>
-                    <CalendarDays size={18} color="var(--primary)" />
-                    <span style={{ fontWeight: 600, fontSize: 15 }}>
-                        {isToday ? "Today — " : ""}{displayDate}
-                    </span>
-                </div>
-
-                <button
-                    onClick={() => changeDate(1)}
-                    disabled={isToday}
-                    style={{
-                        background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8,
-                        padding: "6px 10px", cursor: isToday ? "not-allowed" : "pointer",
-                        opacity: isToday ? 0.4 : 1, display: "flex", alignItems: "center"
-                    }}
-                >
-                    <ChevronRight size={18} />
-                </button>
-
-                <input
-                    type="date"
-                    value={toISTDateString(selectedDate)}
-                    max={toISTDateString(new Date())}
-                    onChange={e => e.target.value && setSelectedDate(new Date(e.target.value + "T12:00:00"))}
-                    style={{
-                        padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)",
-                        background: "var(--bg-card)", color: "var(--text-primary)", fontSize: 13,
-                    }}
-                />
-
-                {!isToday && (
+                {/* Compact arrow + date pill */}
+                <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    background: "var(--bg-card)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 10,
+                    overflow: "hidden",
+                    flex: 1,
+                    minWidth: 220,
+                }}>
                     <button
-                        onClick={() => setSelectedDate(new Date())}
+                        onClick={() => changeDate(-1)}
                         style={{
-                            padding: "6px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer",
-                            background: "var(--primary)", color: "white", border: "none", fontWeight: 600,
+                            padding: "9px 13px", cursor: "pointer", border: "none",
+                            borderRight: "1px solid var(--border)",
+                            background: "transparent", display: "flex", alignItems: "center",
+                            color: "var(--text-primary)",
                         }}
                     >
-                        Today
+                        <ChevronLeft size={16} />
                     </button>
-                )}
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "0 14px", flex: 1, justifyContent: "center" }}>
+                        <CalendarDays size={15} color="var(--color-primary, #2563eb)" />
+                        <span style={{ fontWeight: 600, fontSize: 14, whiteSpace: "nowrap" }}>
+                            {isToday ? "Today — " : ""}{displayDate}
+                        </span>
+                    </div>
+
+                    <button
+                        onClick={() => changeDate(1)}
+                        disabled={isToday}
+                        style={{
+                            padding: "9px 13px", cursor: isToday ? "not-allowed" : "pointer",
+                            border: "none", borderLeft: "1px solid var(--border)",
+                            background: "transparent", display: "flex", alignItems: "center",
+                            opacity: isToday ? 0.35 : 1, color: "var(--text-primary)",
+                        }}
+                    >
+                        <ChevronRight size={16} />
+                    </button>
+                </div>
+
+                {/* Date picker + Today */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input
+                        type="date"
+                        value={toISTDateString(selectedDate)}
+                        max={toISTDateString(new Date())}
+                        onChange={e => e.target.value && setSelectedDate(new Date(e.target.value + "T12:00:00"))}
+                        style={{
+                            padding: "7px 10px", borderRadius: 8, border: "1px solid var(--border)",
+                            background: "var(--bg-card)", color: "var(--text-primary)", fontSize: 13,
+                        }}
+                    />
+                    {!isToday && (
+                        <button
+                            onClick={() => setSelectedDate(new Date())}
+                            style={{
+                                padding: "7px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer",
+                                background: "var(--color-primary, #2563eb)", color: "white",
+                                border: "none", fontWeight: 600, whiteSpace: "nowrap",
+                            }}
+                        >
+                            Today
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Summary Cards */}
