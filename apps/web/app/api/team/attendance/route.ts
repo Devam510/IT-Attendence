@@ -95,6 +95,8 @@ async function handleTeamAttendance(
         if (leave) status = "ON_LEAVE";
         else if (att) status = "PRESENT";
 
+        // If on approved leave → don't show working time (leave takes precedence)
+        const onLeave = status === "ON_LEAVE";
         return {
             id: emp.id,
             fullName: emp.fullName,
@@ -102,9 +104,9 @@ async function handleTeamAttendance(
             designation: emp.designation,
             department: emp.department?.name || null,
             status,
-            checkInAt: att?.checkInAt?.toISOString() || null,
-            checkOutAt: att?.checkOutAt?.toISOString() || null,
-            totalHours: att?.totalHours || null,
+            checkInAt: onLeave ? null : att?.checkInAt?.toISOString() || null,
+            checkOutAt: onLeave ? null : att?.checkOutAt?.toISOString() || null,
+            totalHours: onLeave ? null : att?.totalHours || null,
             leaveType: leave ? (leave as any).leaveType?.name : null,
         };
     });
