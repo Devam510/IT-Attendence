@@ -36,8 +36,12 @@ async function handlePending(
     } else if (auth.role === "HRA") {
         // HR sees everyone in the entity
         managerFilter = { user: { entityId: auth.entityId } };
+    } else if (auth.role === "SADM") {
+        // Admin sees all — no filter
+    } else {
+        // Employee sees only their own requests
+        managerFilter = { userId: auth.sub };
     }
-    // SADM sees all — no filter
 
     const leaveRequests = await prisma.leaveRequest.findMany({
         where: {

@@ -51,6 +51,7 @@ async function handleGetNotifications(
             id: n.id,
             type: n.type,
             title: n.title,
+            subtitle: n.body,       // frontend reads 'subtitle'
             body: n.body,
             data: n.data,
             isRead: n.isRead,
