@@ -26,24 +26,11 @@ interface ManagerData {
     approvalItems?: Array<{ id: string; name: string; type: string; dates: string }>;
 }
 
-interface TeamMember {
-    id: string;
-    fullName: string;
-    employeeId: string;
-    designation?: string;
-    status: "PRESENT" | "ABSENT" | "ON_LEAVE";
-    checkInAt?: string | null;
-    checkOutAt?: string | null;
-    leaveType?: string | null;
-}
-
 export default function DashboardPage() {
     const { user } = useAuth();
     const [data, setData] = useState<DashboardData>({});
     const [managerData, setManagerData] = useState<ManagerData>({});
-    const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
     const [loading, setLoading] = useState(true);
-    const [teamFilter, setTeamFilter] = useState<"ALL" | "PRESENT" | "ABSENT" | "ON_LEAVE">("ALL");
 
     const isManager = user?.role === "MGR" || user?.role === "HRA" || user?.role === "SADM";
 
@@ -60,7 +47,6 @@ export default function DashboardPage() {
                         remote: d.teamSummary?.remote ?? 0,
                         pendingApprovals: d.approvals?.pending ?? 0,
                     });
-                    setTeamMembers(d.teamStatus || []);
                 }
             }
             const res = await apiGet<any>("/api/dashboard/employee");
@@ -146,87 +132,6 @@ export default function DashboardPage() {
                             <div className="dash-stat-value">{managerData.remote ?? 0}</div>
                             <div className="dash-stat-label">Remote</div>
                         </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Team Attendance List - HR/Manager/Admin only */}
-            {isManager && teamMembers.length > 0 && (
-                <div className="dash-section animate-slideUp" style={{ marginBottom: 24 }}>
-                    <div className="dash-section-header" style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                        <h2 className="dash-section-title" style={{ margin: 0 }}>
-                            Team Attendance Today ({teamMembers.length})
-                        </h2>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                            {(["ALL", "PRESENT", "ABSENT", "ON_LEAVE"] as const).map(f => (
-                                <button
-                                    key={f}
-                                    onClick={() => setTeamFilter(f)}
-                                    style={{
-                                        padding: "3px 12px",
-                                        borderRadius: 20,
-                                        border: "1px solid var(--border)",
-                                        fontSize: 12,
-                                        cursor: "pointer",
-                                        fontWeight: teamFilter === f ? 700 : 400,
-                                        background: teamFilter === f
-                                            ? f === "PRESENT" ? "#15803d" : f === "ABSENT" ? "#991b1b" : f === "ON_LEAVE" ? "#92400e" : "var(--primary)"
-                                            : "var(--bg-secondary)",
-                                        color: teamFilter === f ? "white" : "var(--text-secondary)",
-                                    }}
-                                >
-                                    {f === "ON_LEAVE" ? "On Leave" : f === "ALL" ? `All (${teamMembers.length})` : f.charAt(0) + f.slice(1).toLowerCase()}
-                                    {f !== "ALL" && ` (${teamMembers.filter(m => m.status === f).length})`}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div style={{ overflowX: "auto" }}>
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-                            <thead>
-                                <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--text-tertiary)", textAlign: "left" }}>
-                                    <th style={{ padding: "8px 12px", fontWeight: 600 }}>Employee</th>
-                                    <th style={{ padding: "8px 12px", fontWeight: 600 }}>ID</th>
-                                    <th style={{ padding: "8px 12px", fontWeight: 600 }}>Designation</th>
-                                    <th style={{ padding: "8px 12px", fontWeight: 600 }}>Status</th>
-                                    <th style={{ padding: "8px 12px", fontWeight: 600 }}>Check In</th>
-                                    <th style={{ padding: "8px 12px", fontWeight: 600 }}>Check Out</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {teamMembers
-                                    .filter(m => teamFilter === "ALL" || m.status === teamFilter)
-                                    .map(member => {
-                                        const statusColor = member.status === "PRESENT" ? "#15803d" : member.status === "ON_LEAVE" ? "#92400e" : "#991b1b";
-                                        const statusBg = member.status === "PRESENT" ? "#dcfce7" : member.status === "ON_LEAVE" ? "#fef3c7" : "#fee2e2";
-                                        const statusLabel = member.status === "ON_LEAVE" ? `On Leave${member.leaveType ? ` (${member.leaveType})` : ""}` : member.status === "PRESENT" ? "Present" : "Absent";
-                                        const checkIn = member.checkInAt ? new Date(member.checkInAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }) : "—";
-                                        const checkOut = member.checkOutAt ? new Date(member.checkOutAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }) : "—";
-                                        return (
-                                            <tr key={member.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                                                <td style={{ padding: "10px 12px", fontWeight: 500 }}>{member.fullName}</td>
-                                                <td style={{ padding: "10px 12px", color: "var(--text-secondary)", fontFamily: "monospace" }}>{member.employeeId}</td>
-                                                <td style={{ padding: "10px 12px", color: "var(--text-secondary)" }}>{member.designation || "—"}</td>
-                                                <td style={{ padding: "10px 12px" }}>
-                                                    <span style={{
-                                                        background: statusBg,
-                                                        color: statusColor,
-                                                        padding: "2px 10px",
-                                                        borderRadius: 12,
-                                                        fontWeight: 600,
-                                                        fontSize: 12,
-                                                    }}>
-                                                        {statusLabel}
-                                                    </span>
-                                                </td>
-                                                <td style={{ padding: "10px 12px", color: "var(--text-secondary)" }}>{checkIn}</td>
-                                                <td style={{ padding: "10px 12px", color: "var(--text-secondary)" }}>{checkOut}</td>
-                                            </tr>
-                                        );
-                                    })}
-                            </tbody>
-                        </table>
                     </div>
                 </div>
             )}

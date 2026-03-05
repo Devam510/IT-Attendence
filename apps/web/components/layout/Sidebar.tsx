@@ -14,6 +14,7 @@ import {
     ClipboardList,
     HeartPulse,
     ShieldCheck,
+    UsersRound,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -30,10 +31,15 @@ const ADMIN_ITEMS = [
     { href: "/security", Icon: ShieldCheck, label: "Security" },
 ];
 
+const MANAGER_NAV_ITEMS = [
+    { href: "/team-attendance", Icon: UsersRound, label: "Team Attendance" },
+];
+
 export default function Sidebar() {
     const pathname = usePathname();
     const { user } = useAuth();
 
+    const isManager = user?.role === "MGR" || user?.role === "HRA" || user?.role === "SADM";
     const isAdmin = user?.role === "SADM" || user?.role === "HRA" || user?.role === "SEC";
 
     return (
@@ -58,6 +64,20 @@ export default function Sidebar() {
                         key={href}
                         href={href}
                         className={`sidebar-link ${pathname === href || pathname.startsWith(href + "/") ? "active" : ""}`}
+                    >
+                        <span className="sidebar-link-icon">
+                            <Icon size={18} strokeWidth={1.8} />
+                        </span>
+                        {label}
+                    </Link>
+                ))}
+
+                {/* Team Attendance - visible to HR/Manager/Admin */}
+                {isManager && MANAGER_NAV_ITEMS.map(({ href, Icon, label }) => (
+                    <Link
+                        key={href}
+                        href={href}
+                        className={`sidebar-link ${pathname === href ? "active" : ""}`}
                     >
                         <span className="sidebar-link-icon">
                             <Icon size={18} strokeWidth={1.8} />
