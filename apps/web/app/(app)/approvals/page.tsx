@@ -5,7 +5,7 @@ import { apiGet, apiPost } from "@/lib/api-client";
 import { useAuth } from "@/context/AuthContext";
 import "@/styles/leaves.css";
 
-type FilterType = "all" | "leave" | "overtime";
+type FilterType = "all" | "leave";
 type FilterStatus = "pending" | "approved" | "rejected";
 
 interface ApprovalItem {
@@ -14,7 +14,7 @@ interface ApprovalItem {
     employeeName: string;
     employeeRole: string;
     department: string;
-    type: "leave" | "overtime";
+    type: "leave";
     leaveType?: string;
     startDate: string;
     endDate: string;
@@ -27,12 +27,11 @@ interface ApprovalItem {
 const TYPE_LABELS: Record<string, string> = {
     annual: "Annual Leave", sick: "Sick Leave",
     casual: "Casual Leave", comp: "Comp Off",
-    overtime: "Overtime",
 };
 
 const TYPE_ICONS: Record<string, string> = {
     annual: "🏖️", sick: "🤒", casual: "☀️", comp: "🔄",
-    leave: "🗓️", overtime: "⏱️",
+    leave: "🗓️",
 };
 
 export default function ApprovalsPage() {
@@ -169,7 +168,7 @@ export default function ApprovalsPage() {
                     </button>
                 ))}
                 <span style={{ width: 1, height: 24, background: "var(--border-color, #e5e7eb)", alignSelf: "center" }} />
-                {(["all", "leave", "overtime"] as FilterType[]).map(t => (
+                {(["all", "leave"] as FilterType[]).map(t => (
                     <button
                         key={t}
                         className={`filter-chip ${filterType === t ? "active" : ""}`}

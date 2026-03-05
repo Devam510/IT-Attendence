@@ -126,13 +126,7 @@ export default function DashboardPage() {
                             <div className="dash-stat-label">Absent</div>
                         </div>
                     </div>
-                    <div className="dash-stat-card">
-                        <div className="dash-stat-icon blue">🏠</div>
-                        <div>
-                            <div className="dash-stat-value">{managerData.remote ?? 0}</div>
-                            <div className="dash-stat-label">Remote</div>
-                        </div>
-                    </div>
+
                 </div>
             )}
 

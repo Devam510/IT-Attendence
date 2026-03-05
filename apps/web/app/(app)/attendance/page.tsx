@@ -425,14 +425,7 @@ export default function AttendancePage() {
                                         {selectedCalDay.totalHours != null ? `${selectedCalDay.totalHours.toFixed(1)}h` : "—"}
                                     </span>
                                 </div>
-                                {selectedCalDay.overtimeHours != null && selectedCalDay.overtimeHours > 0 && (
-                                    <div className="att-today-row">
-                                        <span className="att-today-label">⚡ Overtime</span>
-                                        <span className="att-today-value" style={{ color: "#f59e0b" }}>
-                                            {selectedCalDay.overtimeHours.toFixed(1)}h
-                                        </span>
-                                    </div>
-                                )}
+
                                 {selectedCalDay.verificationScore != null && (
                                     <div className="att-today-row">
                                         <span className="att-today-label">🛡️ Verification</span>
@@ -464,7 +457,7 @@ export default function AttendancePage() {
             <div className="att-summary">
                 <span>Present: <strong>{summary?.totalPresent ?? "—"}</strong></span>
                 <span>Hours: <strong>{summary?.totalHours ? `${summary.totalHours.toFixed(1)}h` : "—"}</strong></span>
-                <span>Overtime: <strong>{summary?.totalOvertime ? `${summary.totalOvertime.toFixed(1)}h` : "—"}</strong></span>
+
             </div>
         </div>
     );
