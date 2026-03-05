@@ -25,8 +25,8 @@ export default function HomePage() {
       }}
     >
       <div style={{ textAlign: "center" }}>
-        <div style={{ fontSize: "3rem", fontWeight: 700, color: "var(--color-primary)", marginBottom: "var(--space-4)" }}>
-          N
+        <div style={{ fontSize: "2rem", fontWeight: 700, color: "var(--color-primary)", marginBottom: "var(--space-4)" }}>
+          VTL
         </div>
         <div className="spinner" style={{ margin: "0 auto", width: 24, height: 24, border: "3px solid var(--border-primary)", borderTopColor: "var(--color-primary)", borderRadius: "50%" }} />
       </div>

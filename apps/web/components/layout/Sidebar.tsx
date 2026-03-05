@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
@@ -28,8 +29,14 @@ export default function Sidebar() {
         <aside className="sidebar" role="navigation" aria-label="Main navigation">
             <div className="sidebar-header">
                 <Link href="/dashboard" className="sidebar-logo">
-                    <span className="sidebar-logo-icon">N</span>
-                    NEXUS
+                    <Image
+                        src="/vibe-tech-logo.png"
+                        alt="Vibe Tech Labs"
+                        width={140}
+                        height={40}
+                        style={{ objectFit: "contain" }}
+                        priority
+                    />
                 </Link>
             </div>
 

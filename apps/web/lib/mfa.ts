@@ -4,7 +4,7 @@
 import * as speakeasy from "speakeasy";
 import * as QRCode from "qrcode";
 
-const APP_NAME = "NEXUS";
+const APP_NAME = "Vibe Tech Labs";
 
 // ─── Generate TOTP Secret ───────────────────────────────
 

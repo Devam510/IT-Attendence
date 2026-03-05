@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, FormEvent } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import "@/styles/components.css";
@@ -36,9 +37,16 @@ export default function LoginPage() {
         <div className="login-container">
             {/* Left — Brand Panel */}
             <div className="login-brand">
-                <div className="login-brand-logo">N</div>
+                <Image
+                    src="/vibe-tech-logo.png"
+                    alt="Vibe Tech Labs"
+                    width={200}
+                    height={60}
+                    style={{ objectFit: "contain", marginBottom: "1rem" }}
+                    priority
+                />
                 <div className="login-brand-tagline">
-                    Enterprise Workforce Intelligence
+                    A Digital Idea To Grow You Up!
                 </div>
             </div>
 
@@ -147,7 +155,7 @@ export default function LoginPage() {
                     </form>
 
                     <div className="login-footer">
-                        NEXUS v1.0 · Secured with 256-bit encryption
+                        Vibe Tech Labs v1.0 · Secured with 256-bit encryption
                     </div>
                 </div>
             </div>

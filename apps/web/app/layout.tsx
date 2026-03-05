@@ -9,9 +9,9 @@ import "@/styles/admin.css";
 import "@/styles/security.css";
 
 export const metadata: Metadata = {
-  title: "NEXUS — Enterprise Workforce Platform",
-  description: "AI-powered workforce intelligence for modern enterprises. Attendance, leave management, and security compliance.",
-  icons: { icon: "/favicon.ico" },
+  title: "Vibe Tech Labs — Enterprise Workforce Platform",
+  description: "AI-powered workforce intelligence by Vibe Tech Labs. A Digital Idea To Grow You Up! Attendance, leave management, and security compliance.",
+  icons: { icon: "/vibe-tech-logo.png" },
 };
 
 export default function RootLayout({

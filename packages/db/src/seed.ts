@@ -1,4 +1,4 @@
-// NEXUS — Database Seed Script
+// Vibe Tech Labs — Database Seed Script
 // Creates test data: entity, departments, locations, shifts, users, leave types, balances
 
 import { PrismaClient } from "@prisma/client";
@@ -47,7 +47,7 @@ async function main() {
     // ─── 2. Location ────────────────────────────────────
     const location = await prisma.location.create({
         data: {
-            name: "Nexus HQ - Ahmedabad",
+            name: "Vibe Tech Labs HQ - Ahmedabad",
             address: "SG Highway, Ahmedabad, Gujarat 380054",
             latitude: 23.026127,
             longitude: 72.557264,
@@ -60,7 +60,7 @@ async function main() {
 
     // ─── 3. Departments ─────────────────────────────────
     const engineering = await prisma.department.create({
-        data: { name: "Engineering", entityId: entity.id },
+        data: { name: "Vibe Tech Labs", entityId: entity.id },
     });
     const hr = await prisma.department.create({
         data: { name: "Human Resources", entityId: entity.id },
