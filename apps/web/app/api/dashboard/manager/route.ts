@@ -1,5 +1,5 @@
-// NEXUS — GET /api/dashboard/manager
-// Manager dashboard with team overview, pending approvals, and team stats
+// Vibe Tech Labs — GET /api/dashboard/manager
+// Manager dashboard: direct-report team view for MGR; entity-wide view for HRA/SADM
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@nexus/db";
@@ -15,30 +15,39 @@ async function handleManagerDashboard(
 ): Promise<NextResponse> {
     const { auth } = context;
     const now = new Date();
-    const todayStart = new Date(now);
-    todayStart.setHours(0, 0, 0, 0);
-    const tomorrowStart = new Date(todayStart);
-    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
 
-    // Get direct reports
-    const directReports = await prisma.user.findMany({
-        where: { managerId: auth.sub, status: "ACTIVE" },
+    // ── IST-based today range ────────────────────────────
+    const istOffsetMs = 5.5 * 60 * 60 * 1000;
+    const nowIst = new Date(now.getTime() + istOffsetMs);
+    const todayStart = new Date(Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - istOffsetMs);
+    const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+
+    // ── Determine which employees to show ───────────────
+    // HRA / SADM see ALL active employees in the entity
+    // MGR sees their direct reports only
+    const isHraOrAdmin = auth.role === "HRA" || auth.role === "SADM" || auth.role === "HRBP";
+
+    const employeeWhere = isHraOrAdmin
+        ? { entityId: auth.entityId, status: "ACTIVE" as const, role: { notIn: ["SADM"] as any[] } }
+        : { managerId: auth.sub, status: "ACTIVE" as const };
+
+    const employees = await prisma.user.findMany({
+        where: employeeWhere,
         select: { id: true, fullName: true, employeeId: true, designation: true },
     });
 
-    const reportIds = directReports.map((r: any) => r.id);
+    const employeeIds = employees.map((r: any) => r.id);
 
-    // Early return if no direct reports — avoid 6 unnecessary queries
-    if (reportIds.length === 0) {
+    if (employeeIds.length === 0) {
         return success({
-            teamSummary: { totalMembers: 0, present: 0, onLeave: 0, absent: 0, attendanceRate: 0 },
+            teamSummary: { totalMembers: 0, present: 0, onLeave: 0, absent: 0, remote: 0, attendanceRate: 0 },
             teamStatus: [],
             approvals: { pending: 0, overdue: 0, pendingLeaveRequests: 0 },
             notifications: { unreadCount: 0, recent: [] },
         });
     }
 
-    // Parallel fetch all manager data
+    // ── Parallel fetch ───────────────────────────────────
     const [
         teamAttendance,
         teamLeaveToday,
@@ -47,30 +56,26 @@ async function handleManagerDashboard(
         unreadCount,
         recentNotifications,
     ] = await Promise.all([
-        // Today's team attendance
+        // Today's team attendance — use checkInAt IST range
         prisma.attendanceRecord.findMany({
-            where: { userId: { in: reportIds }, date: { gte: todayStart, lt: tomorrowStart } },
+            where: { userId: { in: employeeIds }, checkInAt: { gte: todayStart, lt: tomorrowStart } },
             select: { userId: true, status: true, checkInAt: true, checkOutAt: true },
         }),
         // Team members on leave today
         prisma.leaveRequest.findMany({
             where: {
-                userId: { in: reportIds },
+                userId: { in: employeeIds },
                 status: "APPROVED",
                 startDate: { lte: now },
                 endDate: { gte: todayStart },
             },
             select: { userId: true, user: { select: { fullName: true } }, leaveType: { select: { name: true } } },
         }),
-        // Pending approvals for this manager
         getPendingApprovalsForUser(auth.sub),
-        // Pending leave requests from team
         prisma.leaveRequest.count({
-            where: { userId: { in: reportIds }, status: "PENDING" },
+            where: { userId: { in: employeeIds }, status: "PENDING" },
         }),
-        // Unread notifications
         getUnreadCount(auth.sub),
-        // Recent notifications
         prisma.notification.findMany({
             where: { userId: auth.sub },
             orderBy: { createdAt: "desc" },
@@ -79,17 +84,17 @@ async function handleManagerDashboard(
         }),
     ]);
 
-    // Build team status
+    // ── Build team status ────────────────────────────────
     const checkedInIds = new Set(teamAttendance.map((a: any) => a.userId));
     const onLeaveIds = new Set(teamLeaveToday.map((l: any) => l.userId));
 
-    const teamStatus = directReports.map((member: any) => {
+    const teamStatus = employees.map((member: any) => {
         const attendance = teamAttendance.find((a: any) => a.userId === member.id);
         const leave = teamLeaveToday.find((l: any) => l.userId === member.id);
 
         let status: "PRESENT" | "ON_LEAVE" | "ABSENT" = "ABSENT";
-        if (checkedInIds.has(member.id)) status = "PRESENT";
-        else if (onLeaveIds.has(member.id)) status = "ON_LEAVE";
+        if (onLeaveIds.has(member.id)) status = "ON_LEAVE";
+        else if (checkedInIds.has(member.id)) status = "PRESENT";
 
         return {
             id: member.id,
@@ -98,28 +103,29 @@ async function handleManagerDashboard(
             designation: member.designation,
             status,
             checkInAt: attendance?.checkInAt?.toISOString() || null,
+            checkOutAt: attendance?.checkOutAt?.toISOString() || null,
             leaveType: leave ? (leave as any).leaveType?.name : null,
         };
     });
 
-    // Summary counts
+    // ── Summary counts ───────────────────────────────────
     const presentCount = teamStatus.filter((t: any) => t.status === "PRESENT").length;
     const onLeaveCount = teamStatus.filter((t: any) => t.status === "ON_LEAVE").length;
     const absentCount = teamStatus.filter((t: any) => t.status === "ABSENT").length;
 
-    // SLA-overdue approvals
     const overdueApprovals = pendingApprovals.filter((a) => {
         return a.slaDeadline && a.slaDeadline.getTime() < Date.now();
     });
 
     return success({
         teamSummary: {
-            totalMembers: directReports.length,
+            totalMembers: employees.length,
             present: presentCount,
             onLeave: onLeaveCount,
             absent: absentCount,
-            attendanceRate: directReports.length > 0
-                ? +((presentCount / directReports.length) * 100).toFixed(1)
+            remote: 0, // Remote detection requires future feature
+            attendanceRate: employees.length > 0
+                ? +((presentCount / employees.length) * 100).toFixed(1)
                 : 0,
         },
         teamStatus,
