@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
-import type { JwtPayload, ApiResponse } from "@nexus/shared";
+import type { JwtPayload, ApiResponse } from "@vibetech/shared";
 
 const JWT_SECRET = new TextEncoder().encode(
     process.env.JWT_SECRET || "change-me-to-a-64-char-random-string"

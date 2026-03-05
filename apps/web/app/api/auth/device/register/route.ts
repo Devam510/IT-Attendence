@@ -2,13 +2,13 @@
 // Registers a mobile device and calculates trust score
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
-import { DeviceRegisterSchema } from "@nexus/shared";
+import { prisma } from "@vibetech/db";
+import { DeviceRegisterSchema } from "@vibetech/shared";
 import { withAuth } from "@/lib/auth";
 import { calculateDeviceTrust } from "@/lib/device-trust";
 import { logAuditEvent } from "@/lib/audit";
 import { success, error, logger } from "@/lib/errors";
-import type { JwtPayload } from "@nexus/shared";
+import type { JwtPayload } from "@vibetech/shared";
 
 async function handleDeviceRegister(
     req: NextRequest,

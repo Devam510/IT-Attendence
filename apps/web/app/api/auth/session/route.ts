@@ -3,12 +3,12 @@
 // Works without Redis — falls back to JWT-only validation
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
+import { prisma } from "@vibetech/db";
 import { withAuth } from "@/lib/auth";
 import { getSession, deleteSession } from "@/lib/redis";
 import { logAuditEvent } from "@/lib/audit";
 import { success, logger } from "@/lib/errors";
-import type { JwtPayload } from "@nexus/shared";
+import type { JwtPayload } from "@vibetech/shared";
 
 // ─── GET — Current session status ───────────────────────
 

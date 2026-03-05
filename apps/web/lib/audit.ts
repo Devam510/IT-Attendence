@@ -2,7 +2,7 @@
 // Immutable event log with SHA-256 hash chain integrity
 // When Redis/BullMQ unavailable, writes directly to DB
 
-import { prisma } from "@nexus/db";
+import { prisma } from "@vibetech/db";
 import { createHash } from "crypto";
 
 let lastHash: string | null = null;

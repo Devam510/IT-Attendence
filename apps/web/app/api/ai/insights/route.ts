@@ -2,13 +2,13 @@
 // AI-powered insights endpoint: anomaly detection, burnout risk, demand forecast
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
+import { prisma } from "@vibetech/db";
 import { withRole } from "@/lib/auth";
 import { detectAnomalies } from "@/lib/ai/anomaly-detection";
 import { assessBurnoutRisk } from "@/lib/ai/burnout-risk";
 import { forecastDemand } from "@/lib/ai/demand-forecast";
 import { success, error } from "@/lib/errors";
-import type { JwtPayload } from "@nexus/shared";
+import type { JwtPayload } from "@vibetech/shared";
 
 async function handleAiInsights(
     req: NextRequest,

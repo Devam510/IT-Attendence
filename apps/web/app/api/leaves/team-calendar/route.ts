@@ -2,10 +2,10 @@
 // Manager view of team leave calendar
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
+import { prisma } from "@vibetech/db";
 import { withRole } from "@/lib/auth";
 import { success, error } from "@/lib/errors";
-import type { JwtPayload } from "@nexus/shared";
+import type { JwtPayload } from "@vibetech/shared";
 
 interface LeaveRecord {
     id: string;

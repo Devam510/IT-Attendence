@@ -2,14 +2,14 @@
 // Cancel a pending leave request and release reserved balance
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
-import { LeaveCancelSchema } from "@nexus/shared";
+import { prisma } from "@vibetech/db";
+import { LeaveCancelSchema } from "@vibetech/shared";
 import { withAuth } from "@/lib/auth";
 import { calculateLeaveDays } from "@/lib/leave-accrual";
 import { releaseLeaveBalance } from "@/lib/leave-accrual";
 import { logAuditEvent } from "@/lib/audit";
 import { success, error, logger } from "@/lib/errors";
-import type { JwtPayload } from "@nexus/shared";
+import type { JwtPayload } from "@vibetech/shared";
 
 async function handleCancel(
     req: NextRequest,

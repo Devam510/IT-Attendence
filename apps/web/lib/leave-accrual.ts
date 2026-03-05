@@ -1,7 +1,7 @@
 // Vibe Tech Labs — Leave Accrual Engine
 // Monthly pro-rata accrual, yearly reset, carry-forward with cap
 
-import { prisma } from "@nexus/db";
+import { prisma } from "@vibetech/db";
 
 export interface AccrualResult {
     userId: string;

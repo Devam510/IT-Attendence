@@ -1,7 +1,7 @@
 // Vibe Tech Labs — Linear Approval Chain Engine
 // Manages step-by-step approval workflows with SLA deadlines and escalation
 
-import { prisma } from "@nexus/db";
+import { prisma } from "@vibetech/db";
 
 export interface ApprovalStep {
     approverId: string;

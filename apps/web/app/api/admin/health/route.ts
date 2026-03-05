@@ -2,7 +2,7 @@
 // System health check and readiness probe
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
+import { prisma } from "@vibetech/db";
 import { success } from "@/lib/errors";
 
 // No auth required — health endpoint must be accessible for load balancers

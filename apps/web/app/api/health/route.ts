@@ -2,7 +2,7 @@
 // GET /api/health → 200 OK with service status
 
 import { NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
+import { prisma } from "@vibetech/db";
 import { getRedis } from "@/lib/redis";
 
 export async function GET() {

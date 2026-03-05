@@ -2,10 +2,10 @@
 // Returns today's attendance status matching frontend TodayData interface
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
+import { prisma } from "@vibetech/db";
 import { withAuth } from "@/lib/auth";
 import { success } from "@/lib/errors";
-import type { JwtPayload } from "@nexus/shared";
+import type { JwtPayload } from "@vibetech/shared";
 
 async function handleToday(
     req: NextRequest,

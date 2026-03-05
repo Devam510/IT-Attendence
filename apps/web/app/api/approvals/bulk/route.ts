@@ -2,12 +2,12 @@
 // Bulk approve or reject multiple workflows
 
 import { NextRequest, NextResponse } from "next/server";
-import { ApprovalBulkSchema } from "@nexus/shared";
+import { ApprovalBulkSchema } from "@vibetech/shared";
 import { withAuth } from "@/lib/auth";
 import { processApprovalDecision } from "@/lib/approval-chain";
 import { logAuditEvent } from "@/lib/audit";
 import { success, error, logger } from "@/lib/errors";
-import type { JwtPayload } from "@nexus/shared";
+import type { JwtPayload } from "@vibetech/shared";
 
 interface BulkResultItem {
     workflowId: string;

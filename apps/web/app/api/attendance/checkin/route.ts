@@ -2,10 +2,10 @@
 // Geofence-enforced check-in with device session token to prevent buddy check-out
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
+import { prisma } from "@vibetech/db";
 import { withAuth } from "@/lib/auth";
 import { success, error, logger } from "@/lib/errors";
-import type { JwtPayload } from "@nexus/shared";
+import type { JwtPayload } from "@vibetech/shared";
 
 // Haversine distance in meters
 function haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {

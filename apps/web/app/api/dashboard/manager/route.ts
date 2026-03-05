@@ -2,12 +2,12 @@
 // Manager dashboard: direct-report team view for MGR; entity-wide view for HRA/SADM
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
+import { prisma } from "@vibetech/db";
 import { withRole } from "@/lib/auth";
 import { getPendingApprovalsForUser } from "@/lib/approval-chain";
 import { getUnreadCount } from "@/lib/notifications";
 import { success } from "@/lib/errors";
-import type { JwtPayload } from "@nexus/shared";
+import type { JwtPayload } from "@vibetech/shared";
 
 async function handleManagerDashboard(
     req: NextRequest,

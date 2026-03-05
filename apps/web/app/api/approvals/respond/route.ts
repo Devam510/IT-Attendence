@@ -2,14 +2,14 @@
 // Approve or reject a single approval workflow
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
-import { ApprovalRespondSchema } from "@nexus/shared";
+import { prisma } from "@vibetech/db";
+import { ApprovalRespondSchema } from "@vibetech/shared";
 import { withAuth } from "@/lib/auth";
 import { processApprovalDecision } from "@/lib/approval-chain";
 import { debitLeaveBalance, releaseLeaveBalance, calculateLeaveDays } from "@/lib/leave-accrual";
 import { logAuditEvent } from "@/lib/audit";
 import { success, error, logger } from "@/lib/errors";
-import type { JwtPayload } from "@nexus/shared";
+import type { JwtPayload } from "@vibetech/shared";
 
 async function handleRespond(
     req: NextRequest,

@@ -12,8 +12,8 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@nexus/db": "*",
-    "@nexus/shared": "*",
+    "@vibetech/db": "*",
+    "@vibetech/shared": "*",
     "@types/qrcode": "^1.5.6",
     "@types/speakeasy": "^2.0.10",
     "bullmq": "^5.40.0",

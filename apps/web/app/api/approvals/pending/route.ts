@@ -2,10 +2,10 @@
 // Returns leave requests pending approval for manager/HR/admin
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
+import { prisma } from "@vibetech/db";
 import { withAuth } from "@/lib/auth";
 import { success } from "@/lib/errors";
-import type { JwtPayload } from "@nexus/shared";
+import type { JwtPayload } from "@vibetech/shared";
 
 async function handlePending(
     req: NextRequest,

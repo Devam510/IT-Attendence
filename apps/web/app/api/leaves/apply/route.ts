@@ -2,15 +2,15 @@
 // Submit a leave request with balance validation, sandwich rule, and team overlap detection
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
-import { LeaveApplySchema } from "@nexus/shared";
+import { prisma } from "@vibetech/db";
+import { LeaveApplySchema } from "@vibetech/shared";
 import { withAuth } from "@/lib/auth";
 import { calculateLeaveDays, getAvailableBalance, reserveLeaveBalance } from "@/lib/leave-accrual";
 import { checkSandwichRule } from "@/lib/sandwich-rule";
 import { calculateSlaDeadline } from "@/lib/approval-chain";
 import { logAuditEvent } from "@/lib/audit";
 import { success, error, logger } from "@/lib/errors";
-import type { JwtPayload } from "@nexus/shared";
+import type { JwtPayload } from "@vibetech/shared";
 
 async function handleApply(
     req: NextRequest,

@@ -2,13 +2,13 @@
 // Delegate current approval step to another user
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
-import { ApprovalDelegateSchema } from "@nexus/shared";
+import { prisma } from "@vibetech/db";
+import { ApprovalDelegateSchema } from "@vibetech/shared";
 import { withAuth } from "@/lib/auth";
 import { delegateApproval } from "@/lib/approval-chain";
 import { logAuditEvent } from "@/lib/audit";
 import { success, error, logger } from "@/lib/errors";
-import type { JwtPayload } from "@nexus/shared";
+import type { JwtPayload } from "@vibetech/shared";
 
 async function handleDelegate(
     req: NextRequest,

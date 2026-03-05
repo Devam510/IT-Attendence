@@ -2,11 +2,11 @@
 // Mark notifications as read
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
-import { NotificationReadSchema } from "@nexus/shared";
+import { prisma } from "@vibetech/db";
+import { NotificationReadSchema } from "@vibetech/shared";
 import { withAuth } from "@/lib/auth";
 import { success, error } from "@/lib/errors";
-import type { JwtPayload } from "@nexus/shared";
+import type { JwtPayload } from "@vibetech/shared";
 
 async function handleMarkRead(
     req: NextRequest,

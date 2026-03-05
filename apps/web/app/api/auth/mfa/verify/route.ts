@@ -1,12 +1,12 @@
 // Vibe Tech Labs — POST /api/auth/mfa/verify — Confirm MFA enrollment
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
+import { prisma } from "@vibetech/db";
 import { withAuth } from "@/lib/auth";
 import { verifyTotp } from "@/lib/mfa";
 import { logAuditEvent } from "@/lib/audit";
 import { success, error, logger } from "@/lib/errors";
-import type { JwtPayload } from "@nexus/shared";
+import type { JwtPayload } from "@vibetech/shared";
 
 async function handleVerify(
     req: NextRequest,

@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ZodError } from "zod";
-import type { ApiResponse } from "@nexus/shared";
+import type { ApiResponse } from "@vibetech/shared";
 import pino from "pino";
 
 // ─── Logger ─────────────────────────────────────────────

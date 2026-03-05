@@ -2,11 +2,11 @@
 // Comprehensive employee dashboard with attendance, leaves, and notifications
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
+import { prisma } from "@vibetech/db";
 import { withAuth } from "@/lib/auth";
 import { getUnreadCount } from "@/lib/notifications";
 import { success } from "@/lib/errors";
-import type { JwtPayload } from "@nexus/shared";
+import type { JwtPayload } from "@vibetech/shared";
 
 async function handleEmployeeDashboard(
     req: NextRequest,

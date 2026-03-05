@@ -2,7 +2,7 @@
 // Authenticates user via email/password, returns JWT pair
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
+import { prisma } from "@vibetech/db";
 import { createHash } from "crypto";
 import { generateAccessToken, generateRefreshToken } from "@/lib/auth";
 import { setSession, checkRateLimit } from "@/lib/redis";

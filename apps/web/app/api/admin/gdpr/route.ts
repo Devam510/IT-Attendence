@@ -6,7 +6,7 @@ import { withRole } from "@/lib/auth";
 import { executeGdprErasure, exportUserData } from "@/lib/gdpr";
 import { logAuditEvent } from "@/lib/audit";
 import { success, error } from "@/lib/errors";
-import type { JwtPayload } from "@nexus/shared";
+import type { JwtPayload } from "@vibetech/shared";
 
 async function handleGdprErase(
     req: NextRequest,

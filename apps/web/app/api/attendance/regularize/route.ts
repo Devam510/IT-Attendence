@@ -3,12 +3,12 @@
 // Creates an ApprovalWorkflow entry
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
-import { RegularizeSchema } from "@nexus/shared";
+import { prisma } from "@vibetech/db";
+import { RegularizeSchema } from "@vibetech/shared";
 import { withAuth } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { success, error, logger } from "@/lib/errors";
-import type { JwtPayload } from "@nexus/shared";
+import type { JwtPayload } from "@vibetech/shared";
 
 async function handleRegularize(
     req: NextRequest,

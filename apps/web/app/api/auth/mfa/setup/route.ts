@@ -2,12 +2,12 @@
 // Vibe Tech Labs — DELETE /api/auth/mfa/setup — Disable MFA
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
+import { prisma } from "@vibetech/db";
 import { withAuth } from "@/lib/auth";
 import { generateTotpSecret, generateTotpQrCode, verifyTotp } from "@/lib/mfa";
 import { logAuditEvent } from "@/lib/audit";
 import { success, error, logger } from "@/lib/errors";
-import type { JwtPayload } from "@nexus/shared";
+import type { JwtPayload } from "@vibetech/shared";
 
 // ─── POST — Start MFA enrollment ────────────────────────
 

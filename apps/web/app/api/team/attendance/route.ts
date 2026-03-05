@@ -3,10 +3,10 @@
 // Accessible by MGR (direct reports only), HRA/SADM (entity-wide)
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@nexus/db";
+import { prisma } from "@vibetech/db";
 import { withRole } from "@/lib/auth";
 import { success, error } from "@/lib/errors";
-import type { JwtPayload } from "@nexus/shared";
+import type { JwtPayload } from "@vibetech/shared";
 
 async function handleTeamAttendance(
     req: NextRequest,

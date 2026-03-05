@@ -1,7 +1,7 @@
 // Vibe Tech Labs — Notification Dispatcher
 // Template-based notification creation and dispatch
 
-import { prisma } from "@nexus/db";
+import { prisma } from "@vibetech/db";
 
 // ─── Notification Templates ─────────────────────────────
 
