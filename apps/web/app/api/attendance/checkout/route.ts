@@ -38,27 +38,21 @@ async function handleCheckOut(
         return error("NO_CHECKIN", "No active check-in found for today", 404);
     }
 
-    // ── Strict device session verification ──────────────────────
+    // ── Device session verification ──────────────────────────────
+    // sessionToken is OPTIONAL for web sessions — JWT already proves identity.
+    // We only actively block when BOTH tokens exist AND they don't match
+    // (true buddy-checkout: different person's token was sent).
     const flags = record.anomalyFlags as Record<string, string> | null;
     const storedToken = flags?.sessionToken;
 
-    // Token is REQUIRED — no token = rejected regardless
-    if (!sessionToken) {
-        return error(
-            "SESSION_TOKEN_REQUIRED",
-            "Check-out must be done from the same device used for check-in. Please use the device you checked in with.",
-            403
-        );
-    }
-
-    if (storedToken && sessionToken !== storedToken) {
+    if (storedToken && sessionToken && sessionToken !== storedToken) {
         const checkInDevice = flags?.checkInDevice || "another device";
         logger.warn({
             userId: auth.sub,
             recordId: record.id,
             expected: storedToken.slice(0, 8) + "...",
             received: sessionToken.slice(0, 8) + "...",
-        }, "Checkout device mismatch — buddy checkout attempt blocked");
+        }, "Checkout device mismatch — possible buddy checkout blocked");
 
         return error(
             "DEVICE_MISMATCH",

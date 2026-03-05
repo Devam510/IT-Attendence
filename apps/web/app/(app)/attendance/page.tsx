@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { apiGet, apiPost } from "@/lib/api-client";
+import { useAuth } from "@/context/AuthContext";
 
 interface TodayData {
     checkedIn: boolean;
@@ -61,6 +62,9 @@ export default function AttendancePage() {
     const [actionLoading, setActionLoading] = useState(false);
     const [elapsed, setElapsed] = useState(0);
     const [toast, setToast] = useState<{ message: string; type: "error" | "success" } | null>(null);
+    const { user } = useAuth();
+    // Token key is scoped per user so switching accounts never mixes tokens
+    const tokenKey = `nexus-checkin-token-${user?.id || "guest"}`;
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
     // Auto-dismiss toast
@@ -135,9 +139,9 @@ export default function AttendancePage() {
                 checkInTime: res.data!.checkInTime || new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }),
                 location: res.data!.location || "Office",
             }));
-            // Store session token for device binding
+            // Store session token scoped to this user
             if (res.data.sessionToken) {
-                localStorage.setItem("nexus-checkin-token", res.data.sessionToken);
+                localStorage.setItem(tokenKey, res.data.sessionToken);
             }
             setToast({ message: "✅ Checked in successfully!", type: "success" });
             setSelectedDate(null); // Show today
@@ -151,7 +155,7 @@ export default function AttendancePage() {
         setActionLoading(true);
         setToast(null);
 
-        const sessionToken = localStorage.getItem("nexus-checkin-token") || "";
+        const sessionToken = localStorage.getItem(tokenKey) || "";
 
         const res = await apiPost<TodayData>("/api/attendance/checkout", { sessionToken });
         if (res.data) {
@@ -160,7 +164,7 @@ export default function AttendancePage() {
                 checkedIn: false,
                 checkOutTime: res.data!.checkOutTime || new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }),
             }));
-            localStorage.removeItem("nexus-checkin-token");
+            localStorage.removeItem(tokenKey);
             if (intervalRef.current) clearInterval(intervalRef.current);
             setToast({ message: "✅ Checked out successfully!", type: "success" });
         } else {
@@ -399,9 +403,9 @@ export default function AttendancePage() {
                                     <span className="att-today-label">📋 Status</span>
                                     <span className="att-today-value">
                                         <span className={`badge ${selectedCalDay.status === "PRESENT" || selectedCalDay.status === "VERIFIED" || selectedCalDay.status === "REGULARIZED" ? "badge-success" :
-                                                selectedCalDay.status === "ABSENT" ? "badge-danger" :
-                                                    selectedCalDay.status === "LEAVE" ? "badge-warning" :
-                                                        selectedCalDay.status === "WEEKEND" ? "badge-warning" : ""
+                                            selectedCalDay.status === "ABSENT" ? "badge-danger" :
+                                                selectedCalDay.status === "LEAVE" ? "badge-warning" :
+                                                    selectedCalDay.status === "WEEKEND" ? "badge-warning" : ""
                                             }`}>
                                             {selectedCalDay.status}
                                         </span>
