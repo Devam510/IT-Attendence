@@ -1,5 +1,5 @@
 // Vibe Tech Labs — POST /api/auth/login
-// Authenticates user via email/password, returns JWT pair
+// Authenticates user via username (employeeId) or email + password, returns JWT pair
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@vibetech/db";
@@ -31,20 +31,29 @@ async function handleLogin(req: NextRequest): Promise<NextResponse> {
         return error("INVALID_JSON", "Request body must be valid JSON", 400);
     }
 
-    const { email, password, totpToken, deviceId } = body as {
-        email?: string;
+    const { identifier, email, password, totpToken, deviceId } = body as {
+        identifier?: string; // username (employeeId) or email
+        email?: string;       // legacy support
         password?: string;
         totpToken?: string;
         deviceId?: string;
     };
 
-    if (!email || !password) {
-        return error("INVALID_INPUT", "Email and password are required", 400);
+    // Accept either new "identifier" field or legacy "email" field
+    const loginId = (identifier || email || "").trim();
+
+    if (!loginId || !password) {
+        return error("INVALID_INPUT", "Username/Email and password are required", 400);
     }
 
-    // Find user
-    const user = await prisma.user.findUnique({
-        where: { email: email.toLowerCase().trim() },
+    // Find user by email OR employeeId (case-insensitive)
+    const user = await prisma.user.findFirst({
+        where: {
+            OR: [
+                { email: loginId.toLowerCase() },
+                { employeeId: loginId },
+            ],
+        },
         include: {
             entity: { select: { id: true, timezone: true } },
             location: { select: { id: true, name: true } },
@@ -53,7 +62,7 @@ async function handleLogin(req: NextRequest): Promise<NextResponse> {
     });
 
     if (!user) {
-        logger.warn({ email }, "Login attempt for non-existent user");
+        logger.warn({ loginId }, "Login attempt for non-existent user");
         return error("AUTH_FAILED", "Invalid credentials", 401);
     }
 

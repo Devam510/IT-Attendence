@@ -9,7 +9,7 @@ import "@/styles/components.css";
 export default function LoginPage() {
     const router = useRouter();
     const { login } = useAuth();
-    const [email, setEmail] = useState("");
+    const [identifier, setIdentifier] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
@@ -20,7 +20,7 @@ export default function LoginPage() {
         setError("");
         setLoading(true);
 
-        const result = await login(email, password);
+        const result = await login(identifier, password);
 
         if (result.mfaRequired) {
             router.push("/mfa");
@@ -75,18 +75,18 @@ export default function LoginPage() {
                         )}
 
                         <div className="input-group" style={{ marginBottom: "var(--space-5)" }}>
-                            <label className="input-label" htmlFor="email">
-                                Email Address
+                            <label className="input-label" htmlFor="identifier">
+                                Username or Email
                             </label>
                             <input
-                                id="email"
-                                type="email"
+                                id="identifier"
+                                type="text"
                                 className="input"
-                                placeholder="you@company.com"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="Employee ID or email address"
+                                value={identifier}
+                                onChange={(e) => setIdentifier(e.target.value)}
                                 required
-                                autoComplete="email"
+                                autoComplete="username"
                                 autoFocus
                             />
                         </div>
@@ -140,7 +140,7 @@ export default function LoginPage() {
                         <button
                             type="submit"
                             className="btn btn-primary btn-full btn-lg"
-                            disabled={loading || !email || !password}
+                            disabled={loading || !identifier || !password}
                         >
                             {loading ? (
                                 <>

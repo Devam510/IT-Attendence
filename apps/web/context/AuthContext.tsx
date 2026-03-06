@@ -18,7 +18,7 @@ interface AuthContextType {
     user: User | null;
     isAuthenticated: boolean;
     isLoading: boolean;
-    login: (email: string, password: string) => Promise<{ success: boolean; mfaRequired?: boolean; error?: string }>;
+    login: (identifier: string, password: string) => Promise<{ success: boolean; mfaRequired?: boolean; error?: string }>;
     verifyMfa: (code: string) => Promise<{ success: boolean; error?: string }>;
     logout: () => void;
 }
@@ -117,7 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             });
     }, []);
 
-    const login = useCallback(async (email: string, password: string) => {
+    const login = useCallback(async (identifier: string, password: string) => {
         const res = await api<{
             accessToken?: string;
             refreshToken?: string;
@@ -126,7 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             tempToken?: string;
         }>("/api/auth/login", {
             method: "POST",
-            body: JSON.stringify({ email, password }),
+            body: JSON.stringify({ identifier, password }),
         });
 
         if (res.error) return { success: false, error: res.error };
