@@ -562,16 +562,7 @@ export default function AttendancePage() {
                                 </span>
                             </div>
                         )}
-                        <div className="att-today-row">
-                            <span className="att-today-label">🛡️ Verification</span>
-                            <span className="att-today-value">
-                                {today.verificationScore !== undefined && today.verificationScore !== null ? (
-                                    <span className={`badge ${today.verificationScore >= 80 ? "badge-success" : today.verificationScore >= 50 ? "badge-warning" : "badge-danger"}`}>
-                                        {today.verificationScore}/100
-                                    </span>
-                                ) : "—"}
-                            </span>
-                        </div>
+
 
                         <div style={{ marginTop: "var(--space-6)" }}>
                             {today.checkedIn ? (
@@ -684,22 +675,7 @@ export default function AttendancePage() {
                                     </div>
                                 )}
 
-                                {selectedCalDay.verificationScore != null && (
-                                    <div className="att-today-row">
-                                        <span className="att-today-label">🛡️ Verification</span>
-                                        <span className="att-today-value">
-                                            <span className={`badge ${selectedCalDay.verificationScore >= 80 ? "badge-success" : selectedCalDay.verificationScore >= 50 ? "badge-warning" : "badge-danger"}`}>
-                                                {selectedCalDay.verificationScore}/100
-                                            </span>
-                                        </span>
-                                    </div>
-                                )}
-                                {selectedCalDay.checkInMethod && (
-                                    <div className="att-today-row">
-                                        <span className="att-today-label">📱 Method</span>
-                                        <span className="att-today-value">{selectedCalDay.checkInMethod}</span>
-                                    </div>
-                                )}
+
                             </>
                         ) : (
                             <div style={{ textAlign: "center", padding: "var(--space-6)", color: "var(--text-secondary)" }}>
