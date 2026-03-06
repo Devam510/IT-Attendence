@@ -124,6 +124,7 @@ async function handleTeamAttendance(
             checkInAt: onLeave ? null : att?.checkInAt?.toISOString() || null,
             checkOutAt: onLeave ? null : att?.checkOutAt?.toISOString() || null,
             totalHours: onLeave ? null : att?.totalHours || null,
+            overtimeHours: onLeave ? 0 : Math.max(0, (att?.totalHours || 0) - 8),
             leaveType: leave ? (leave as any).leaveType?.name : null,
             leaveStart: leave ? (leave as any).startDate?.toISOString() || null : null,
             leaveEnd: leave ? (leave as any).endDate?.toISOString() || null : null,

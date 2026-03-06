@@ -155,16 +155,16 @@ async function handleExportAdvanced(
     const daysRequested = Math.ceil(totalMs / (24 * 3600 * 1000));
 
     // Summary structures
-    type Stats = { present: number, absent: number, leave: number, totalHours: number, breaksSecs: number };
+    type Stats = { present: number, absent: number, leave: number, totalHours: number, overtimeHours: number, breaksSecs: number };
     const statsMap = new Map<string, Stats>();
-    users.forEach(u => statsMap.set(u.id, { present: 0, absent: 0, leave: 0, totalHours: 0, breaksSecs: 0 }));
+    users.forEach(u => statsMap.set(u.id, { present: 0, absent: 0, leave: 0, totalHours: 0, overtimeHours: 0, breaksSecs: 0 }));
 
     // CSV Output lines
     const csvRows: string[][] = [];
     csvRows.push([
         "Employee Name", "Employee ID", "Department", "Designation",
         "Date", "Status", "Check In", "Check Out", "Total Hours",
-        "Breaks (Mins)", "Remarks"
+        "Overtime (hrs)", "Breaks (Mins)", "Remarks"
     ]);
 
     // Go sequentially day by day to structure output gracefully
@@ -211,7 +211,10 @@ async function handleExportAdvanced(
                 }
                 hours = wHours ? wHours.toFixed(2) : "";
 
-                if (wHours) userStats.totalHours += wHours;
+                if (wHours) {
+                    userStats.totalHours += wHours;
+                    userStats.overtimeHours += Math.max(0, wHours - 8);
+                }
 
                 const flags: any = att.anomalyFlags || {};
                 if (flags.isHalfDay) {
@@ -234,6 +237,10 @@ async function handleExportAdvanced(
             const normalizedStatus = status.replace(" ", "_"); // "ON LEAVE" -> "ON_LEAVE"
             if (statusFilter !== "all" && normalizedStatus !== statusFilter) continue;
 
+            const overtimeHrs = status === "PRESENT" || status === "HALF DAY"
+                ? Math.max(0, parseFloat(hours || "0") - 8).toFixed(2)
+                : "";
+
             csvRows.push([
                 u.fullName,
                 u.employeeId,
@@ -244,6 +251,7 @@ async function handleExportAdvanced(
                 checkIn,
                 checkOut,
                 hours,
+                overtimeHrs !== "0.00" ? overtimeHrs : "",
                 breaksMins,
                 remark
             ]);
@@ -253,7 +261,7 @@ async function handleExportAdvanced(
     if (includeStats) {
         csvRows.push([]); // blank line
         csvRows.push(["--- STATISTICS SUMMARY ---"]);
-        csvRows.push(["Employee Name", "Employee ID", "Days Present", "Days Absent", "Days on Leave", "Total Worked Hours", "Total Break Hours"]);
+        csvRows.push(["Employee Name", "Employee ID", "Days Present", "Days Absent", "Days on Leave", "Total Worked Hours", "Total Overtime Hours", "Total Break Hours"]);
 
         for (const u of users) {
             const st = statsMap.get(u.id)!;
@@ -264,6 +272,7 @@ async function handleExportAdvanced(
                 String(st.absent),
                 String(st.leave),
                 st.totalHours.toFixed(2),
+                st.overtimeHours.toFixed(2),
                 (st.breaksSecs / 3600).toFixed(2)
             ]);
         }

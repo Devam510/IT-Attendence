@@ -19,6 +19,7 @@ interface StaffMember {
     checkInAt?: string | null;
     checkOutAt?: string | null;
     totalHours?: number | null;
+    overtimeHours?: number;
     leaveType?: string | null;
     remark?: string | null;
     breaks?: { start: string; end?: string | null; duration?: number }[];
@@ -878,7 +879,22 @@ export default function TeamAttendancePage() {
                                                 </span>
                                             </td>
                                             <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>
-                                                {fmtHours(m.totalHours)}
+                                                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                                                    <span>{fmtHours(m.totalHours)}</span>
+                                                    {(m.overtimeHours ?? 0) > 0 && (
+                                                        <span style={{
+                                                            display: "inline-block",
+                                                            background: "#fef3c7",
+                                                            color: "#92400e",
+                                                            fontSize: 11, fontWeight: 700,
+                                                            padding: "1px 6px", borderRadius: 8,
+                                                            border: "1px solid #fde68a",
+                                                            width: "fit-content",
+                                                        }}>
+                                                            +{fmtHours(m.overtimeHours)} OT
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     );

@@ -452,6 +452,7 @@ export default function DashboardPage() {
     const WORK_SECS = 8 * 3600;
     const [countdown, setCountdown] = useState(WORK_SECS);
     const [countdownColor, setCountdownColor] = useState("#16a34a");
+    const [overtimeSecs, setOvertimeSecs] = useState(0);
 
     // Break state — log-based so multiple breaks can be recorded
     interface BreakEntry { start: string; end: string | null; }
@@ -567,7 +568,9 @@ export default function DashboardPage() {
                     : 0;
                 const netWorked = elapsed - finishedBreak - liveBreak;
                 const rem = Math.max(0, WORK_SECS - netWorked);
+                const ot = Math.max(0, netWorked - WORK_SECS);
                 setCountdown(rem);
+                setOvertimeSecs(ot);
                 const pct = rem / WORK_SECS;
                 setCountdownColor(pct > 0.5 ? "#16a34a" : pct > 0.2 ? "#d97706" : "#dc2626");
             };
@@ -829,9 +832,11 @@ export default function DashboardPage() {
                         ? "linear-gradient(135deg,#0f766e,#0d9488)"
                         : onBreak
                             ? "linear-gradient(135deg,#92400e,#d97706)"
-                            : empData.checkedIn
-                                ? "linear-gradient(135deg,#15803d,#16a34a)"
-                                : "linear-gradient(135deg,#1d4ed8,#2563eb)",
+                            : empData.checkedIn && overtimeSecs > 0
+                                ? "linear-gradient(135deg,#92400e,#b45309)"
+                                : empData.checkedIn
+                                    ? "linear-gradient(135deg,#15803d,#16a34a)"
+                                    : "linear-gradient(135deg,#1d4ed8,#2563eb)",
                     transition: "background 0.5s",
                 }}>
                     {/* Top status row */}
@@ -854,8 +859,19 @@ export default function DashboardPage() {
                                 {empData.checkInTime} → {empData.checkOutTime}
                             </div>
                         ) : empData.checkedIn ? (
-                            <div style={{ fontSize: 38, fontWeight: 800, letterSpacing: -2, fontVariantNumeric: "tabular-nums", fontFamily: "monospace" }}>
-                                {fmtCountdown(countdown)}
+                            <div>
+                                {overtimeSecs > 0 ? (
+                                    <>
+                                        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontWeight: 700, marginBottom: 2, letterSpacing: "0.08em" }}>🔥 OVERTIME</div>
+                                        <div style={{ fontSize: 38, fontWeight: 800, letterSpacing: -2, fontVariantNumeric: "tabular-nums", fontFamily: "monospace", color: "#fef08a" }}>
+                                            +{fmtCountdown(overtimeSecs)}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div style={{ fontSize: 38, fontWeight: 800, letterSpacing: -2, fontVariantNumeric: "tabular-nums", fontFamily: "monospace" }}>
+                                        {fmtCountdown(countdown)}
+                                    </div>
+                                )}
                             </div>
                         ) : (
                             <div style={{ fontSize: 32, fontWeight: 700 }}>
@@ -870,24 +886,35 @@ export default function DashboardPage() {
                                 : empData.checkedIn
                                     ? onBreak
                                         ? `Break: ${fmtCountdown(breakElapsed)}  ·  Remaining work time`
-                                        : "Remaining work time"
+                                        : overtimeSecs > 0
+                                            ? "You're in overtime — great work! 💪"
+                                            : "Remaining work time"
                                     : "Tap check in to start your day"}
                         </div>
 
-                        {/* Progress bar (only when checked in) */}
                         {empData.checkedIn && !empData.checkedOut && (
                             <div style={{ height: 5, borderRadius: 99, background: "rgba(255,255,255,0.2)", marginBottom: 14, overflow: "hidden" }}>
-                                <div style={{
-                                    height: "100%", borderRadius: 99,
-                                    background: countdown === 0 ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.7)",
-                                    width: `${(countdown / WORK_SECS) * 100}%`,
-                                    transition: "width 1s linear",
-                                }} />
+                                {overtimeSecs > 0 ? (
+                                    // Overtime bar — grows from left in yellow
+                                    <div style={{
+                                        height: "100%", borderRadius: 99,
+                                        background: "rgba(254,240,138,0.9)",
+                                        width: `${Math.min(100, (overtimeSecs / (2 * 3600)) * 100)}%`,
+                                        transition: "width 1s linear",
+                                    }} />
+                                ) : (
+                                    <div style={{
+                                        height: "100%", borderRadius: 99,
+                                        background: countdown === 0 ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.7)",
+                                        width: `${(countdown / WORK_SECS) * 100}%`,
+                                        transition: "width 1s linear",
+                                    }} />
+                                )}
                             </div>
                         )}
 
-                        {/* Done banner */}
-                        {empData.checkedIn && !empData.checkedOut && countdown === 0 && (
+                        {/* Overtime section below progress bar */}
+                        {empData.checkedIn && !empData.checkedOut && overtimeSecs === 0 && countdown === 0 && (
                             <div style={{ fontSize: 12, color: "rgba(255,255,255,0.9)", marginBottom: 10, fontWeight: 600 }}>🎉 8-hour workday complete!</div>
                         )}
                     </div>

@@ -541,6 +541,29 @@ export default function AttendancePage() {
                                 {today.checkedIn ? formatElapsed(elapsed) : (today.totalMinutes ? `${(today.totalMinutes / 60).toFixed(1)}h` : "—")}
                             </span>
                         </div>
+                        {/* Overtime: live for today — shown only when elapsed > 8h */}
+                        {(() => {
+                            const WORK_SECS = 8 * 3600;
+                            // Subtract break time from elapsed for net worked seconds
+                            const breakSecs = attBreakLog.reduce((sum, b) => {
+                                if (!b.start || !b.end) return sum;
+                                return sum + Math.floor((new Date(b.end).getTime() - new Date(b.start).getTime()) / 1000);
+                            }, 0);
+                            const netSecs = Math.max(0, elapsed - breakSecs);
+                            const otSecs = today.checkedIn ? Math.max(0, netSecs - WORK_SECS) : 0;
+                            if (otSecs <= 0) return null;
+                            const otH = Math.floor(otSecs / 3600);
+                            const otM = Math.floor((otSecs % 3600) / 60);
+                            const otLabel = otH > 0 ? `${otH}h ${otM}m` : `${otM}m`;
+                            return (
+                                <div className="att-today-row">
+                                    <span className="att-today-label">🔥 Overtime</span>
+                                    <span className="att-today-value" style={{ color: "#d97706", fontFamily: "var(--font-mono)", fontWeight: 700 }}>
+                                        +{otLabel}
+                                    </span>
+                                </div>
+                            );
+                        })()}
                         {/* Break History from dashboard localStorage */}
                         {attBreakLog.length > 0 && (
                             <div className="att-today-row" style={{ alignItems: "flex-start" }}>
@@ -653,6 +676,22 @@ export default function AttendancePage() {
                                         {selectedCalDay.totalHours != null ? `${selectedCalDay.totalHours.toFixed(1)}h` : "—"}
                                     </span>
                                 </div>
+                                {/* Overtime for past day */}
+                                {(() => {
+                                    const ot = selectedCalDay.overtimeHours ?? Math.max(0, (selectedCalDay.totalHours ?? 0) - 8);
+                                    if (ot <= 0) return null;
+                                    const otH = Math.floor(ot);
+                                    const otM = Math.round((ot - otH) * 60);
+                                    const otLabel = otH > 0 ? `${otH}h ${otM}m` : `${otM}m`;
+                                    return (
+                                        <div className="att-today-row">
+                                            <span className="att-today-label">🔥 Overtime</span>
+                                            <span className="att-today-value" style={{ color: "#d97706", fontFamily: "var(--font-mono)", fontWeight: 700 }}>
+                                                +{otLabel}
+                                            </span>
+                                        </div>
+                                    );
+                                })()}
 
                                 {/* Breaks for past day */}
                                 {selectedCalDay.breaks && selectedCalDay.breaks.length > 0 && (
