@@ -32,6 +32,7 @@ async function handleEmployeeDashboard(
         recentNotifications,
         unreadCount,
         pendingApprovals,
+        pendingTasks,
     ] = await Promise.all([
         // User profile
         prisma.user.findUnique({
@@ -69,6 +70,26 @@ async function handleEmployeeDashboard(
         // Pending approvals (for managers)
         prisma.approvalWorkflow.count({
             where: { requesterId: auth.sub, status: "PENDING" },
+        }),
+        // Pending tasks assigned to this employee
+        prisma.task.findMany({
+            where: {
+                assignedToId: auth.sub,
+                status: { in: ["PENDING", "IN_PROGRESS"] },
+            },
+            select: {
+                id: true,
+                title: true,
+                priority: true,
+                dueDate: true,
+                status: true,
+                assignedBy: { select: { fullName: true } },
+            },
+            orderBy: [
+                { priority: "desc" },   // HIGH first
+                { dueDate: "asc" },
+            ],
+            take: 20,
         }),
     ]);
 
@@ -131,6 +152,16 @@ async function handleEmployeeDashboard(
             })),
         },
         pendingApprovals,
+        pendingItems: pendingTasks.map((t: any) => ({
+            id: t.id,
+            title: t.title,
+            meta: [
+                t.assignedBy?.fullName ? `From: ${t.assignedBy.fullName}` : null,
+                t.dueDate ? `Due: ${new Date(t.dueDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : null,
+                t.status === "IN_PROGRESS" ? "In Progress" : null,
+            ].filter(Boolean).join(" · "),
+            priority: t.priority === "HIGH" ? "high" : t.priority === "MEDIUM" ? "medium" : undefined,
+        })),
     });
 }
 
