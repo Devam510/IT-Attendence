@@ -44,7 +44,7 @@ export default function Sidebar() {
 
     // Admins don't have personal attendance — hide that link for them
     const visibleNavItems = isSuperAdmin
-        ? NAV_ITEMS.filter(item => item.href !== "/attendance")
+        ? NAV_ITEMS.filter(item => item.href !== "/attendance" && item.href !== "/leaves")
         : NAV_ITEMS;
 
     return (
