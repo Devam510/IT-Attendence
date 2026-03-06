@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { apiGet, apiPost } from "@/lib/api-client";
 import { useAuth } from "@/context/AuthContext";
 import "@/styles/admin.css";
@@ -124,10 +125,10 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
     const passwordsMatch = confirmPassword.length > 0 && confirmPassword === newPassword;
     const passwordsMismatch = confirmPassword.length > 0 && confirmPassword !== newPassword;
 
-    return (
+    return createPortal(
         <div
             style={{
-                position: "fixed", inset: 0, zIndex: "var(--z-modal-backdrop)" as any,
+                position: "fixed", inset: 0, zIndex: 9999,
                 background: "rgba(10,20,40,0.6)", backdropFilter: "blur(8px)",
                 display: "flex", alignItems: "center", justifyContent: "center", padding: "var(--space-4)",
             }}
@@ -316,7 +317,7 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
                 </div>
             </div>
         </div>
-    );
+        , document.body);
 }
 
 /* ─── Profile Page ────────────────────────────────────── */
@@ -437,12 +438,13 @@ export default function ProfilePage() {
 
             {/* ── Hero Avatar Card ─────────────────────────── */}
             <div style={{
-                borderRadius: "var(--radius-2xl)", overflow: "hidden",
+                borderRadius: "var(--radius-2xl)", overflow: "visible",
                 marginBottom: "var(--space-4)", boxShadow: "var(--shadow-sm)",
                 border: "1px solid var(--border-primary)",
+                background: "var(--bg-primary)",
             }}>
                 {/* Gradient banner */}
-                <div style={{ background: avatarGradient, height: 90, position: "relative" }}>
+                <div style={{ background: avatarGradient, height: 90, position: "relative", borderRadius: "var(--radius-2xl) var(--radius-2xl) 0 0", overflow: "hidden" }}>
                     {/* Subtle dot pattern */}
                     <div style={{
                         position: "absolute", inset: 0,
