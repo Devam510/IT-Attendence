@@ -330,6 +330,156 @@ function EmployeeMonthModal({ employee, onClose }: {
     return createPortal(modal, document.body);
 }
 
+// ─── Advanced Export Modal ─────────────────────────────────────────────────────
+function AdvancedExportModal({ onClose }: { onClose: () => void }) {
+    const [loading, setLoading] = useState(true);
+    const [options, setOptions] = useState<{ employees: { id: string; fullName: string; employeeId: string }[]; departments: { id: string; name: string }[] }>({ employees: [], departments: [] });
+
+    const now = new Date();
+    const firstDayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    const [start, setStart] = useState(firstDayStr);
+    const [end, setEnd] = useState(todayStr);
+    const [empId, setEmpId] = useState("all");
+    const [deptId, setDeptId] = useState("all");
+    const [role, setRole] = useState("all");
+    const [stats, setStats] = useState(true);
+    const [downloading, setDownloading] = useState(false);
+
+    useEffect(() => {
+        apiGet<{ employees: any[]; departments: any[] }>("/api/attendance/export-options")
+            .then(res => {
+                if (res.data) setOptions(res.data);
+            })
+            .finally(() => setLoading(false));
+    }, []);
+
+    const handleDownload = async () => {
+        setDownloading(true);
+        try {
+            const params = new URLSearchParams({
+                start, end, empId, deptId, role, stats: stats.toString()
+            });
+            const res = await fetch(`/api/attendance/export-advanced?${params.toString()}`);
+            if (!res.ok) {
+                const text = await res.text();
+                alert(`Export failed: ${text}`);
+                return;
+            }
+
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `attendance-export-${start}-to-${end}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            onClose();
+        } catch (e: any) {
+            alert(`Error: ${e.message}`);
+        } finally {
+            setDownloading(false);
+        }
+    };
+
+    const modal = (
+        <div
+            onClick={onClose}
+            style={{
+                position: "fixed", inset: 0, zIndex: 9999,
+                background: "rgba(10,20,40,0.65)", backdropFilter: "blur(6px)",
+                display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+            }}
+        >
+            <div
+                onClick={e => e.stopPropagation()}
+                style={{
+                    background: "var(--bg-primary)", borderRadius: 16, padding: 24,
+                    width: "100%", maxWidth: 500,
+                    boxShadow: "0 24px 60px rgba(0,0,0,0.4)",
+                    border: "1px solid var(--border-primary)",
+                }}
+            >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                    <h2 style={{ margin: 0, fontSize: 18, display: "flex", alignItems: "center", gap: 8 }}>
+                        <Download size={20} className="text-primary" /> Advanced Export
+                    </h2>
+                    <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "var(--text-secondary)" }}>✕</button>
+                </div>
+
+                {loading ? (
+                    <div style={{ padding: 40, textAlign: "center", color: "var(--text-tertiary)" }}>Loading options…</div>
+                ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                            <div>
+                                <label style={{ display: "block", fontSize: 13, marginBottom: 6, fontWeight: 500, color: "var(--text-secondary)" }}>From Date</label>
+                                <input type="date" value={start} onChange={e => setStart(e.target.value)} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-secondary)", color: "var(--text-primary)" }} />
+                            </div>
+                            <div>
+                                <label style={{ display: "block", fontSize: 13, marginBottom: 6, fontWeight: 500, color: "var(--text-secondary)" }}>To Date</label>
+                                <input type="date" value={end} onChange={e => setEnd(e.target.value)} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-secondary)", color: "var(--text-primary)" }} />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label style={{ display: "block", fontSize: 13, marginBottom: 6, fontWeight: 500, color: "var(--text-secondary)" }}>Employee</label>
+                            <select value={empId} onChange={e => setEmpId(e.target.value)} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-secondary)", color: "var(--text-primary)" }}>
+                                <option value="all">All Employees</option>
+                                {options.employees.map(e => (
+                                    <option key={e.id} value={e.id}>{e.fullName} ({e.employeeId})</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                            <div>
+                                <label style={{ display: "block", fontSize: 13, marginBottom: 6, fontWeight: 500, color: "var(--text-secondary)" }}>Department</label>
+                                <select value={deptId} onChange={e => setDeptId(e.target.value)} disabled={empId !== "all"} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-secondary)", color: "var(--text-primary)", opacity: empId !== "all" ? 0.5 : 1 }}>
+                                    <option value="all">All Departments</option>
+                                    {options.departments.map(d => (
+                                        <option key={d.id} value={d.id}>{d.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{ display: "block", fontSize: 13, marginBottom: 6, fontWeight: 500, color: "var(--text-secondary)" }}>Role</label>
+                                <select value={role} onChange={e => setRole(e.target.value)} disabled={empId !== "all"} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-secondary)", color: "var(--text-primary)", opacity: empId !== "all" ? 0.5 : 1 }}>
+                                    <option value="all">All Roles</option>
+                                    <option value="EMP">Employee (EMP)</option>
+                                    <option value="MGR">Manager (MGR)</option>
+                                    <option value="HRBP">HR Business Partner</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginTop: 8 }}>
+                            <input type="checkbox" checked={stats} onChange={e => setStats(e.target.checked)} style={{ width: 16, height: 16, accentColor: "var(--color-primary, #2563eb)", cursor: "pointer" }} />
+                            <span style={{ fontSize: 14, color: "var(--text-primary)" }}>Include Statistics Summary</span>
+                        </label>
+
+                        <button
+                            onClick={handleDownload}
+                            disabled={downloading || !start || !end}
+                            style={{
+                                marginTop: 12, width: "100%", padding: "12px", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: (downloading || !start || !end) ? "not-allowed" : "pointer",
+                                background: "var(--color-primary, #2563eb)", color: "white", border: "none", opacity: (downloading || !start || !end) ? 0.7 : 1,
+                                display: "flex", justifyContent: "center", alignItems: "center", gap: 8
+                            }}
+                        >
+                            {downloading ? "Generating CSV..." : <><Download size={16} /> Download Report</>}
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+
+    return createPortal(modal, document.body);
+}
+
+
 
 export default function TeamAttendancePage() {
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -341,6 +491,7 @@ export default function TeamAttendancePage() {
     const [search, setSearch] = useState("");
     const [viewingEmployee, setViewingEmployee] = useState<{ id: string; fullName: string; employeeId: string } | null>(null);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const [showExportModal, setShowExportModal] = useState(false);
 
     const loadData = useCallback(async (date: Date, silent = false) => {
         if (silent) setRefreshing(true);
@@ -548,31 +699,7 @@ export default function TeamAttendancePage() {
 
                 {/* Export button */}
                 <button
-                    onClick={() => {
-                        const csvContent = [
-                            ["Employee", "ID", "Dept / Role", "Status", "Check In", "Check Out", "Hours", "Breaks", "Half Day", "Early Reason", "Remark"],
-                            ...filtered.map(m => [
-                                `"${m.fullName}"`,
-                                m.employeeId,
-                                m.designation || "-",
-                                m.status,
-                                fmtTime(m.checkInAt),
-                                fmtTime(m.checkOutAt),
-                                m.totalHours?.toFixed(2) || "-",
-                                m.breaks?.length || 0,
-                                m.isHalfDay ? "Yes" : "No",
-                                m.earlyReason ? `"${m.earlyReason.replace(/"/g, '""')}"` : "-",
-                                m.remark ? `"${m.remark.replace(/"/g, '""')}"` : "-"
-                            ])
-                        ].map(row => row.join(",")).join("\n");
-                        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = `team_attendance_${toISTDateString(selectedDate)}.csv`;
-                        a.click();
-                        URL.revokeObjectURL(url);
-                    }}
+                    onClick={() => setShowExportModal(true)}
                     style={{
                         padding: "7px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer",
                         background: "none", color: "var(--text-primary)", border: "1px solid var(--border)",
@@ -722,6 +849,11 @@ export default function TeamAttendancePage() {
                     employee={viewingEmployee}
                     onClose={() => setViewingEmployee(null)}
                 />
+            )}
+
+            {/* Advanced Export Modal */}
+            {showExportModal && (
+                <AdvancedExportModal onClose={() => setShowExportModal(false)} />
             )}
         </div>
     );
