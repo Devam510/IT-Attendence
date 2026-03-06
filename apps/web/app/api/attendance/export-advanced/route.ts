@@ -46,6 +46,7 @@ async function handleExportAdvanced(
     const empId = searchParams.get("empId");
     const deptId = searchParams.get("deptId");
     const roleId = searchParams.get("role");
+    const statusFilter = searchParams.get("statusFilter") || "all"; // "all" | "PRESENT" | "ABSENT" | "ON_LEAVE"
     const includeStats = searchParams.get("stats") === "true";
 
     const istOffsetMs = 5.5 * 60 * 60 * 1000;
@@ -225,8 +226,10 @@ async function handleExportAdvanced(
                 userStats.absent++;
             }
 
-            // Exclude future days from absent count / rows if desired? 
-            // We'll output all days requested in the range for completeness
+            // Apply status filter — skip rows that don't match the requested status
+            const normalizedStatus = status.replace(" ", "_"); // "ON LEAVE" -> "ON_LEAVE"
+            if (statusFilter !== "all" && normalizedStatus !== statusFilter) continue;
+
             csvRows.push([
                 u.fullName,
                 u.employeeId,

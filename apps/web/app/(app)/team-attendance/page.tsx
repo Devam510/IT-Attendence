@@ -351,6 +351,7 @@ function AdvancedExportModal({ onClose, onToast }: {
     const [empId, setEmpId] = useState("all");
     const [deptId, setDeptId] = useState("all");
     const [role, setRole] = useState("all");
+    const [statusFilter, setStatusFilter] = useState("all");
     const [stats, setStats] = useState(true);
     const [downloading, setDownloading] = useState(false);
 
@@ -367,7 +368,7 @@ function AdvancedExportModal({ onClose, onToast }: {
         onToast({ type: "info", message: "Generating CSV…" });
         try {
             const params = new URLSearchParams({
-                start, end, empId, deptId, role, stats: stats.toString()
+                start, end, empId, deptId, role, statusFilter, stats: stats.toString()
             });
             const res = await apiFetch(`/api/attendance/export-advanced?${params.toString()}`, { method: "GET" });
             if (!res.ok) {
@@ -459,7 +460,7 @@ function AdvancedExportModal({ onClose, onToast }: {
                             </select>
                         </div>
 
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
                             <div>
                                 <label style={{ display: "block", fontSize: 13, marginBottom: 6, fontWeight: 500, color: "var(--text-secondary)" }}>Department</label>
                                 <select value={deptId} onChange={e => setDeptId(e.target.value)} disabled={empId !== "all"} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-secondary)", color: "var(--text-primary)", opacity: empId !== "all" ? 0.5 : 1 }}>
@@ -476,6 +477,15 @@ function AdvancedExportModal({ onClose, onToast }: {
                                     <option value="EMP">Employee (EMP)</option>
                                     <option value="MGR">Manager (MGR)</option>
                                     <option value="HRBP">HR Business Partner</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{ display: "block", fontSize: 13, marginBottom: 6, fontWeight: 500, color: "var(--text-secondary)" }}>Status</label>
+                                <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-secondary)", color: "var(--text-primary)" }}>
+                                    <option value="all">All Statuses</option>
+                                    <option value="PRESENT">✅ Present</option>
+                                    <option value="ABSENT">❌ Absent</option>
+                                    <option value="ON_LEAVE">🏖️ On Leave</option>
                                 </select>
                             </div>
                         </div>
