@@ -62,6 +62,10 @@ async function handleExportAdvanced(
     const pEnd = endParam.split("-").map(Number);
     const dayEnd = new Date(Date.UTC(pEnd[0] ?? 2026, (pEnd[1] ?? 1) - 1, pEnd[2] ?? 1) - istOffsetMs + 24 * 60 * 60 * 1000); // end of that day
 
+    // For PostgreSQL DATE columns, we must compare against absolute 00:00:00Z 
+    const queryStartDateUtc = new Date(`${startParam}T00:00:00Z`);
+    const queryEndDateUtc = new Date(`${endParam}T00:00:00Z`);
+
     // Base scoping logic
     const isHraOrAdmin = auth.role === "HRA" || auth.role === "SADM" || auth.role === "HRBP";
 
@@ -124,8 +128,8 @@ async function handleExportAdvanced(
             where: {
                 userId: { in: userIds },
                 status: "APPROVED",
-                startDate: { lte: dayEnd },
-                endDate: { gte: dayStart },
+                startDate: { lte: queryEndDateUtc },
+                endDate: { gte: queryStartDateUtc },
             },
             select: {
                 userId: true,

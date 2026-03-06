@@ -21,8 +21,10 @@ async function handleTeamAttendance(
 
     let dayStart: Date;
     let dayEnd: Date;
+    let targetDateStr: string;
 
     if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+        targetDateStr = dateParam;
         const parts = dateParam.split("-").map(Number);
         const y = parts[0] ?? 2026, m = parts[1] ?? 1, d = parts[2] ?? 1;
         // Build IST midnight → next midnight in UTC
@@ -31,9 +33,14 @@ async function handleTeamAttendance(
     } else {
         // Default: today in IST
         const nowIst = new Date(Date.now() + istOffsetMs);
+        targetDateStr = nowIst.toISOString().slice(0, 10);
         dayStart = new Date(Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - istOffsetMs);
         dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
     }
+
+    // For PostgreSQL DATE columns, we must compare against absolute 00:00:00Z 
+    // to prevent timezone offsets from drifting dates in the query
+    const targetDateUtc = new Date(`${targetDateStr}T00:00:00Z`);
 
     const isHraOrAdmin = auth.role === "HRA" || auth.role === "SADM" || auth.role === "HRBP";
 
@@ -72,8 +79,8 @@ async function handleTeamAttendance(
         prisma.leaveRequest.findMany({
             where: {
                 status: "APPROVED",
-                startDate: { lte: dayEnd },
-                endDate: { gte: dayStart },
+                startDate: { lte: targetDateUtc },
+                endDate: { gte: targetDateUtc },
                 user: isHraOrAdmin
                     ? { entityId: auth.entityId }
                     : { managerId: auth.sub },
