@@ -40,6 +40,12 @@ export default function Sidebar() {
 
     const isManager = user?.role === "MGR" || user?.role === "HRA" || user?.role === "SADM";
     const isAdmin = user?.role === "SADM" || user?.role === "HRA" || user?.role === "SEC";
+    const isSuperAdmin = user?.role === "SADM";
+
+    // Admins don't have personal attendance — hide that link for them
+    const visibleNavItems = isSuperAdmin
+        ? NAV_ITEMS.filter(item => item.href !== "/attendance")
+        : NAV_ITEMS;
 
     return (
         <aside className="sidebar" role="navigation" aria-label="Main navigation">
@@ -59,7 +65,7 @@ export default function Sidebar() {
 
             <nav className="sidebar-nav">
                 <div className="sidebar-section">Main</div>
-                {NAV_ITEMS.map(({ href, Icon, label }) => (
+                {visibleNavItems.map(({ href, Icon, label }) => (
                     <Link
                         key={href}
                         href={href}
