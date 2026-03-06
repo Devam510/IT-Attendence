@@ -90,6 +90,42 @@ export const POST = withAuth(async (req: NextRequest, { auth }: { auth: JwtPaylo
             return NextResponse.json({ error: "Managers can only assign tasks to their direct reports" }, { status: 403 });
         }
 
+        // Block assigning tasks to employees on approved leave
+        // Check against task due date (if provided) or today, to catch immediate assignments
+        const istOffsetMs = 5.5 * 60 * 60 * 1000;
+        const refDate = dueDate ? new Date(dueDate) : new Date();
+        const refIst = new Date(refDate.getTime() + istOffsetMs);
+        const checkStart = new Date(Date.UTC(refIst.getUTCFullYear(), refIst.getUTCMonth(), refIst.getUTCDate()) - istOffsetMs);
+        const checkEnd = new Date(checkStart.getTime() + 24 * 60 * 60 * 1000);
+
+        // Also always check today for immediate assignments (due date could be future but task is assigned now)
+        const nowIst = new Date(Date.now() + istOffsetMs);
+        const todayStart = new Date(Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - istOffsetMs);
+        const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+
+        const leaveConflict = await prisma.leaveRequest.findFirst({
+            where: {
+                userId: assignedToId,
+                status: "APPROVED",
+                OR: [
+                    // Conflicts with today (can't assign tasks to someone who is out today)
+                    { startDate: { lte: todayEnd }, endDate: { gte: todayStart } },
+                    // Conflicts with the due date (can't assign tasks due on their leave day)
+                    ...(dueDate ? [{ startDate: { lte: checkEnd }, endDate: { gte: checkStart } }] : []),
+                ],
+            },
+            select: { leaveType: { select: { name: true } }, startDate: true, endDate: true },
+        });
+
+        if (leaveConflict) {
+            const leaveName = (leaveConflict as any).leaveType?.name || "Leave";
+            const leaveStart = (leaveConflict.startDate as Date).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" });
+            const leaveEnd = (leaveConflict.endDate as Date).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" });
+            return NextResponse.json({
+                error: `${assignee.fullName} is on approved ${leaveName} (${leaveStart} – ${leaveEnd}). Tasks cannot be assigned to employees on leave.`,
+            }, { status: 409 });
+        }
+
         const task = await prisma.task.create({
             data: {
                 title,

@@ -60,7 +60,27 @@ async function handleCheckIn(
         return error("ALREADY_CHECKED_IN", "Already checked in today", 409);
     }
 
-    // 2. Get user's assigned office location
+    // 2. Block check-in if user has an APPROVED leave covering today
+    const leaveToday = await prisma.leaveRequest.findFirst({
+        where: {
+            userId: auth.sub,
+            status: "APPROVED",
+            startDate: { lte: tomorrowStart },
+            endDate: { gte: todayStart },
+        },
+        select: { id: true, leaveType: { select: { name: true } } },
+    });
+
+    if (leaveToday) {
+        const leaveTypeName = (leaveToday as any).leaveType?.name || "Leave";
+        return error(
+            "ON_APPROVED_LEAVE",
+            `You are on approved ${leaveTypeName} today. You cannot check in.`,
+            403
+        );
+    }
+
+    // 3. Get user's assigned office location
     const user = await prisma.user.findUnique({
         where: { id: auth.sub },
         select: { locationId: true, location: true },

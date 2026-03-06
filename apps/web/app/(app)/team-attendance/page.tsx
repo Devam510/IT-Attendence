@@ -18,6 +18,7 @@ interface StaffMember {
     checkOutAt?: string | null;
     totalHours?: number | null;
     leaveType?: string | null;
+    remark?: string | null;
 }
 
 interface DayData {
@@ -282,7 +283,7 @@ export default function TeamAttendancePage() {
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                             <thead>
                                 <tr style={{ background: "var(--bg-secondary)", borderBottom: "1px solid var(--border)" }}>
-                                    {["Employee", "ID", "Dept / Role", "Status", "Check In", "Check Out", "Hours"].map(h => (
+                                    {["Employee", "ID", "Dept / Role", "Status", "Check In", "Check Out", "Hours", "Remark"].map(h => (
                                         <th key={h} style={{ padding: "10px 14px", fontWeight: 600, textAlign: "left", color: "var(--text-secondary)", fontSize: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                                             {h}
                                         </th>
@@ -307,9 +308,28 @@ export default function TeamAttendancePage() {
                                                     {cfg.icon} {label}
                                                 </span>
                                             </td>
-                                            <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>{fmtTime(m.checkInAt)}</td>
+                                            <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>
+                                                {fmtTime(m.checkInAt)}
+                                            </td>
                                             <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>{fmtTime(m.checkOutAt)}</td>
                                             <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>{fmtHours(m.totalHours)}</td>
+                                            <td style={{ padding: "11px 14px", maxWidth: 220 }}>
+                                                {m.remark ? (
+                                                    <span title={m.remark} style={{
+                                                        fontSize: 12,
+                                                        color: "var(--text-secondary)",
+                                                        fontStyle: "italic",
+                                                        display: "block",
+                                                        overflow: "hidden",
+                                                        textOverflow: "ellipsis",
+                                                        whiteSpace: "nowrap",
+                                                    }}>
+                                                        💬 {m.remark}
+                                                    </span>
+                                                ) : (
+                                                    <span style={{ color: "var(--text-tertiary)", fontSize: 12 }}>—</span>
+                                                )}
+                                            </td>
                                         </tr>
                                     );
                                 })}

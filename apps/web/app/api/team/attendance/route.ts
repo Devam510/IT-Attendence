@@ -66,6 +66,7 @@ async function handleTeamAttendance(
                 checkInAt: true,
                 checkOutAt: true,
                 totalHours: true,
+                anomalyFlags: true,
             },
         }),
         prisma.leaveRequest.findMany({
@@ -97,6 +98,9 @@ async function handleTeamAttendance(
 
         // If on approved leave → don't show working time (leave takes precedence)
         const onLeave = status === "ON_LEAVE";
+        // Extract remark from anomalyFlags JSON (stored by check-in route)
+        const flags = att?.anomalyFlags as Record<string, unknown> | null;
+        const remark = typeof flags?.remark === "string" && flags.remark.trim() ? flags.remark.trim() : null;
         return {
             id: emp.id,
             fullName: emp.fullName,
@@ -108,6 +112,7 @@ async function handleTeamAttendance(
             checkOutAt: onLeave ? null : att?.checkOutAt?.toISOString() || null,
             totalHours: onLeave ? null : att?.totalHours || null,
             leaveType: leave ? (leave as any).leaveType?.name : null,
+            remark: onLeave ? null : remark,
         };
     });
 
