@@ -448,14 +448,28 @@ export default function DashboardPage() {
     const [countdown, setCountdown] = useState(WORK_SECS);
     const [countdownColor, setCountdownColor] = useState("#16a34a");
 
-    // Break state
+    // Break state — log-based so multiple breaks can be recorded
+    interface BreakEntry { start: string; end: string | null; }
+    const [breakLog, setBreakLog] = useState<BreakEntry[]>([]);
     const [onBreak, setOnBreak] = useState(false);
-    const [breakAccumSecs, setBreakAccumSecs] = useState(0);  // total seconds on break
     const [breakStartedAt, setBreakStartedAt] = useState<Date | null>(null);
-    const [breakElapsed, setBreakElapsed] = useState(0); // live current break
+    const [breakElapsed, setBreakElapsed] = useState(0); // live current break secs
+
+    // Refs so ticker closure never reads stale values
+    const breakLogRef = useRef<BreakEntry[]>([]);
+    const breakStartedAtRef = useRef<Date | null>(null);
+    const onBreakRef = useRef(false);
 
     const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const breakTickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    // Helper: compute total finished break seconds from log
+    function totalBreakSecs(log: BreakEntry[]): number {
+        return log.reduce((sum, b) => {
+            if (!b.end) return sum;
+            return sum + Math.floor((new Date(b.end).getTime() - new Date(b.start).getTime()) / 1000);
+        }, 0);
+    }
 
     const isManager = ["MGR", "HRA", "SADM", "HRBP"].includes(user?.role ?? "");
     const isAdmin = user?.role === "SADM";
@@ -510,32 +524,42 @@ export default function DashboardPage() {
         load();
     }, [isManager, isAdmin, loadEmpData]);
 
-    // ── Restore sessionToken from localStorage on mount ────────────
+    // ── Restore sessionToken + break log from localStorage on mount ──
     useEffect(() => {
         const saved = localStorage.getItem("dash_sessionToken");
         if (saved) setSessionToken(saved);
         const breakState = localStorage.getItem("dash_break");
         if (breakState) {
-            const parsed = JSON.parse(breakState);
-            setBreakAccumSecs(parsed.accumSecs ?? 0);
-            if (parsed.onBreak && parsed.startedAt) {
-                setOnBreak(true);
-                setBreakStartedAt(new Date(parsed.startedAt));
-            }
+            try {
+                const parsed = JSON.parse(breakState);
+                const log: BreakEntry[] = parsed.log ?? [];
+                setBreakLog(log);
+                breakLogRef.current = log;
+                // If last entry has no end, we're still on break
+                const last = log[log.length - 1];
+                if (last && !last.end) {
+                    const startDate = new Date(last.start);
+                    setOnBreak(true);
+                    setBreakStartedAt(startDate);
+                    onBreakRef.current = true;
+                    breakStartedAtRef.current = startDate;
+                }
+            } catch { /* ignore corrupt data */ }
         }
     }, []);
 
-    // ── 8-hour countdown ticker ────────────────────────────────────
+    // ── 8-hour countdown ticker — uses refs to avoid stale closures ──
     useEffect(() => {
         if (tickerRef.current) clearInterval(tickerRef.current);
         if (empData.checkedIn && empData.checkInAt) {
+            const checkInTime = (empData.checkInAt as Date).getTime();
             const tick = () => {
-                const elapsed = Math.floor((Date.now() - (empData.checkInAt as Date).getTime()) / 1000);
-                // Subtract accumulated break time (and live break if active)
-                const liveBreak = (onBreak && breakStartedAt)
-                    ? Math.floor((Date.now() - breakStartedAt.getTime()) / 1000)
+                const elapsed = Math.floor((Date.now() - checkInTime) / 1000);
+                const finishedBreak = totalBreakSecs(breakLogRef.current);
+                const liveBreak = (onBreakRef.current && breakStartedAtRef.current)
+                    ? Math.floor((Date.now() - breakStartedAtRef.current.getTime()) / 1000)
                     : 0;
-                const netWorked = elapsed - breakAccumSecs - liveBreak;
+                const netWorked = elapsed - finishedBreak - liveBreak;
                 const rem = Math.max(0, WORK_SECS - netWorked);
                 setCountdown(rem);
                 const pct = rem / WORK_SECS;
@@ -545,7 +569,7 @@ export default function DashboardPage() {
             tickerRef.current = setInterval(tick, 1000);
         }
         return () => { if (tickerRef.current) clearInterval(tickerRef.current); };
-    }, [empData.checkedIn, empData.checkInAt, breakAccumSecs, onBreak, breakStartedAt]);
+    }, [empData.checkedIn, empData.checkInAt]);
 
     // ── Live break elapsed ticker ─────────────────────────────────
     useEffect(() => {
@@ -611,8 +635,11 @@ export default function DashboardPage() {
             localStorage.removeItem("dash_break");
             setSessionToken(null);
             setOnBreak(false);
-            setBreakAccumSecs(0);
+            onBreakRef.current = false;
+            setBreakLog([]);
+            breakLogRef.current = [];
             setBreakStartedAt(null);
+            breakStartedAtRef.current = null;
             await loadEmpData();
         }
         setActionLoading(null);
@@ -620,18 +647,29 @@ export default function DashboardPage() {
 
     function handleBreakStart() {
         const now = new Date();
+        const newEntry: BreakEntry = { start: now.toISOString(), end: null };
+        const newLog = [...breakLog, newEntry];
+        setBreakLog(newLog);
+        breakLogRef.current = newLog;
         setOnBreak(true);
+        onBreakRef.current = true;
         setBreakStartedAt(now);
-        localStorage.setItem("dash_break", JSON.stringify({ onBreak: true, startedAt: now.toISOString(), accumSecs: breakAccumSecs }));
+        breakStartedAtRef.current = now;
+        localStorage.setItem("dash_break", JSON.stringify({ log: newLog }));
     }
 
     function handleBreakEnd() {
-        const extra = breakStartedAt ? Math.floor((Date.now() - breakStartedAt.getTime()) / 1000) : 0;
-        const newAccum = breakAccumSecs + extra;
-        setBreakAccumSecs(newAccum);
+        const now = new Date();
+        const newLog = breakLog.map((b, i) =>
+            i === breakLog.length - 1 && !b.end ? { ...b, end: now.toISOString() } : b
+        );
+        setBreakLog(newLog);
+        breakLogRef.current = newLog;
         setOnBreak(false);
+        onBreakRef.current = false;
         setBreakStartedAt(null);
-        localStorage.setItem("dash_break", JSON.stringify({ onBreak: false, startedAt: null, accumSecs: newAccum }));
+        breakStartedAtRef.current = null;
+        localStorage.setItem("dash_break", JSON.stringify({ log: newLog }));
     }
 
     const now = new Date();
@@ -707,7 +745,7 @@ export default function DashboardPage() {
                                         : "⬜ NOT CHECKED IN"}
                         </span>
                         {empData.checkedIn && !empData.checkedOut && (
-                            <span style={{ fontSize: 11, opacity: 0.75 }}>Since {empData.checkInTime}</span>
+                            <span style={{ fontSize: 11, opacity: 0.75 }}>Check In Since {empData.checkInTime}</span>
                         )}
                     </div>
 
@@ -836,6 +874,34 @@ export default function DashboardPage() {
                             </Link>
                         )}
                     </div>
+
+                    {/* Break History */}
+                    {breakLog.length > 0 && empData.checkedIn && (
+                        <div style={{ padding: "0 20px 16px" }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)", letterSpacing: "0.08em", marginBottom: 6 }}>☕ BREAK HISTORY</div>
+                            {breakLog.map((b, i) => {
+                                const start = new Date(b.start);
+                                const end = b.end ? new Date(b.end) : null;
+                                const durSecs = end
+                                    ? Math.floor((end.getTime() - start.getTime()) / 1000)
+                                    : breakElapsed;
+                                const durMin = Math.floor(durSecs / 60);
+                                const durSec = durSecs % 60;
+                                const fmtT = (d: Date) => d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" });
+                                return (
+                                    <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "rgba(255,255,255,0.85)", marginBottom: 3 }}>
+                                        <span>{fmtT(start)} → {end ? fmtT(end) : "ongoing…"}</span>
+                                        <span style={{ opacity: 0.7 }}>{durMin > 0 ? `${durMin}m ` : ""}{durSec}s</span>
+                                    </div>
+                                );
+                            })}
+                            {breakLog.filter(b => b.end).length > 1 && (
+                                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", marginTop: 4 }}>
+                                    Total break: {fmtCountdown(totalBreakSecs(breakLog))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
 

@@ -68,6 +68,19 @@ export default function AttendancePage() {
     const tokenKey = `nexus-checkin-token-${user?.id || "guest"}`;
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
+    // Break log from dashboard localStorage (read-only here for display)
+    interface BreakEntry { start: string; end: string | null; }
+    const [attBreakLog, setAttBreakLog] = useState<BreakEntry[]>([]);
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem("dash_break");
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                setAttBreakLog(parsed.log ?? []);
+            }
+        } catch { /* ignore */ }
+    }, []);
+
     // Auto-dismiss toast
     useEffect(() => {
         if (toast) {
@@ -368,41 +381,7 @@ export default function AttendancePage() {
                         )}
                     </h3>
 
-                    {/* 9-hour countdown — only visible when actively checked in */}
-                    {isShowingToday && today.checkedIn && (
-                        <div style={{
-                            display: "flex", flexDirection: "column", alignItems: "center",
-                            background: "var(--bg-secondary)",
-                            border: `1.5px solid ${countdownColor}`,
-                            borderRadius: 12, padding: "8px 16px", minWidth: 160,
-                        }}>
-                            <div style={{ fontSize: 10, fontWeight: 600, color: countdownColor, textTransform: "uppercase", letterSpacing: 1, marginBottom: 2 }}>
-                                ⏳ Time Remaining
-                            </div>
-                            <div style={{
-                                fontFamily: "var(--font-mono)",
-                                fontSize: "var(--text-xl)",
-                                fontWeight: 700,
-                                color: countdownColor,
-                                letterSpacing: 2,
-                                lineHeight: 1.2,
-                            }}>
-                                {formatCountdown(countdownSecs)}
-                            </div>
-                            {/* Progress bar */}
-                            <div style={{ width: "100%", height: 4, background: "var(--border-primary)", borderRadius: 99, marginTop: 6, overflow: "hidden" }}>
-                                <div style={{
-                                    height: "100%", width: `${countdownPct}%`,
-                                    background: countdownColor,
-                                    borderRadius: 99,
-                                    transition: "width 1s linear, background 1s",
-                                }} />
-                            </div>
-                            <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 3 }}>
-                                {countdownSecs === 0 ? "🎉 Full day complete!" : `of 9h workday`}
-                            </div>
-                        </div>
-                    )}
+                    {/* The 8-hour countdown is shown on the Dashboard — hidden here */}
                 </div>
 
                 {isShowingToday ? (
@@ -426,6 +405,27 @@ export default function AttendancePage() {
                                 {today.checkedIn ? formatElapsed(elapsed) : (today.totalMinutes ? `${(today.totalMinutes / 60).toFixed(1)}h` : "—")}
                             </span>
                         </div>
+                        {/* Break History from dashboard localStorage */}
+                        {attBreakLog.length > 0 && (
+                            <div className="att-today-row" style={{ alignItems: "flex-start" }}>
+                                <span className="att-today-label">☕ Breaks</span>
+                                <span className="att-today-value" style={{ textAlign: "right" }}>
+                                    {attBreakLog.map((b, i) => {
+                                        const start = new Date(b.start);
+                                        const end = b.end ? new Date(b.end) : null;
+                                        const fmtT = (d: Date) => d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" });
+                                        const durSecs = end ? Math.floor((end.getTime() - start.getTime()) / 1000) : null;
+                                        const durMin = durSecs !== null ? Math.floor(durSecs / 60) : null;
+                                        return (
+                                            <div key={i} style={{ fontSize: "var(--text-xs)", marginBottom: 2 }}>
+                                                {fmtT(start)} – {end ? fmtT(end) : "ongoing"}
+                                                {durMin !== null && <span style={{ color: "var(--text-tertiary)", marginLeft: 6 }}>({durMin}m)</span>}
+                                            </div>
+                                        );
+                                    })}
+                                </span>
+                            </div>
+                        )}
                         <div className="att-today-row">
                             <span className="att-today-label">🛡️ Verification</span>
                             <span className="att-today-value">
