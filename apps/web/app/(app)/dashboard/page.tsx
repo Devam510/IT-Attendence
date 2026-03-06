@@ -634,14 +634,14 @@ export default function DashboardPage() {
 
     async function handleCheckOut(force = false, reason = "") {
         setActionError(null);
-        // Calculate worked hours to detect early checkout (< 4h)
-        if (!force && empData.checkInAt) {
+        // Skip early-checkout check if already in overtime — no need to ask for a reason
+        if (!force && empData.checkInAt && overtimeSecs === 0) {
             const workedSecs = Math.floor((Date.now() - (empData.checkInAt as Date).getTime()) / 1000)
                 - totalBreakSecs(breakLogRef.current)
                 - (onBreakRef.current && breakStartedAtRef.current
                     ? Math.floor((Date.now() - breakStartedAtRef.current.getTime()) / 1000) : 0);
             const workedHours = workedSecs / 3600;
-            if (workedHours < 4) {
+            if (workedHours < WORK_SECS / 3600) {
                 setEarlyReason("");
                 setEarlyReasonError(false);
                 setShowEarlyModal(true);
