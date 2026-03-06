@@ -768,7 +768,7 @@ export default function TeamAttendancePage() {
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                             <thead>
                                 <tr style={{ background: "var(--bg-secondary)", borderBottom: "1px solid var(--border)" }}>
-                                    {["Employee", "ID", "Dept / Role", "Status", "Check In", "Check Out", "Hours", "Remark"].map(h => (
+                                    {["Employee", "ID", "Dept / Role", "Status", "Check In", "Breaks", "Check Out", "Hours", "Remark"].map(h => (
                                         <th key={h} style={{ padding: "10px 14px", fontWeight: 600, textAlign: "left", color: "var(--text-secondary)", fontSize: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                                             {h}
                                         </th>
@@ -814,14 +814,45 @@ export default function TeamAttendancePage() {
                                             <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>
                                                 {fmtTime(m.checkInAt)}
                                             </td>
+                                            {/* ─── Breaks column ─── */}
+                                            <td style={{ padding: "11px 14px" }}>
+                                                {(() => {
+                                                    const breaks = m.breaks || [];
+                                                    if (breaks.length === 0) return <span style={{ color: "var(--text-tertiary)", fontSize: 12 }}>—</span>;
+                                                    const totalSecs = breaks.reduce((sum, b) => {
+                                                        if (!b.start || !b.end) return sum;
+                                                        return sum + Math.max(0, Math.floor((new Date(b.end).getTime() - new Date(b.start).getTime()) / 1000));
+                                                    }, 0);
+                                                    const totalMins = Math.floor(totalSecs / 60);
+                                                    const hrs = Math.floor(totalMins / 60);
+                                                    const mins = totalMins % 60;
+                                                    const durationLabel = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+                                                    const tooltipLines = breaks.map((b, idx) => {
+                                                        const s = b.start ? new Date(b.start).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }) : "?";
+                                                        const e = b.end ? new Date(b.end).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }) : "ongoing";
+                                                        return `Break ${idx + 1}: ${s} – ${e}`;
+                                                    }).join("\n");
+                                                    return (
+                                                        <span
+                                                            title={tooltipLines}
+                                                            style={{
+                                                                display: "inline-flex", alignItems: "center", gap: 5,
+                                                                fontSize: 13, cursor: "help",
+                                                                background: "var(--bg-secondary)",
+                                                                border: "1px solid var(--border)",
+                                                                borderRadius: 8, padding: "3px 8px",
+                                                                color: "var(--text-primary)", fontWeight: 500,
+                                                            }}
+                                                        >
+                                                            ☕ <strong>{durationLabel}</strong>
+                                                            <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>× {breaks.length}</span>
+                                                        </span>
+                                                    );
+                                                })()}
+                                            </td>
                                             <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>{fmtTime(m.checkOutAt)}</td>
                                             <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>
                                                 {fmtHours(m.totalHours)}
-                                                {m.breaks && m.breaks.length > 0 && (
-                                                    <span title={`${m.breaks.length} break(s)`} style={{ marginLeft: 6, fontSize: 11, background: "var(--bg-card)", padding: "2px 6px", borderRadius: 10, border: "1px solid var(--border)" }}>
-                                                        ☕ {m.breaks.length}
-                                                    </span>
-                                                )}
                                             </td>
                                             <td style={{ padding: "11px 14px", maxWidth: 220 }}>
                                                 {m.isHalfDay && (
