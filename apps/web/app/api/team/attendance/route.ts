@@ -104,6 +104,7 @@ async function handleTeamAttendance(
         const breaks = Array.isArray(flags?.breaks) ? flags!.breaks : [];
         const earlyReason = typeof flags?.earlyReason === "string" && flags.earlyReason.trim() ? flags.earlyReason.trim() : null;
         const isHalfDay = flags?.isHalfDay === true;
+        const location = typeof flags?.location === "string" ? flags.location : null;
         return {
             id: emp.id,
             fullName: emp.fullName,
@@ -119,6 +120,7 @@ async function handleTeamAttendance(
             breaks: onLeave ? [] : breaks,
             earlyReason: onLeave ? null : earlyReason,
             isHalfDay: onLeave ? false : isHalfDay,
+            location: onLeave ? null : location,
         };
     });
 

@@ -83,6 +83,7 @@ async function handleEmployeeHistory(
             const breaks = Array.isArray(flags?.breaks) ? flags!.breaks : [];
             const earlyReason = typeof flags?.earlyReason === "string" && flags.earlyReason.trim() ? flags.earlyReason.trim() : null;
             const isHalfDay = flags?.isHalfDay === true;
+            const location = typeof flags?.location === "string" ? flags.location : null;
 
             calendar.push({
                 date: dateStr,
@@ -98,6 +99,7 @@ async function handleEmployeeHistory(
                 breaks,
                 earlyReason,
                 isHalfDay,
+                location,
             });
         } else {
             const dayDate = new Date(Date.UTC(year, mon - 1, day));

@@ -64,6 +64,7 @@ interface EmpCalDay {
     status: string;
     checkInAt: string | null;
     checkOutAt: string | null;
+    location?: string | null;
     totalHours: number | null;
     verificationScore?: number | null;
     remark?: string | null;
@@ -273,6 +274,8 @@ function EmployeeMonthModal({ employee, onClose }: {
                                     <div>{selectedDay.checkInAt ? new Date(selectedDay.checkInAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }) : "—"}</div>
                                     <div style={{ color: "var(--text-secondary)" }}>Check Out</div>
                                     <div>{selectedDay.checkOutAt ? new Date(selectedDay.checkOutAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }) : "—"}</div>
+                                    <div style={{ color: "var(--text-secondary)" }}>Location</div>
+                                    <div>{selectedDay.location || "—"}</div>
                                     <div style={{ color: "var(--text-secondary)" }}>Hours</div>
                                     <div>{selectedDay.totalHours != null ? `${selectedDay.totalHours.toFixed(1)}h` : "—"}</div>
                                     {selectedDay.verificationScore != null && <>
@@ -603,69 +606,51 @@ export default function TeamAttendancePage() {
             </div>
 
             {/* Date Navigator */}
-            <div style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                margin: "20px 0 16px",
-                flexWrap: "wrap",
-            }}>
-                {/* Compact arrow + date pill */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "var(--space-4)", gap: 8 }}>
+                <button
+                    onClick={() => changeDate(-1)}
+                    style={{
+                        width: 40, height: 40, borderRadius: "50%",
+                        border: "1px solid var(--border-primary)", background: "var(--bg-card)",
+                        color: "var(--text-primary)", display: "flex", alignItems: "center", justifyContent: "center",
+                        cursor: "pointer", fontSize: 16, transition: "all 0.2s"
+                    }}
+                    aria-label="Previous day"
+                >◄</button>
+
                 <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    background: "var(--bg-card)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 10,
-                    overflow: "hidden",
-                    flex: 1,
-                    minWidth: 220,
+                    display: "flex", alignItems: "center", gap: 7, padding: "0 24px",
+                    fontWeight: 600, fontSize: 16, whiteSpace: "nowrap", minWidth: 260, justifyContent: "center"
                 }}>
-                    <button
-                        onClick={() => changeDate(-1)}
-                        style={{
-                            padding: "9px 13px", cursor: "pointer", border: "none",
-                            borderRight: "1px solid var(--border)",
-                            background: "transparent", display: "flex", alignItems: "center",
-                            color: "var(--text-primary)",
-                        }}
-                    >
-                        <ChevronLeft size={16} />
-                    </button>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "0 14px", flex: 1, justifyContent: "center" }}>
-                        <CalendarDays size={15} color="var(--color-primary, #2563eb)" />
-                        <span style={{ fontWeight: 600, fontSize: 14, whiteSpace: "nowrap" }}>
-                            {isToday ? "Today — " : ""}{displayDate}
-                        </span>
-                    </div>
-
-                    <button
-                        onClick={() => changeDate(1)}
-                        disabled={isToday}
-                        style={{
-                            padding: "9px 13px", cursor: isToday ? "not-allowed" : "pointer",
-                            border: "none", borderLeft: "1px solid var(--border)",
-                            background: "transparent", display: "flex", alignItems: "center",
-                            opacity: isToday ? 0.35 : 1, color: "var(--text-primary)",
-                        }}
-                    >
-                        <ChevronRight size={16} />
-                    </button>
-                </div>
-
-                {/* Date picker + Today */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <CalendarDays size={18} color="var(--color-primary, #2563eb)" />
                     <input
                         type="date"
                         value={toISTDateString(selectedDate)}
                         max={toISTDateString(new Date())}
                         onChange={e => e.target.value && setSelectedDate(new Date(e.target.value + "T12:00:00"))}
                         style={{
-                            padding: "7px 10px", borderRadius: 8, border: "1px solid var(--border)",
-                            background: "var(--bg-card)", color: "var(--text-primary)", fontSize: 13,
+                            border: "none", background: "transparent", color: "var(--text-primary)",
+                            fontWeight: 600, fontSize: 16, cursor: "pointer", outline: "none"
                         }}
                     />
+                </div>
+
+                <button
+                    onClick={() => changeDate(1)}
+                    disabled={isToday}
+                    style={{
+                        width: 40, height: 40, borderRadius: "50%",
+                        border: "1px solid var(--border-primary)", background: "var(--bg-card)",
+                        color: "var(--text-primary)", display: "flex", alignItems: "center", justifyContent: "center",
+                        cursor: isToday ? "not-allowed" : "pointer", fontSize: 16, opacity: isToday ? 0.35 : 1, transition: "all 0.2s"
+                    }}
+                    aria-label="Next day"
+                >►</button>
+            </div>
+
+            {/* Export & Actions Row */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 10, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 8 }}>
                     {!isToday && (
                         <button
                             onClick={() => setSelectedDate(new Date())}
@@ -675,7 +660,7 @@ export default function TeamAttendancePage() {
                                 border: "none", fontWeight: 600, whiteSpace: "nowrap",
                             }}
                         >
-                            Today
+                            Back to Today
                         </button>
                     )}
                 </div>
@@ -701,7 +686,8 @@ export default function TeamAttendancePage() {
                         </div>
                     ))}
                 </div>
-            )}
+            )
+            }
 
             {/* Table Controls */}
             <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
@@ -885,20 +871,24 @@ export default function TeamAttendancePage() {
             </div>
 
             {/* Employee Month Modal */}
-            {viewingEmployee && (
-                <EmployeeMonthModal
-                    employee={viewingEmployee}
-                    onClose={() => setViewingEmployee(null)}
-                />
-            )}
+            {
+                viewingEmployee && (
+                    <EmployeeMonthModal
+                        employee={viewingEmployee}
+                        onClose={() => setViewingEmployee(null)}
+                    />
+                )
+            }
 
             {/* Advanced Export Modal */}
-            {showExportModal && (
-                <AdvancedExportModal
-                    onClose={() => setShowExportModal(false)}
-                    onToast={setToast}
-                />
-            )}
-        </div>
+            {
+                showExportModal && (
+                    <AdvancedExportModal
+                        onClose={() => setShowExportModal(false)}
+                        onToast={setToast}
+                    />
+                )
+            }
+        </div >
     );
 }
