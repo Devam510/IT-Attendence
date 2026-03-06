@@ -35,6 +35,7 @@ export default function DashboardPage() {
     const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const isManager = user?.role === "MGR" || user?.role === "HRA" || user?.role === "SADM";
+    const isAdmin = user?.role === "SADM"; // Admins don't track their own attendance
 
     useEffect(() => {
         async function load() {
@@ -155,53 +156,55 @@ export default function DashboardPage() {
                 </div>
             )}
 
-            {/* Check-In Status Card */}
-            <div className="dash-checkin-card animate-slideUp"
-                style={{
-                    background: data.checkedOut
-                        ? "linear-gradient(135deg, #0f766e, #0d9488)"
-                        : data.checkedIn
-                            ? "linear-gradient(135deg, #15803d, #16a34a)"
-                            : "linear-gradient(135deg, #1d4ed8, #2563eb)",
-                }}
-            >
-                <div className="dash-checkin-status">
-                    {data.checkedOut ? "✅ DAY COMPLETE" : data.checkedIn ? "🟢 CHECKED IN" : "⬜ NOT CHECKED IN"}
+            {/* Check-In Status Card — hidden for SADM */}
+            {!isAdmin && (
+                <div className="dash-checkin-card animate-slideUp"
+                    style={{
+                        background: data.checkedOut
+                            ? "linear-gradient(135deg, #0f766e, #0d9488)"
+                            : data.checkedIn
+                                ? "linear-gradient(135deg, #15803d, #16a34a)"
+                                : "linear-gradient(135deg, #1d4ed8, #2563eb)",
+                    }}
+                >
+                    <div className="dash-checkin-status">
+                        {data.checkedOut ? "✅ DAY COMPLETE" : data.checkedIn ? "🟢 CHECKED IN" : "⬜ NOT CHECKED IN"}
+                    </div>
+                    <div className="dash-checkin-time">
+                        {data.checkedOut
+                            ? `${data.checkInTime || "--:--"} → ${data.checkOutTime || "--:--"}`
+                            : data.checkedIn
+                                ? `Since ${data.checkInTime || "--:--"}`
+                                : new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })
+                        }
+                    </div>
+                    <div className="dash-checkin-location">
+                        {data.checkedOut
+                            ? `Total: ${data.workingHours && data.workingHours > 0 ? `${(data.workingHours * 60).toFixed(0)} min (${data.workingHours.toFixed(2)}h)` : "—"}`
+                            : data.checkedIn
+                                ? `Working: ${liveWorking}`
+                                : "Tap below to check in"}
+                    </div>
+                    {!data.checkedOut && (
+                        <Link
+                            href="/attendance"
+                            className="btn btn-primary"
+                            style={{ background: "rgba(255,255,255,0.2)", color: "white", borderColor: "rgba(255,255,255,0.3)" }}
+                        >
+                            {data.checkedIn ? "View Attendance" : "Check In Now"}
+                        </Link>
+                    )}
+                    {data.checkedOut && (
+                        <Link
+                            href="/attendance"
+                            className="btn btn-primary"
+                            style={{ background: "rgba(255,255,255,0.15)", color: "white", borderColor: "rgba(255,255,255,0.3)" }}
+                        >
+                            View Details
+                        </Link>
+                    )}
                 </div>
-                <div className="dash-checkin-time">
-                    {data.checkedOut
-                        ? `${data.checkInTime || "--:--"} → ${data.checkOutTime || "--:--"}`
-                        : data.checkedIn
-                            ? `Since ${data.checkInTime || "--:--"}`
-                            : new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })
-                    }
-                </div>
-                <div className="dash-checkin-location">
-                    {data.checkedOut
-                        ? `Total: ${data.workingHours && data.workingHours > 0 ? `${(data.workingHours * 60).toFixed(0)} min (${data.workingHours.toFixed(2)}h)` : "—"}`
-                        : data.checkedIn
-                            ? `Working: ${liveWorking}`
-                            : "Tap below to check in"}
-                </div>
-                {!data.checkedOut && (
-                    <Link
-                        href="/attendance"
-                        className="btn btn-primary"
-                        style={{ background: "rgba(255,255,255,0.2)", color: "white", borderColor: "rgba(255,255,255,0.3)" }}
-                    >
-                        {data.checkedIn ? "View Attendance" : "Check In Now"}
-                    </Link>
-                )}
-                {data.checkedOut && (
-                    <Link
-                        href="/attendance"
-                        className="btn btn-primary"
-                        style={{ background: "rgba(255,255,255,0.15)", color: "white", borderColor: "rgba(255,255,255,0.3)" }}
-                    >
-                        View Details
-                    </Link>
-                )}
-            </div>
+            )}
 
             {/* Quick Actions */}
             <div className="dash-quick-actions animate-slideUp" style={{ animationDelay: "100ms" }}>
