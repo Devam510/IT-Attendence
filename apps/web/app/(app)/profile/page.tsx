@@ -453,19 +453,24 @@ export default function ProfilePage() {
                     }} />
                 </div>
 
-                {/* Avatar + info */}
+                {/* Avatar + info — sits above the banner via z-index */}
                 <div style={{
-                    background: "var(--bg-primary)", padding: "0 var(--space-6) var(--space-6)",
-                    marginTop: -40, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center",
+                    background: "var(--bg-primary)",
+                    paddingTop: "var(--space-12)", // leaves 48px room for the avatar circle
+                    padding: "0 var(--space-6) var(--space-6)",
+                    paddingTop: 56,
+                    display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center",
+                    position: "relative", zIndex: 1, marginTop: -44,
                 }}>
                     <div style={{
-                        width: 80, height: 80, borderRadius: "50%",
+                        width: 88, height: 88, borderRadius: "50%",
                         background: avatarGradient, color: "white",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: "var(--text-2xl)", fontWeight: "var(--font-bold)",
                         border: "4px solid var(--bg-primary)",
-                        boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
-                        marginBottom: "var(--space-3)",
+                        boxShadow: "0 8px 28px rgba(0,0,0,0.18)",
+                        position: "absolute", top: -44, left: "50%", transform: "translateX(-50%)",
+                        zIndex: 2,
                     }}>
                         {initials}
                     </div>
