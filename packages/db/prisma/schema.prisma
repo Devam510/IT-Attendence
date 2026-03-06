@@ -80,6 +80,19 @@ enum ApprovalStatus {
   DELEGATED
 }
 
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
 // ─── ORGANIZATION ───────────────────────────────────────
 
 model Entity {
@@ -150,6 +163,8 @@ model User {
   approvalRequests  ApprovalWorkflow[]  @relation("ApprovalRequester")
   notifications     Notification[]
   auditEvents       AuditEvent[]
+  assignedTasks     Task[]              @relation("TaskAssignee")
+  createdTasks      Task[]              @relation("TaskAssigner")
 
   @@index([entityId])
   @@index([departmentId])
@@ -378,3 +393,27 @@ model AuditEvent {
   @@index([resourceType, resourceId])
   @@map("audit_events")
 }
+
+// ─── TASKS ──────────────────────────────────────────────
+
+model Task {
+  id           String       @id @default(uuid())
+  title        String
+  description  String?
+  assignedToId String       @map("assigned_to_id")
+  assignedById String       @map("assigned_by_id")
+  priority     TaskPriority @default(MEDIUM)
+  status       TaskStatus   @default(PENDING)
+  dueDate      DateTime?    @map("due_date") @db.Date
+  completedAt  DateTime?    @map("completed_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  assignedTo User @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  assignedBy User @relation("TaskAssigner", fields: [assignedById], references: [id])
+
+  @@index([assignedToId, status])
+  @@index([assignedById])
+  @@map("tasks")
+}
+

@@ -9,6 +9,7 @@ import {
     Clock,
     CalendarDays,
     CheckSquare,
+    ClipboardCheck,
     ClipboardList,
     HeartPulse,
     ShieldCheck,
@@ -18,6 +19,7 @@ import {
 const NAV_ITEMS = [
     { href: "/dashboard", Icon: LayoutDashboard, label: "Dashboard" },
     { href: "/attendance", Icon: Clock, label: "Attendance" },
+    { href: "/tasks", Icon: ClipboardCheck, label: "Tasks" },
     { href: "/leaves", Icon: CalendarDays, label: "Leaves" },
     { href: "/approvals", Icon: CheckSquare, label: "Approvals" },
 ];
