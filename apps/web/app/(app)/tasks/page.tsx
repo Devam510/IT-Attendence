@@ -280,6 +280,11 @@ export default function TasksPage() {
         status: (isOverdue(t) && t.status === "PENDING" ? "OVERDUE" : t.status) as TaskStatus,
     }));
 
+    // Track if user already has a task IN_PROGRESS (only one active at a time)
+    const hasTaskInProgress = enrichedTasks.some(
+        (t) => t.assignedTo.id === user?.id && t.status === "IN_PROGRESS"
+    );
+
     const counts = {
         ALL: enrichedTasks.length,
         PENDING: enrichedTasks.filter((t) => t.status === "PENDING").length,
@@ -301,6 +306,18 @@ export default function TasksPage() {
         if (!res.error) {
             setTasks((prev) =>
                 prev.map((t) => (t.id === taskId ? { ...t, status: "COMPLETED" as TaskStatus, completedAt: new Date().toISOString() } : t))
+            );
+        }
+    };
+
+    const handleStartWorking = async (taskId: string) => {
+        const res = await api(`/api/tasks/${taskId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ status: "IN_PROGRESS" }),
+        });
+        if (!res.error) {
+            setTasks((prev) =>
+                prev.map((t) => (t.id === taskId ? { ...t, status: "IN_PROGRESS" as TaskStatus } : t))
             );
         }
     };
@@ -506,8 +523,44 @@ export default function TasksPage() {
                                                 </span>
                                             </td>
                                             <td style={{ padding: "14px 16px" }}>
-                                                <div style={{ display: "flex", gap: "var(--space-2)" }}>
-                                                    {canComplete && (
+                                                <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                                                    {/* Employee: Start Working (PENDING → IN_PROGRESS) */}
+                                                    {isMyTask && task.status === "PENDING" && (
+                                                        <button
+                                                            onClick={() => handleStartWorking(task.id)}
+                                                            disabled={hasTaskInProgress}
+                                                            title={hasTaskInProgress ? "You already have a task in progress" : "Start working on this task"}
+                                                            style={{
+                                                                padding: "5px 12px", borderRadius: "var(--radius-md)",
+                                                                background: hasTaskInProgress ? "var(--bg-tertiary)" : "#dbeafe",
+                                                                color: hasTaskInProgress ? "var(--text-tertiary)" : "#1d4ed8",
+                                                                border: "none", fontSize: "12px", fontWeight: "500",
+                                                                cursor: hasTaskInProgress ? "not-allowed" : "pointer",
+                                                                display: "flex", alignItems: "center", gap: 4,
+                                                                opacity: hasTaskInProgress ? 0.6 : 1,
+                                                                whiteSpace: "nowrap",
+                                                            }}
+                                                        >
+                                                            <Loader2 size={12} />
+                                                            {hasTaskInProgress ? "Another in progress" : "Start Working"}
+                                                        </button>
+                                                    )}
+                                                    {/* Employee: Complete (IN_PROGRESS → COMPLETED) */}
+                                                    {canComplete && task.status === "IN_PROGRESS" && (
+                                                        <button
+                                                            onClick={() => handleMarkComplete(task.id)}
+                                                            style={{
+                                                                padding: "5px 12px", borderRadius: "var(--radius-md)",
+                                                                background: "var(--color-secondary)", color: "white",
+                                                                border: "none", fontSize: "12px", fontWeight: "500",
+                                                                cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
+                                                            }}
+                                                        >
+                                                            <CheckCircle2 size={12} /> Complete
+                                                        </button>
+                                                    )}
+                                                    {/* Manager/HR can also mark complete directly */}
+                                                    {!isMyTask && canAssign && task.status !== "COMPLETED" && (
                                                         <button
                                                             onClick={() => handleMarkComplete(task.id)}
                                                             style={{

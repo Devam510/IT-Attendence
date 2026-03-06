@@ -1,17 +1,19 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
+import { api } from "@/lib/api-client";
 
 export default function Navbar() {
     const { theme, toggleTheme } = useTheme();
     const { user, logout } = useAuth();
     const pathname = usePathname();
     const [showDropdown, setShowDropdown] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     // Close dropdown on outside click
@@ -25,9 +27,33 @@ export default function Navbar() {
         return () => document.removeEventListener("mousedown", handleClick);
     }, []);
 
+    // Fetch unread notification count — poll every 30s
+    const fetchUnreadCount = useCallback(async () => {
+        try {
+            const res = await api<{ unreadCount: number }>("/api/notifications?unread=true&limit=1");
+            if (res.data?.unreadCount !== undefined) {
+                setUnreadCount(res.data.unreadCount);
+            }
+        } catch {
+            // silent — don't disrupt the navbar on error
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!user) return; // only fetch once authenticated
+        fetchUnreadCount();
+        const interval = setInterval(fetchUnreadCount, 30_000);
+        return () => clearInterval(interval);
+    }, [user, fetchUnreadCount]);
+
     const initials = user?.fullName
         ?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()
         || "VT";
+
+    const badgeLabel = unreadCount > 9 ? "9+" : String(unreadCount);
+
+    // suppress unused warning — pathname used for future active-link highlighting
+    void pathname;
 
     return (
         <nav className="navbar" role="navigation" aria-label="Top navigation">
@@ -58,10 +84,17 @@ export default function Navbar() {
                     {theme === "light" ? "🌙" : "☀️"}
                 </button>
 
-                {/* Notifications */}
-                <Link href="/notifications" className="navbar-icon-btn" aria-label="Notifications">
+                {/* Notifications — dynamic unread badge */}
+                <Link
+                    href="/notifications"
+                    className="navbar-icon-btn"
+                    aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
+                    onClick={() => setUnreadCount(0)} // optimistic clear on click
+                >
                     🔔
-                    <span className="navbar-badge">3</span>
+                    {unreadCount > 0 && (
+                        <span className="navbar-badge">{badgeLabel}</span>
+                    )}
                 </Link>
 
                 {/* Avatar + Dropdown */}
