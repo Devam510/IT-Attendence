@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { apiGet, apiPost } from "@/lib/api-client";
+import { apiGet, api } from "@/lib/api-client";
 import "@/styles/admin.css";
 
 type NotifCategory = "all" | "attendance" | "approval" | "alert" | "message";
@@ -50,7 +50,20 @@ export default function NotificationsPage() {
         async function load() {
             setLoading(true);
             const res = await apiGet<{ notifications: Notification[] }>("/api/notifications");
-            if (res.data?.notifications) setNotifications(res.data.notifications);
+            if (res.data?.notifications) {
+                setNotifications(res.data.notifications);
+                // Auto-mark all as read when the page is opened
+                // This clears the navbar badge immediately for the user
+                const hasUnread = res.data.notifications.some(n => !n.isRead);
+                if (hasUnread) {
+                    await api("/api/notifications/read", {
+                        method: "PATCH",
+                        body: JSON.stringify({ markAll: true }),
+                    });
+                    // Optimistically mark all as read in local state too
+                    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+                }
+            }
             setLoading(false);
         }
         load();
@@ -58,13 +71,21 @@ export default function NotificationsPage() {
 
     async function markAllRead() {
         setMarkingAll(true);
-        await apiPost("/api/notifications/read", { all: true });
+        // Correct payload: { markAll: true } via PATCH
+        await api("/api/notifications/read", {
+            method: "PATCH",
+            body: JSON.stringify({ markAll: true }),
+        });
         setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
         setMarkingAll(false);
     }
 
     async function markOneRead(id: string) {
-        await apiPost("/api/notifications/read", { id });
+        // Correct payload: { ids: [id] } via PATCH
+        await api("/api/notifications/read", {
+            method: "PATCH",
+            body: JSON.stringify({ ids: [id] }),
+        });
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
     }
 

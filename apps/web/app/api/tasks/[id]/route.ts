@@ -44,9 +44,9 @@ export const PATCH = withAuth(async (
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
-        // Employees can only mark their own tasks as COMPLETED
-        if (auth.role === "EMP" && status !== "COMPLETED") {
-            return NextResponse.json({ error: "Employees can only mark tasks as completed" }, { status: 403 });
+        // Employees can only transition their own tasks to IN_PROGRESS or COMPLETED
+        if (auth.role === "EMP" && !["IN_PROGRESS", "COMPLETED"].includes(status)) {
+            return NextResponse.json({ error: "Employees can only start or complete their own tasks" }, { status: 403 });
         }
 
         const updatedTask = await prisma.task.update({
@@ -62,9 +62,22 @@ export const PATCH = withAuth(async (
             await prisma.notification.create({
                 data: {
                     userId: task.assignedById,
-                    type: "task_completed",
+                    type: "approval",
                     title: "✅ Task Completed",
                     body: `${task.assignedTo.fullName} completed the task: "${task.title}"`,
+                    data: { taskId: id },
+                },
+            });
+        }
+
+        // When task is started — notify the assigner too
+        if (status === "IN_PROGRESS") {
+            await prisma.notification.create({
+                data: {
+                    userId: task.assignedById,
+                    type: "message",
+                    title: "▶️ Task Started",
+                    body: `${task.assignedTo.fullName} started working on: "${task.title}"`,
                     data: { taskId: id },
                 },
             });
