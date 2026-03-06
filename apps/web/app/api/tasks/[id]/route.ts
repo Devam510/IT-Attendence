@@ -8,7 +8,7 @@ import type { JwtPayload } from "@vibetech/shared";
 // Helper: extract id from the request URL (/api/tasks/<id>)
 function getTaskId(req: NextRequest): string {
     const parts = req.nextUrl.pathname.split("/");
-    return parts[parts.length - 1];
+    return parts[parts.length - 1]!;
 }
 
 // PATCH /api/tasks/[id] — update status (e.g. mark complete)

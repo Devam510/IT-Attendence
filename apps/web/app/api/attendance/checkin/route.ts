@@ -36,6 +36,10 @@ async function handleCheckIn(
         return error("VALIDATION_ERROR", "Location coordinates are required for check-in", 422);
     }
 
+    // Optional remark (e.g. reason for late arrival)
+    const remark = typeof body.remark === "string" ? body.remark.trim().slice(0, 500) : undefined;
+
+
     const now = new Date();
     // Calculate "today" in IST (UTC+5:30), not in server's UTC timezone
     const istOffsetMs = 5.5 * 60 * 60 * 1000;
@@ -112,6 +116,7 @@ async function handleCheckIn(
                 checkInDevice: deviceType,
                 checkInUserAgent: userAgent,
                 checkInIp: ip,
+                ...(remark ? { remark } : {}),
             })),
         },
     });

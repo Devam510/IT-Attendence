@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { apiGet } from "@/lib/api-client";
-import { ChevronLeft, ChevronRight, Users, UserCheck, UserX, CalendarDays, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users, UserCheck, UserX, CalendarDays, Download, RefreshCw } from "lucide-react";
 
 type Status = "PRESENT" | "ABSENT" | "ON_LEAVE";
 type Filter = "ALL" | Status;
@@ -53,18 +53,41 @@ export default function TeamAttendancePage() {
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
     const [data, setData] = useState<DayData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
     const [filter, setFilter] = useState<Filter>("ALL");
     const [search, setSearch] = useState("");
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    const loadData = useCallback(async (date: Date) => {
-        setLoading(true);
+    const loadData = useCallback(async (date: Date, silent = false) => {
+        if (silent) setRefreshing(true);
+        else setLoading(true);
         const dateStr = toISTDateString(date);
         const res = await apiGet<DayData>(`/api/team/attendance?date=${dateStr}`);
         if (res.data) setData(res.data);
-        setLoading(false);
+        setLastUpdated(new Date());
+        if (silent) setRefreshing(false);
+        else setLoading(false);
     }, []);
 
-    useEffect(() => { loadData(selectedDate); }, [selectedDate, loadData]);
+    // Initial load + auto-refresh every 30s when viewing today
+    useEffect(() => {
+        loadData(selectedDate);
+
+        // Clear any existing interval first
+        if (intervalRef.current) clearInterval(intervalRef.current);
+
+        const viewingToday = toISTDateString(selectedDate) === toISTDateString(new Date());
+        if (viewingToday) {
+            intervalRef.current = setInterval(() => {
+                loadData(selectedDate, true); // silent refresh (no spinner)
+            }, 30_000); // every 30 seconds
+        }
+
+        return () => {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+        };
+    }, [selectedDate, loadData]);
 
     const changeDate = (delta: number) => {
         setSelectedDate(prev => {
@@ -79,6 +102,10 @@ export default function TeamAttendancePage() {
     const displayDate = selectedDate.toLocaleDateString("en-US", {
         weekday: "long", day: "numeric", month: "long", year: "numeric",
     });
+
+    const lastUpdatedStr = lastUpdated
+        ? lastUpdated.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Kolkata" })
+        : null;
 
     const filtered = (data?.staff || []).filter(m => {
         const matchFilter = filter === "ALL" || m.status === filter;
@@ -292,8 +319,30 @@ export default function TeamAttendancePage() {
                 )}
             </div>
 
-            <div style={{ marginTop: 10, color: "var(--text-tertiary)", fontSize: 12, textAlign: "right" }}>
-                Showing {filtered.length} of {data?.staff?.length ?? 0} employees
+            <div style={{ marginTop: 10, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                <div style={{ color: "var(--text-tertiary)", fontSize: 12 }}>
+                    Showing {filtered.length} of {data?.staff?.length ?? 0} employees
+                    {lastUpdatedStr && (
+                        <span style={{ marginLeft: 10 }}>
+                            · Last updated: <strong>{lastUpdatedStr}</strong> IST
+                            {isToday && <span style={{ marginLeft: 6, color: "var(--color-primary, #2563eb)" }}>· Auto-refreshes every 30s</span>}
+                        </span>
+                    )}
+                </div>
+                <button
+                    onClick={() => loadData(selectedDate, true)}
+                    disabled={refreshing}
+                    style={{
+                        display: "flex", alignItems: "center", gap: 5,
+                        padding: "5px 12px", borderRadius: 8, border: "1px solid var(--border)",
+                        background: "var(--bg-card)", color: "var(--text-secondary)",
+                        fontSize: 12, cursor: refreshing ? "not-allowed" : "pointer",
+                        opacity: refreshing ? 0.6 : 1,
+                    }}
+                >
+                    <RefreshCw size={12} style={{ animation: refreshing ? "spin 1s linear infinite" : "none" }} />
+                    {refreshing ? "Refreshing…" : "Refresh"}
+                </button>
             </div>
         </div>
     );

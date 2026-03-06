@@ -62,6 +62,7 @@ export default function AttendancePage() {
     const [actionLoading, setActionLoading] = useState(false);
     const [elapsed, setElapsed] = useState(0);
     const [toast, setToast] = useState<{ message: string; type: "error" | "success" } | null>(null);
+    const [lateRemark, setLateRemark] = useState("");
     const { user } = useAuth();
     // Token key is scoped per user so switching accounts never mixes tokens
     const tokenKey = `nexus-checkin-token-${user?.id || "guest"}`;
@@ -113,7 +114,7 @@ export default function AttendancePage() {
         return `${h}h ${m.toString().padStart(2, "0")}m ${s.toString().padStart(2, "0")}s`;
     };
 
-    const handleCheckIn = useCallback(async () => {
+    const handleCheckIn = useCallback(async (remark?: string) => {
         setActionLoading(true);
         setToast(null);
 
@@ -131,7 +132,11 @@ export default function AttendancePage() {
             return;
         }
 
-        const res = await apiPost<TodayData & { sessionToken?: string }>("/api/attendance/checkin", { latitude, longitude });
+        const res = await apiPost<TodayData & { sessionToken?: string }>("/api/attendance/checkin", {
+            latitude,
+            longitude,
+            ...(remark?.trim() ? { remark: remark.trim() } : {}),
+        });
         if (res.data) {
             setToday(prev => ({
                 ...prev,
@@ -139,10 +144,10 @@ export default function AttendancePage() {
                 checkInTime: res.data!.checkInTime || new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }),
                 location: res.data!.location || "Office",
             }));
-            // Store session token scoped to this user
             if (res.data.sessionToken) {
                 localStorage.setItem(tokenKey, res.data.sessionToken);
             }
+            setLateRemark(""); // clear remark after successful check-in
             setToast({ message: "✅ Checked in successfully!", type: "success" });
             setSelectedDate(null); // Show today
         } else {
@@ -388,9 +393,55 @@ export default function AttendancePage() {
                                     {actionLoading ? <><span className="spinner" /> Checking out...</> : "Check Out"}
                                 </button>
                             ) : (
-                                <button className="btn btn-primary btn-full" onClick={handleCheckIn} disabled={actionLoading}>
-                                    {actionLoading ? <><span className="spinner" /> Checking in...</> : "Check In"}
-                                </button>
+                                <>
+                                    {/* Optional late-arrival remark — shown before check-in */}
+                                    <div style={{ marginBottom: "var(--space-3)" }}>
+                                        <label style={{
+                                            display: "block",
+                                            fontSize: "var(--text-xs)",
+                                            fontWeight: "var(--font-medium)",
+                                            color: "var(--text-secondary)",
+                                            marginBottom: 6,
+                                        }}>
+                                            Remark <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>(optional — e.g. reason for late arrival)</span>
+                                        </label>
+                                        <textarea
+                                            value={lateRemark}
+                                            onChange={e => setLateRemark(e.target.value)}
+                                            placeholder="e.g. Traffic jam, doctor appointment…"
+                                            maxLength={500}
+                                            rows={2}
+                                            style={{
+                                                width: "100%",
+                                                padding: "8px 12px",
+                                                borderRadius: "var(--radius-md)",
+                                                border: "1px solid var(--border-primary)",
+                                                background: "var(--bg-secondary)",
+                                                color: "var(--text-primary)",
+                                                fontSize: "var(--text-sm)",
+                                                fontFamily: "inherit",
+                                                resize: "none",
+                                                outline: "none",
+                                                boxSizing: "border-box",
+                                                transition: "border-color 0.2s",
+                                            }}
+                                            onFocus={e => (e.currentTarget.style.borderColor = "var(--color-primary)")}
+                                            onBlur={e => (e.currentTarget.style.borderColor = "var(--border-primary)")}
+                                        />
+                                        {lateRemark.length > 0 && (
+                                            <div style={{ textAlign: "right", fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>
+                                                {lateRemark.length}/500
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button
+                                        className="btn btn-primary btn-full"
+                                        onClick={() => handleCheckIn(lateRemark)}
+                                        disabled={actionLoading}
+                                    >
+                                        {actionLoading ? <><span className="spinner" /> Checking in...</> : "Check In"}
+                                    </button>
+                                </>
                             )}
                         </div>
                     </>
