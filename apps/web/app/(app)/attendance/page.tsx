@@ -114,6 +114,18 @@ export default function AttendancePage() {
         return `${h}h ${m.toString().padStart(2, "0")}m ${s.toString().padStart(2, "0")}s`;
     };
 
+    // 9-hour countdown: how many seconds remain out of a 9h workday
+    const WORKDAY_SECS = 9 * 3600;
+    const countdownSecs = Math.max(0, WORKDAY_SECS - elapsed);
+    const formatCountdown = (secs: number) => {
+        const h = Math.floor(secs / 3600).toString().padStart(2, "0");
+        const m = Math.floor((secs % 3600) / 60).toString().padStart(2, "0");
+        const s = (secs % 60).toString().padStart(2, "0");
+        return `${h}:${m}:${s}`;
+    };
+    const countdownPct = Math.max(0, Math.min(100, (countdownSecs / WORKDAY_SECS) * 100));
+    const countdownColor = countdownPct > 50 ? "#16a34a" : countdownPct > 20 ? "#d97706" : "#dc2626";
+
     const handleCheckIn = useCallback(async (remark?: string) => {
         setActionLoading(true);
         setToast(null);
@@ -338,22 +350,60 @@ export default function AttendancePage() {
 
             {/* Day Detail Card */}
             <div className="att-today-card animate-slideUp">
-                <h3 style={{ fontWeight: "var(--font-semibold)", marginBottom: "var(--space-4)", display: "flex", alignItems: "center", gap: 8 }}>
-                    {selectedLabel}
-                    {!isShowingToday && (
-                        <button
-                            onClick={() => setSelectedDate(null)}
-                            style={{
-                                background: "none", border: "none", cursor: "pointer",
-                                color: "var(--color-primary)", fontSize: "var(--text-xs)",
-                                padding: "2px 8px", borderRadius: 6,
-                                backgroundColor: "var(--color-primary-light, rgba(99,102,241,0.1))",
-                            }}
-                        >
-                            ← Back to Today
-                        </button>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-4)", flexWrap: "wrap", gap: 8 }}>
+                    <h3 style={{ fontWeight: "var(--font-semibold)", display: "flex", alignItems: "center", gap: 8, margin: 0 }}>
+                        {selectedLabel}
+                        {!isShowingToday && (
+                            <button
+                                onClick={() => setSelectedDate(null)}
+                                style={{
+                                    background: "none", border: "none", cursor: "pointer",
+                                    color: "var(--color-primary)", fontSize: "var(--text-xs)",
+                                    padding: "2px 8px", borderRadius: 6,
+                                    backgroundColor: "var(--color-primary-light, rgba(99,102,241,0.1))",
+                                }}
+                            >
+                                ← Back to Today
+                            </button>
+                        )}
+                    </h3>
+
+                    {/* 9-hour countdown — only visible when actively checked in */}
+                    {isShowingToday && today.checkedIn && (
+                        <div style={{
+                            display: "flex", flexDirection: "column", alignItems: "center",
+                            background: "var(--bg-secondary)",
+                            border: `1.5px solid ${countdownColor}`,
+                            borderRadius: 12, padding: "8px 16px", minWidth: 160,
+                        }}>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: countdownColor, textTransform: "uppercase", letterSpacing: 1, marginBottom: 2 }}>
+                                ⏳ Time Remaining
+                            </div>
+                            <div style={{
+                                fontFamily: "var(--font-mono)",
+                                fontSize: "var(--text-xl)",
+                                fontWeight: 700,
+                                color: countdownColor,
+                                letterSpacing: 2,
+                                lineHeight: 1.2,
+                            }}>
+                                {formatCountdown(countdownSecs)}
+                            </div>
+                            {/* Progress bar */}
+                            <div style={{ width: "100%", height: 4, background: "var(--border-primary)", borderRadius: 99, marginTop: 6, overflow: "hidden" }}>
+                                <div style={{
+                                    height: "100%", width: `${countdownPct}%`,
+                                    background: countdownColor,
+                                    borderRadius: 99,
+                                    transition: "width 1s linear, background 1s",
+                                }} />
+                            </div>
+                            <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 3 }}>
+                                {countdownSecs === 0 ? "🎉 Full day complete!" : `of 9h workday`}
+                            </div>
+                        </div>
                     )}
-                </h3>
+                </div>
 
                 {isShowingToday ? (
                     <>
