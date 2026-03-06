@@ -101,6 +101,9 @@ async function handleTeamAttendance(
         // Extract remark from anomalyFlags JSON (stored by check-in route)
         const flags = att?.anomalyFlags as Record<string, unknown> | null;
         const remark = typeof flags?.remark === "string" && flags.remark.trim() ? flags.remark.trim() : null;
+        const breaks = Array.isArray(flags?.breaks) ? flags!.breaks : [];
+        const earlyReason = typeof flags?.earlyReason === "string" && flags.earlyReason.trim() ? flags.earlyReason.trim() : null;
+        const isHalfDay = flags?.isHalfDay === true;
         return {
             id: emp.id,
             fullName: emp.fullName,
@@ -113,6 +116,9 @@ async function handleTeamAttendance(
             totalHours: onLeave ? null : att?.totalHours || null,
             leaveType: leave ? (leave as any).leaveType?.name : null,
             remark: onLeave ? null : remark,
+            breaks: onLeave ? [] : breaks,
+            earlyReason: onLeave ? null : earlyReason,
+            isHalfDay: onLeave ? false : isHalfDay,
         };
     });
 

@@ -78,6 +78,12 @@ async function handleEmployeeHistory(
 
         if (dayRecords.length > 0) {
             const rec = dayRecords[0]!;
+            const flags = rec.anomalyFlags as Record<string, unknown> | null;
+            const remark = typeof flags?.remark === "string" && flags.remark.trim() ? flags.remark.trim() : null;
+            const breaks = Array.isArray(flags?.breaks) ? flags!.breaks : [];
+            const earlyReason = typeof flags?.earlyReason === "string" && flags.earlyReason.trim() ? flags.earlyReason.trim() : null;
+            const isHalfDay = flags?.isHalfDay === true;
+
             calendar.push({
                 date: dateStr,
                 status: rec.status,
@@ -88,6 +94,10 @@ async function handleEmployeeHistory(
                 checkInMethod: rec.checkInMethod,
                 verificationScore: rec.verificationScore,
                 hasAnomaly: rec.anomalyFlags != null,
+                remark,
+                breaks,
+                earlyReason,
+                isHalfDay,
             });
         } else {
             const dayDate = new Date(Date.UTC(year, mon - 1, day));

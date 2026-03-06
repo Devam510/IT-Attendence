@@ -17,6 +17,7 @@ async function handleCheckOut(
     try { body = await req.json(); } catch { /* empty body is ok */ }
 
     const sessionToken = body.sessionToken as string | undefined;
+    const earlyReason = body.earlyReason as string | undefined;
 
     const now = new Date();
     // Calculate "today" in IST (UTC+5:30), not in server's UTC timezone
@@ -73,6 +74,7 @@ async function handleCheckOut(
     const diffMs = checkOutTime.getTime() - record.checkInAt!.getTime();
     const totalHours = +(diffMs / 3600000).toFixed(2);
     const overtimeHours = Math.max(0, +(totalHours - 8).toFixed(2));
+    const isHalfDay = totalHours < 4;
 
     // Update device info and check-out time
     const updatedFlags = {
@@ -80,6 +82,8 @@ async function handleCheckOut(
         checkOutDevice,
         checkOutUserAgent,
         checkOutIp,
+        ...(isHalfDay ? { isHalfDay: true } : {}),
+        ...(isHalfDay && earlyReason ? { earlyReason } : {}),
     };
 
     await prisma.attendanceRecord.update({
@@ -107,6 +111,7 @@ async function handleCheckOut(
         checkOutAt: checkOutTime.toISOString(),
         totalHours,
         overtimeHours,
+        isHalfDay,
         deviceMatch: !storedToken || !sessionToken || sessionToken === storedToken,
     });
 }

@@ -63,6 +63,9 @@ export default function AttendancePage() {
     const [elapsed, setElapsed] = useState(0);
     const [toast, setToast] = useState<{ message: string; type: "error" | "success" } | null>(null);
     const [lateRemark, setLateRemark] = useState("");
+    const [showEarlyModal, setShowEarlyModal] = useState(false);
+    const [earlyReason, setEarlyReason] = useState("");
+    const [earlyReasonError, setEarlyReasonError] = useState(false);
     const { user } = useAuth();
     // Token key is scoped per user so switching accounts never mixes tokens
     const tokenKey = `nexus-checkin-token-${user?.id || "guest"}`;
@@ -181,13 +184,29 @@ export default function AttendancePage() {
         setActionLoading(false);
     }, []);
 
-    const handleCheckOut = useCallback(async () => {
+    const handleCheckOut = useCallback(async (force = false, reason = "") => {
         setActionLoading(true);
         setToast(null);
 
-        const sessionToken = localStorage.getItem(tokenKey) || "";
+        // Gate: if worked < 4h and not forced, show early checkout modal
+        if (!force && today.checkInTime) {
+            const checkInMs = elapsed > 0 ? (Date.now() - elapsed * 1000) : 0;
+            // Use elapsed directly — elapsed is already in seconds from check-in
+            const workedHours = elapsed / 3600;
+            if (workedHours < 4) {
+                setEarlyReason("");
+                setEarlyReasonError(false);
+                setShowEarlyModal(true);
+                setActionLoading(false);
+                return;
+            }
+        }
 
-        const res = await apiPost<TodayData>("/api/attendance/checkout", { sessionToken });
+        const sessionToken = localStorage.getItem(tokenKey) || "";
+        const body: Record<string, unknown> = { sessionToken };
+        if (reason) body.earlyReason = reason;
+
+        const res = await apiPost<TodayData>("/api/attendance/checkout", body);
         if (res.data) {
             setToday(prev => ({
                 ...prev,
@@ -201,9 +220,42 @@ export default function AttendancePage() {
             setToast({ message: res.error || "Check-out failed", type: "error" });
         }
         setActionLoading(false);
-    }, []);
+    }, [today.checkInTime, elapsed, tokenKey]);
 
-    // Calendar generation
+    function confirmEarlyCheckout() {
+        if (!earlyReason.trim()) { setEarlyReasonError(true); return; }
+        setShowEarlyModal(false);
+        handleCheckOut(true, earlyReason.trim());
+    }
+
+    // ── Export to CSV ─────────────────────────────────────────────
+    function exportToCSV() {
+        const rows = [
+            ["Date", "Status", "Check In", "Check Out", "Hours", "Overtime (h)", "Verification Score"],
+        ];
+        calendar.forEach(d => {
+            const formatT = (iso: string | null) => iso
+                ? new Date(iso).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })
+                : "";
+            rows.push([
+                d.date,
+                d.status,
+                formatT(d.checkInAt),
+                formatT(d.checkOutAt),
+                d.totalHours != null ? d.totalHours.toFixed(2) : "",
+                d.overtimeHours != null ? d.overtimeHours.toFixed(2) : "",
+                d.verificationScore != null ? String(d.verificationScore) : "",
+            ]);
+        });
+        const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, "\"\"")}"`).join(",")).join("\n");
+        const blob = new Blob([csv], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `attendance-${year}-${String(month + 1).padStart(2, "0")}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const todayDate = now.getDate();
@@ -285,6 +337,50 @@ export default function AttendancePage() {
     return (
         <div>
             {/* Toast Notification */}
+            {/* Early Checkout Modal */}
+            {showEarlyModal && (
+                <div style={{
+                    position: "fixed", inset: 0, zIndex: 9999,
+                    background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
+                    display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+                }}>
+                    <div style={{
+                        background: "var(--bg-primary)", borderRadius: 16, padding: "28px 32px",
+                        maxWidth: 440, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+                        border: "1.5px solid #f87171",
+                    }}>
+                        <div style={{ fontSize: 32, marginBottom: 8, textAlign: "center" }}>⚠️</div>
+                        <h3 style={{ fontSize: "var(--text-lg)", fontWeight: 700, color: "#dc2626", textAlign: "center", margin: "0 0 8px" }}>Early Check-Out</h3>
+                        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", textAlign: "center", margin: "0 0 20px" }}>
+                            You have worked less than <strong>4 hours</strong>. Leaving early will be counted as a <strong>Half Day</strong>. Please provide a reason.
+                        </p>
+                        <textarea
+                            value={earlyReason}
+                            onChange={e => { setEarlyReason(e.target.value); setEarlyReasonError(false); }}
+                            placeholder="Enter your reason for leaving early…"
+                            rows={3}
+                            style={{
+                                width: "100%", padding: "10px 12px", borderRadius: 8,
+                                border: `1.5px solid ${earlyReasonError ? "#dc2626" : "var(--border-primary)"}`,
+                                backgroundColor: "var(--bg-secondary)", color: "var(--text-primary)",
+                                fontSize: "var(--text-sm)", resize: "none", boxSizing: "border-box", outline: "none",
+                            }}
+                        />
+                        {earlyReasonError && <p style={{ color: "#dc2626", fontSize: 12, margin: "4px 0 0" }}>Reason is required.</p>}
+                        <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                            <button onClick={() => setShowEarlyModal(false)}
+                                style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "1.5px solid var(--border-primary)", background: "var(--bg-secondary)", color: "var(--text-primary)", fontWeight: 600, cursor: "pointer" }}>
+                                Cancel — Stay
+                            </button>
+                            <button onClick={confirmEarlyCheckout} disabled={actionLoading}
+                                style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "none", background: "#dc2626", color: "white", fontWeight: 700, cursor: actionLoading ? "not-allowed" : "pointer", opacity: actionLoading ? 0.7 : 1 }}>
+                                {actionLoading ? "Checking out…" : "Confirm Half Day Check-Out"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {toast && (
                 <div
                     style={{
@@ -317,12 +413,24 @@ export default function AttendancePage() {
             </div>
 
             {/* Month Navigation */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "var(--space-4)" }}>
-                <button className="att-month-btn" onClick={prevMonth} aria-label="Previous month">◀</button>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "var(--space-4)", gap: 8 }}>
+                <button className="att-month-btn" onClick={prevMonth} aria-label="Previous month">◄</button>
                 <span className="att-month" style={{ minWidth: 180, justifyContent: "center" }}>
                     {MONTHS[month]} {year}
                 </span>
-                <button className="att-month-btn" onClick={nextMonth} aria-label="Next month">▶</button>
+                <button className="att-month-btn" onClick={nextMonth} aria-label="Next month">►</button>
+                <button
+                    onClick={exportToCSV}
+                    title="Download as CSV"
+                    style={{
+                        marginLeft: 12, display: "flex", alignItems: "center", gap: 5,
+                        padding: "6px 14px", borderRadius: 8, border: "1.5px solid var(--border-primary)",
+                        background: "var(--bg-secondary)", color: "var(--text-primary)",
+                        fontSize: "var(--text-xs)", fontWeight: 600, cursor: "pointer",
+                    }}
+                >
+                    ⬇ Export CSV
+                </button>
             </div>
 
             {/* Calendar Grid */}
@@ -439,7 +547,7 @@ export default function AttendancePage() {
 
                         <div style={{ marginTop: "var(--space-6)" }}>
                             {today.checkedIn ? (
-                                <button className="btn btn-danger btn-full" onClick={handleCheckOut} disabled={actionLoading}>
+                                <button className="btn btn-danger btn-full" onClick={() => handleCheckOut()} disabled={actionLoading}>
                                     {actionLoading ? <><span className="spinner" /> Checking out...</> : "Check Out"}
                                 </button>
                             ) : (

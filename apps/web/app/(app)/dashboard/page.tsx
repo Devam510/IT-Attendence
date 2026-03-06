@@ -443,6 +443,11 @@ export default function DashboardPage() {
     const [actionError, setActionError] = useState<string | null>(null);
     const [sessionToken, setSessionToken] = useState<string | null>(null);
 
+    // Early checkout modal
+    const [showEarlyModal, setShowEarlyModal] = useState(false);
+    const [earlyReason, setEarlyReason] = useState("");
+    const [earlyReasonError, setEarlyReasonError] = useState(false);
+
     // 8-hour countdown (in seconds)
     const WORK_SECS = 8 * 3600;
     const [countdown, setCountdown] = useState(WORK_SECS);
@@ -623,11 +628,27 @@ export default function DashboardPage() {
         }
     }
 
-    async function handleCheckOut() {
+    async function handleCheckOut(force = false, reason = "") {
         setActionError(null);
+        // Calculate worked hours to detect early checkout (< 4h)
+        if (!force && empData.checkInAt) {
+            const workedSecs = Math.floor((Date.now() - (empData.checkInAt as Date).getTime()) / 1000)
+                - totalBreakSecs(breakLogRef.current)
+                - (onBreakRef.current && breakStartedAtRef.current
+                    ? Math.floor((Date.now() - breakStartedAtRef.current.getTime()) / 1000) : 0);
+            const workedHours = workedSecs / 3600;
+            if (workedHours < 4) {
+                setEarlyReason("");
+                setEarlyReasonError(false);
+                setShowEarlyModal(true);
+                return;
+            }
+        }
         setActionLoading("checkout");
         const token = sessionToken || localStorage.getItem("dash_sessionToken") || undefined;
-        const res = await apiPost<any>("/api/attendance/checkout", token ? { sessionToken: token } : {});
+        const body: Record<string, unknown> = token ? { sessionToken: token } : {};
+        if (reason) body.earlyReason = reason;
+        const res = await apiPost<any>("/api/attendance/checkout", body);
         if (res.error) {
             setActionError(res.error || "Check-out failed");
         } else {
@@ -645,7 +666,13 @@ export default function DashboardPage() {
         setActionLoading(null);
     }
 
-    function handleBreakStart() {
+    function confirmEarlyCheckout() {
+        if (!earlyReason.trim()) { setEarlyReasonError(true); return; }
+        setShowEarlyModal(false);
+        handleCheckOut(true, earlyReason.trim());
+    }
+
+    async function handleBreakStart() {
         const now = new Date();
         const newEntry: BreakEntry = { start: now.toISOString(), end: null };
         const newLog = [...breakLog, newEntry];
@@ -656,9 +683,11 @@ export default function DashboardPage() {
         setBreakStartedAt(now);
         breakStartedAtRef.current = now;
         localStorage.setItem("dash_break", JSON.stringify({ log: newLog }));
+        // Persist to DB (fire-and-forget)
+        apiPost("/api/attendance/break", { action: "start" }).catch(() => null);
     }
 
-    function handleBreakEnd() {
+    async function handleBreakEnd() {
         const now = new Date();
         const newLog = breakLog.map((b, i) =>
             i === breakLog.length - 1 && !b.end ? { ...b, end: now.toISOString() } : b
@@ -670,6 +699,8 @@ export default function DashboardPage() {
         setBreakStartedAt(null);
         breakStartedAtRef.current = null;
         localStorage.setItem("dash_break", JSON.stringify({ log: newLog }));
+        // Persist to DB (fire-and-forget)
+        apiPost("/api/attendance/break", { action: "end" }).catch(() => null);
     }
 
     const now = new Date();
@@ -691,12 +722,76 @@ export default function DashboardPage() {
         );
     }
 
+    // ── Early Checkout Modal ───────────────────────────────────────
+    const EarlyCheckoutModal = showEarlyModal ? (
+        <div style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+        }}>
+            <div style={{
+                background: "var(--bg-primary)", borderRadius: 16, padding: "28px 32px",
+                maxWidth: 440, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+                border: "1.5px solid #f87171",
+            }}>
+                <div style={{ fontSize: 32, marginBottom: 8, textAlign: "center" }}>⚠️</div>
+                <h3 style={{ fontSize: "var(--text-lg)", fontWeight: 700, color: "#dc2626", textAlign: "center", margin: "0 0 8px" }}>
+                    Early Check-Out
+                </h3>
+                <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", textAlign: "center", margin: "0 0 20px" }}>
+                    You have worked less than <strong>4 hours</strong> today.
+                    Leaving this early will be counted as a <strong>Half Day</strong>.
+                    Please provide a reason for leaving early.
+                </p>
+                <textarea
+                    value={earlyReason}
+                    onChange={e => { setEarlyReason(e.target.value); setEarlyReasonError(false); }}
+                    placeholder="Enter your reason for leaving early…"
+                    rows={3}
+                    style={{
+                        width: "100%", padding: "10px 12px", borderRadius: 8,
+                        border: `1.5px solid ${earlyReasonError ? "#dc2626" : "var(--border-primary)"}`,
+                        backgroundColor: "var(--bg-secondary)", color: "var(--text-primary)",
+                        fontSize: "var(--text-sm)", resize: "none", boxSizing: "border-box",
+                        outline: "none",
+                    }}
+                />
+                {earlyReasonError && <p style={{ color: "#dc2626", fontSize: 12, margin: "4px 0 0" }}>Reason is required to proceed.</p>}
+                <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                    <button
+                        onClick={() => setShowEarlyModal(false)}
+                        style={{
+                            flex: 1, padding: "10px 0", borderRadius: 8,
+                            border: "1.5px solid var(--border-primary)", background: "var(--bg-secondary)",
+                            color: "var(--text-primary)", fontWeight: 600, cursor: "pointer",
+                        }}
+                    >
+                        Cancel — Stay
+                    </button>
+                    <button
+                        onClick={confirmEarlyCheckout}
+                        disabled={actionLoading === "checkout"}
+                        style={{
+                            flex: 1, padding: "10px 0", borderRadius: 8, border: "none",
+                            background: "#dc2626", color: "white", fontWeight: 700,
+                            cursor: actionLoading ? "not-allowed" : "pointer",
+                            opacity: actionLoading ? 0.7 : 1,
+                        }}
+                    >
+                        {actionLoading === "checkout" ? "Checking out…" : "Confirm Half Day Check-Out"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    ) : null;
+
     // Admin gets the full redesign
     if (isAdmin) return <AdminDashboard user={user} md={managerData} />;
 
     // Everyone else (EMP / MGR / HR) keeps the original layout
     return (
         <div>
+            {EarlyCheckoutModal}
             <div className="dash-greeting animate-fadeIn">
                 <h1>{greetingText}, {user?.fullName?.split(" ")[0] || "there"}</h1>
                 <p>{dateText}</p>
@@ -846,7 +941,7 @@ export default function DashboardPage() {
                                     </button>
                                 )}
                                 <button
-                                    onClick={handleCheckOut}
+                                    onClick={() => handleCheckOut()}
                                     disabled={actionLoading === "checkout"}
                                     style={{
                                         flex: 1, padding: "10px 0", borderRadius: 10, border: "none",

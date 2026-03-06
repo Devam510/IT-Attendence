@@ -20,6 +20,9 @@ interface StaffMember {
     totalHours?: number | null;
     leaveType?: string | null;
     remark?: string | null;
+    breaks?: { start: string; end?: string | null; duration?: number }[];
+    earlyReason?: string | null;
+    isHalfDay?: boolean;
 }
 
 interface DayData {
@@ -63,6 +66,9 @@ interface EmpCalDay {
     totalHours: number | null;
     verificationScore?: number | null;
     remark?: string | null;
+    breaks?: { start: string; end?: string | null; duration?: number }[];
+    earlyReason?: string | null;
+    isHalfDay?: boolean;
 }
 interface EmpHistoryData {
     month: string;
@@ -146,11 +152,46 @@ function EmployeeMonthModal({ employee, onClose }: {
                         <div style={{ fontWeight: 700, fontSize: 18 }}>📅 {employee.fullName}</div>
                         <div style={{ fontSize: 12, color: "var(--text-secondary)", fontFamily: "monospace", marginTop: 2 }}>{employee.employeeId}</div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "var(--text-secondary)", padding: "0 4px", lineHeight: 1 }}
-                        aria-label="Close"
-                    >✕</button>
+                    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                        <button
+                            onClick={() => {
+                                if (!data?.calendar) return;
+                                const csvContent = [
+                                    ["Date", "Status", "Check In", "Check Out", "Total Hours", "Remark", "Half Day", "Early Checkout Reason"],
+                                    ...data.calendar.map(d => [
+                                        d.date,
+                                        d.status,
+                                        d.checkInAt ? new Date(d.checkInAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }) : "-",
+                                        d.checkOutAt ? new Date(d.checkOutAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }) : "-",
+                                        d.totalHours?.toFixed(2) || "-",
+                                        d.remark ? `"${d.remark.replace(/"/g, '""')}"` : "-",
+                                        d.isHalfDay ? "Yes" : "No",
+                                        d.earlyReason ? `"${d.earlyReason.replace(/"/g, '""')}"` : "-"
+                                    ])
+                                ].map(row => row.join(",")).join("\n");
+                                const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = `attendance_${employee.employeeId}_${MODAL_MONTHS[month]}_${year}.csv`;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                            }}
+                            title="Export to CSV"
+                            style={{
+                                display: "flex", alignItems: "center", gap: 6,
+                                padding: "6px 12px", background: "none", border: "1px solid var(--border-primary)", borderRadius: 6,
+                                cursor: "pointer", fontSize: 13, color: "var(--text-secondary)", fontWeight: 500
+                            }}
+                        >
+                            <Download size={14} /> Export CSV
+                        </button>
+                        <button
+                            onClick={onClose}
+                            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "var(--text-secondary)", padding: "0 4px", lineHeight: 1 }}
+                            aria-label="Close"
+                        >✕</button>
+                    </div>
                 </div>
 
                 {/* Month nav */}
@@ -240,6 +281,24 @@ function EmployeeMonthModal({ employee, onClose }: {
                                     {selectedDay.remark && <>
                                         <div style={{ color: "var(--text-secondary)" }}>Remark</div>
                                         <div style={{ fontStyle: "italic" }}>💬 {selectedDay.remark}</div>
+                                    </>}
+                                    {selectedDay.isHalfDay && <>
+                                        <div style={{ color: "var(--text-secondary)" }}>Half Day</div>
+                                        <div style={{ color: "#d97706", fontWeight: 600 }}>Yes</div>
+                                    </>}
+                                    {selectedDay.earlyReason && <>
+                                        <div style={{ color: "var(--text-secondary)" }}>Early Checkout</div>
+                                        <div style={{ fontStyle: "italic", color: "#dc2626" }}>{selectedDay.earlyReason}</div>
+                                    </>}
+                                    {selectedDay.breaks && selectedDay.breaks.length > 0 && <>
+                                        <div style={{ color: "var(--text-secondary)" }}>Breaks</div>
+                                        <div>
+                                            {selectedDay.breaks.map((b, i) => (
+                                                <div key={i} style={{ fontSize: 11, background: "rgba(0,0,0,0.05)", padding: "2px 6px", borderRadius: 4, display: "inline-block", marginRight: 4, marginBottom: 4 }}>
+                                                    ☕ {new Date(b.start).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })} - {b.end ? new Date(b.end).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }) : "Ongoing"}
+                                                </div>
+                                            ))}
+                                        </div>
                                     </>}
                                 </div>
                             </div>
@@ -484,6 +543,45 @@ export default function TeamAttendancePage() {
                         {f === "ALL" ? `All${s ? ` (${s.total})` : ""}` : f === "ON_LEAVE" ? `On Leave${s ? ` (${s.onLeave})` : ""}` : `${f.charAt(0) + f.slice(1).toLowerCase()}${s ? ` (${s[f.toLowerCase() as "present" | "absent"]})` : ""}`}
                     </button>
                 ))}
+
+                <div style={{ flex: 1 }} />
+
+                {/* Export button */}
+                <button
+                    onClick={() => {
+                        const csvContent = [
+                            ["Employee", "ID", "Dept / Role", "Status", "Check In", "Check Out", "Hours", "Breaks", "Half Day", "Early Reason", "Remark"],
+                            ...filtered.map(m => [
+                                `"${m.fullName}"`,
+                                m.employeeId,
+                                m.designation || "-",
+                                m.status,
+                                fmtTime(m.checkInAt),
+                                fmtTime(m.checkOutAt),
+                                m.totalHours?.toFixed(2) || "-",
+                                m.breaks?.length || 0,
+                                m.isHalfDay ? "Yes" : "No",
+                                m.earlyReason ? `"${m.earlyReason.replace(/"/g, '""')}"` : "-",
+                                m.remark ? `"${m.remark.replace(/"/g, '""')}"` : "-"
+                            ])
+                        ].map(row => row.join(",")).join("\n");
+                        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `team_attendance_${toISTDateString(selectedDate)}.csv`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    }}
+                    style={{
+                        padding: "7px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer",
+                        background: "none", color: "var(--text-primary)", border: "1px solid var(--border)",
+                        fontWeight: 600, display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
+                        marginLeft: "auto"
+                    }}
+                >
+                    <Download size={15} /> Export CSV
+                </button>
             </div>
 
             {/* Table */}
@@ -553,21 +651,33 @@ export default function TeamAttendancePage() {
                                                 {fmtTime(m.checkInAt)}
                                             </td>
                                             <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>{fmtTime(m.checkOutAt)}</td>
-                                            <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>{fmtHours(m.totalHours)}</td>
+                                            <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>
+                                                {fmtHours(m.totalHours)}
+                                                {m.breaks && m.breaks.length > 0 && (
+                                                    <span title={`${m.breaks.length} break(s)`} style={{ marginLeft: 6, fontSize: 11, background: "var(--bg-card)", padding: "2px 6px", borderRadius: 10, border: "1px solid var(--border)" }}>
+                                                        ☕ {m.breaks.length}
+                                                    </span>
+                                                )}
+                                            </td>
                                             <td style={{ padding: "11px 14px", maxWidth: 220 }}>
-                                                {m.remark ? (
+                                                {m.isHalfDay && (
+                                                    <span style={{ fontSize: 11, background: "#fef3c7", color: "#92400e", padding: "1px 6px", borderRadius: 4, fontWeight: 600, display: "inline-block", marginBottom: 3 }}>
+                                                        Half Day
+                                                    </span>
+                                                )}
+                                                {m.earlyReason && (
+                                                    <span title={m.earlyReason} style={{ fontSize: 12, color: "#dc2626", fontStyle: "italic", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                        Early: {m.earlyReason}
+                                                    </span>
+                                                )}
+                                                {m.remark && (
                                                     <span title={m.remark} style={{
-                                                        fontSize: 12,
-                                                        color: "var(--text-secondary)",
-                                                        fontStyle: "italic",
-                                                        display: "block",
-                                                        overflow: "hidden",
-                                                        textOverflow: "ellipsis",
-                                                        whiteSpace: "nowrap",
+                                                        fontSize: 12, color: "var(--text-secondary)", fontStyle: "italic", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                                                     }}>
                                                         💬 {m.remark}
                                                     </span>
-                                                ) : (
+                                                )}
+                                                {!m.isHalfDay && !m.earlyReason && !m.remark && (
                                                     <span style={{ color: "var(--text-tertiary)", fontSize: 12 }}>—</span>
                                                 )}
                                             </td>
