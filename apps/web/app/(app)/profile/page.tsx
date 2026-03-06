@@ -456,9 +456,7 @@ export default function ProfilePage() {
                 {/* Avatar + info — sits above the banner via z-index */}
                 <div style={{
                     background: "var(--bg-primary)",
-                    paddingTop: "var(--space-12)", // leaves 48px room for the avatar circle
-                    padding: "0 var(--space-6) var(--space-6)",
-                    paddingTop: 56,
+                    padding: "56px var(--space-6) var(--space-6)",
                     display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center",
                     position: "relative", zIndex: 1, marginTop: -44,
                 }}>
