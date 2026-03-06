@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { apiGet } from "@/lib/api-client";
@@ -28,9 +28,11 @@ interface ManagerData {
 
 export default function DashboardPage() {
     const { user } = useAuth();
-    const [data, setData] = useState<DashboardData>({});
+    const [data, setData] = useState<DashboardData & { checkInAt?: Date | null }>({});
     const [managerData, setManagerData] = useState<ManagerData>({});
     const [loading, setLoading] = useState(true);
+    const [liveWorking, setLiveWorking] = useState<string>("0.0h");
+    const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const isManager = user?.role === "MGR" || user?.role === "HRA" || user?.role === "SADM";
 
@@ -66,6 +68,7 @@ export default function DashboardPage() {
                 setData({
                     checkedIn,
                     checkedOut,
+                    checkInAt: checkInAt,          // store raw Date for live ticker
                     checkInTime: checkInAt ? checkInAt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }) : undefined,
                     checkOutTime: checkOutAt ? checkOutAt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }) : undefined,
                     workingHours,
@@ -77,6 +80,28 @@ export default function DashboardPage() {
         }
         load();
     }, [isManager]);
+
+    // Live working-time ticker — updates every second while checked in
+    useEffect(() => {
+        if (tickerRef.current) clearInterval(tickerRef.current);
+
+        if (data.checkedIn && data.checkInAt) {
+            const tick = () => {
+                const elapsedMs = Date.now() - (data.checkInAt as Date).getTime();
+                const totalMins = Math.floor(elapsedMs / 60000);
+                const h = Math.floor(totalMins / 60);
+                const m = totalMins % 60;
+                setLiveWorking(h > 0 ? `${h}h ${m}m` : `${m}m`);
+            };
+            tick(); // run immediately
+            tickerRef.current = setInterval(tick, 1000);
+        } else {
+            // Not checked in or already checked out — use static value
+            setLiveWorking(data.workingHours ? `${data.workingHours.toFixed(1)}h` : "0m");
+        }
+
+        return () => { if (tickerRef.current) clearInterval(tickerRef.current); };
+    }, [data.checkedIn, data.checkInAt, data.workingHours]);
 
     const now = new Date();
     const greetingText = now.getHours() < 12 ? "Good morning" : now.getHours() < 17 ? "Good afternoon" : "Good evening";
@@ -155,7 +180,7 @@ export default function DashboardPage() {
                     {data.checkedOut
                         ? `Total: ${data.workingHours && data.workingHours > 0 ? `${(data.workingHours * 60).toFixed(0)} min (${data.workingHours.toFixed(2)}h)` : "—"}`
                         : data.checkedIn
-                            ? `Working: ${data.workingHours?.toFixed(1) || 0}h`
+                            ? `Working: ${liveWorking}`
                             : "Tap below to check in"}
                 </div>
                 {!data.checkedOut && (
