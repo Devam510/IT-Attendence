@@ -112,7 +112,6 @@ export default function TasksPage() {
     }, []);
 
     const fetchEmployees = useCallback(async () => {
-        if (!canAssign) return;
         try {
             const res = await fetch("/api/tasks/employees");
             if (res.ok) {
@@ -122,15 +121,18 @@ export default function TasksPage() {
         } catch {
             // silent
         }
-    }, [canAssign]);
+    }, []);
 
     useEffect(() => {
         fetchTasks();
-        fetchEmployees();
-        // Real-time polling every 15 seconds
         const interval = setInterval(fetchTasks, 15_000);
         return () => clearInterval(interval);
-    }, [fetchTasks, fetchEmployees]);
+    }, [fetchTasks]);
+
+    // Fetch employees separately — re-runs when auth loads (canAssign changes from false → true)
+    useEffect(() => {
+        if (canAssign) fetchEmployees();
+    }, [canAssign, fetchEmployees]);
 
     // ─── Computed tasks with overdue detection ──────────────
 
