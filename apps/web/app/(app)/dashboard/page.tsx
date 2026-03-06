@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { apiGet } from "@/lib/api-client";
+import { apiGet, apiPost } from "@/lib/api-client";
 
 /* ─── Types ──────────────────────────────────────────────────── */
 interface DashboardData {
@@ -437,16 +437,52 @@ export default function DashboardPage() {
         teamStatus: [], recentNotifications: [],
     });
     const [loading, setLoading] = useState(true);
-    const [liveWorking, setLiveWorking] = useState("0m");
+
+    // ── Attendance widget state ─────────────────────────────────────
+    const [actionLoading, setActionLoading] = useState<"checkin" | "checkout" | null>(null);
+    const [actionError, setActionError] = useState<string | null>(null);
+    const [sessionToken, setSessionToken] = useState<string | null>(null);
+
+    // 8-hour countdown (in seconds)
+    const WORK_SECS = 8 * 3600;
+    const [countdown, setCountdown] = useState(WORK_SECS);
+    const [countdownColor, setCountdownColor] = useState("#16a34a");
+
+    // Break state
+    const [onBreak, setOnBreak] = useState(false);
+    const [breakAccumSecs, setBreakAccumSecs] = useState(0);  // total seconds on break
+    const [breakStartedAt, setBreakStartedAt] = useState<Date | null>(null);
+    const [breakElapsed, setBreakElapsed] = useState(0); // live current break
+
     const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const breakTickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const isManager = ["MGR", "HRA", "SADM", "HRBP"].includes(user?.role ?? "");
     const isAdmin = user?.role === "SADM";
 
+    const loadEmpData = useCallback(async () => {
+        const res = await apiGet<any>("/api/dashboard/employee");
+        if (!res.data) return;
+        const d = res.data;
+        const info = d.today || {};
+        const checkedIn = info.status === "CHECKED_IN";
+        const checkedOut = info.status === "CHECKED_OUT";
+        const checkInAt = info.checkInAt ? new Date(info.checkInAt) : null;
+        const checkOutAt = info.checkOutAt ? new Date(info.checkOutAt) : null;
+        let wh = info.totalHours ?? 0;
+        if (wh === 0 && checkInAt && checkOutAt)
+            wh = +((checkOutAt.getTime() - checkInAt.getTime()) / 3600000).toFixed(2);
+        setEmpData({
+            checkedIn, checkedOut, checkInAt, workingHours: wh,
+            checkInTime: checkInAt ? fmt(checkInAt.toISOString()) : undefined,
+            checkOutTime: checkOutAt ? fmt(checkOutAt.toISOString()) : undefined,
+            pendingItems: d.pendingItems ?? [],
+        });
+    }, []);
+
     useEffect(() => {
         async function load() {
             const promises: Promise<void>[] = [];
-
             if (isManager) {
                 promises.push(
                     apiGet<any>("/api/dashboard/manager").then(res => {
@@ -467,52 +503,136 @@ export default function DashboardPage() {
                     })
                 );
             }
-
-            if (!isAdmin) {
-                promises.push(
-                    apiGet<any>("/api/dashboard/employee").then(res => {
-                        if (!res.data) return;
-                        const d = res.data;
-                        const info = d.today || {};
-                        const checkedIn = info.status === "CHECKED_IN";
-                        const checkedOut = info.status === "CHECKED_OUT";
-                        const checkInAt = info.checkInAt ? new Date(info.checkInAt) : null;
-                        const checkOutAt = info.checkOutAt ? new Date(info.checkOutAt) : null;
-                        let wh = info.totalHours ?? 0;
-                        if (wh === 0 && checkInAt && checkOutAt)
-                            wh = +((checkOutAt.getTime() - checkInAt.getTime()) / 3600000).toFixed(2);
-                        setEmpData({
-                            checkedIn, checkedOut, checkInAt, workingHours: wh,
-                            checkInTime: checkInAt ? fmt(checkInAt.toISOString()) : undefined,
-                            checkOutTime: checkOutAt ? fmt(checkOutAt.toISOString()) : undefined,
-                        });
-                    })
-                );
-            }
-
+            if (!isAdmin) promises.push(loadEmpData());
             await Promise.all(promises);
             setLoading(false);
         }
         load();
-    }, [isManager, isAdmin]);
+    }, [isManager, isAdmin, loadEmpData]);
 
-    // Live ticker for employees
+    // ── Restore sessionToken from localStorage on mount ────────────
+    useEffect(() => {
+        const saved = localStorage.getItem("dash_sessionToken");
+        if (saved) setSessionToken(saved);
+        const breakState = localStorage.getItem("dash_break");
+        if (breakState) {
+            const parsed = JSON.parse(breakState);
+            setBreakAccumSecs(parsed.accumSecs ?? 0);
+            if (parsed.onBreak && parsed.startedAt) {
+                setOnBreak(true);
+                setBreakStartedAt(new Date(parsed.startedAt));
+            }
+        }
+    }, []);
+
+    // ── 8-hour countdown ticker ────────────────────────────────────
     useEffect(() => {
         if (tickerRef.current) clearInterval(tickerRef.current);
         if (empData.checkedIn && empData.checkInAt) {
             const tick = () => {
-                const ms = Date.now() - (empData.checkInAt as Date).getTime();
-                const h = Math.floor(ms / 3600000);
-                const m = Math.floor((ms % 3600000) / 60000);
-                setLiveWorking(h > 0 ? `${h}h ${m}m` : `${m}m`);
+                const elapsed = Math.floor((Date.now() - (empData.checkInAt as Date).getTime()) / 1000);
+                // Subtract accumulated break time (and live break if active)
+                const liveBreak = (onBreak && breakStartedAt)
+                    ? Math.floor((Date.now() - breakStartedAt.getTime()) / 1000)
+                    : 0;
+                const netWorked = elapsed - breakAccumSecs - liveBreak;
+                const rem = Math.max(0, WORK_SECS - netWorked);
+                setCountdown(rem);
+                const pct = rem / WORK_SECS;
+                setCountdownColor(pct > 0.5 ? "#16a34a" : pct > 0.2 ? "#d97706" : "#dc2626");
             };
             tick();
             tickerRef.current = setInterval(tick, 1000);
-        } else {
-            setLiveWorking(empData.workingHours ? `${empData.workingHours.toFixed(1)}h` : "0m");
         }
         return () => { if (tickerRef.current) clearInterval(tickerRef.current); };
-    }, [empData.checkedIn, empData.checkInAt, empData.workingHours]);
+    }, [empData.checkedIn, empData.checkInAt, breakAccumSecs, onBreak, breakStartedAt]);
+
+    // ── Live break elapsed ticker ─────────────────────────────────
+    useEffect(() => {
+        if (breakTickerRef.current) clearInterval(breakTickerRef.current);
+        if (onBreak && breakStartedAt) {
+            const tick = () => setBreakElapsed(Math.floor((Date.now() - breakStartedAt.getTime()) / 1000));
+            tick();
+            breakTickerRef.current = setInterval(tick, 1000);
+        } else {
+            setBreakElapsed(0);
+        }
+        return () => { if (breakTickerRef.current) clearInterval(breakTickerRef.current); };
+    }, [onBreak, breakStartedAt]);
+
+    // ── Handlers ─────────────────────────────────────────────────
+    function fmtCountdown(secs: number) {
+        const h = Math.floor(secs / 3600).toString().padStart(2, "0");
+        const m = Math.floor((secs % 3600) / 60).toString().padStart(2, "0");
+        const s = (secs % 60).toString().padStart(2, "0");
+        return `${h}:${m}:${s}`;
+    }
+
+    async function handleCheckIn() {
+        setActionError(null);
+        setActionLoading("checkin");
+        try {
+            const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+                navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
+            );
+            const res = await apiPost<any>("/api/attendance/checkin", {
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+            });
+            if (res.error) {
+                setActionError(res.error || "Check-in failed");
+            } else {
+                const token = res.data?.sessionToken;
+                if (token) {
+                    setSessionToken(token);
+                    localStorage.setItem("dash_sessionToken", token);
+                }
+                await loadEmpData();
+            }
+        } catch (e: any) {
+            if (e?.code === 1) setActionError("Location access denied. Please enable location in browser settings.");
+            else if (e?.code === 2) setActionError("Location unavailable. Please try again.");
+            else if (e?.code === 3) setActionError("Location request timed out.");
+            else setActionError("Check-in failed. Please try again.");
+        } finally {
+            setActionLoading(null);
+        }
+    }
+
+    async function handleCheckOut() {
+        setActionError(null);
+        setActionLoading("checkout");
+        const token = sessionToken || localStorage.getItem("dash_sessionToken") || undefined;
+        const res = await apiPost<any>("/api/attendance/checkout", token ? { sessionToken: token } : {});
+        if (res.error) {
+            setActionError(res.error || "Check-out failed");
+        } else {
+            localStorage.removeItem("dash_sessionToken");
+            localStorage.removeItem("dash_break");
+            setSessionToken(null);
+            setOnBreak(false);
+            setBreakAccumSecs(0);
+            setBreakStartedAt(null);
+            await loadEmpData();
+        }
+        setActionLoading(null);
+    }
+
+    function handleBreakStart() {
+        const now = new Date();
+        setOnBreak(true);
+        setBreakStartedAt(now);
+        localStorage.setItem("dash_break", JSON.stringify({ onBreak: true, startedAt: now.toISOString(), accumSecs: breakAccumSecs }));
+    }
+
+    function handleBreakEnd() {
+        const extra = breakStartedAt ? Math.floor((Date.now() - breakStartedAt.getTime()) / 1000) : 0;
+        const newAccum = breakAccumSecs + extra;
+        setBreakAccumSecs(newAccum);
+        setOnBreak(false);
+        setBreakStartedAt(null);
+        localStorage.setItem("dash_break", JSON.stringify({ onBreak: false, startedAt: null, accumSecs: newAccum }));
+    }
 
     const now = new Date();
     const greetingText = now.getHours() < 12 ? "Good morning" : now.getHours() < 17 ? "Good afternoon" : "Good evening";
@@ -562,41 +682,162 @@ export default function DashboardPage() {
                 </div>
             )}
 
-            <div className="dash-checkin-card animate-slideUp" style={{
-                background: empData.checkedOut
-                    ? "linear-gradient(135deg,#0f766e,#0d9488)"
-                    : empData.checkedIn
-                        ? "linear-gradient(135deg,#15803d,#16a34a)"
-                        : "linear-gradient(135deg,#1d4ed8,#2563eb)",
-            }}>
-                <div className="dash-checkin-status">
-                    {empData.checkedOut ? "✅ DAY COMPLETE" : empData.checkedIn ? "🟢 CHECKED IN" : "⬜ NOT CHECKED IN"}
+            {/* ─── Attendance Widget ─────────────────────────────────────── */}
+            {!isAdmin && (
+                <div className="animate-slideUp" style={{
+                    borderRadius: 16,
+                    overflow: "hidden",
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+                    marginBottom: "var(--space-4)",
+                    background: empData.checkedOut
+                        ? "linear-gradient(135deg,#0f766e,#0d9488)"
+                        : onBreak
+                            ? "linear-gradient(135deg,#92400e,#d97706)"
+                            : empData.checkedIn
+                                ? "linear-gradient(135deg,#15803d,#16a34a)"
+                                : "linear-gradient(135deg,#1d4ed8,#2563eb)",
+                    transition: "background 0.5s",
+                }}>
+                    {/* Top status row */}
+                    <div style={{ padding: "16px 20px 0", color: "rgba(255,255,255,0.85)", fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span>
+                            {empData.checkedOut ? "✅ DAY COMPLETE"
+                                : onBreak ? "☕ ON BREAK"
+                                    : empData.checkedIn ? "🟢 CHECKED IN"
+                                        : "⬜ NOT CHECKED IN"}
+                        </span>
+                        {empData.checkedIn && !empData.checkedOut && (
+                            <span style={{ fontSize: 11, opacity: 0.75 }}>Since {empData.checkInTime}</span>
+                        )}
+                    </div>
+
+                    {/* Main time display */}
+                    <div style={{ padding: "8px 20px 0", color: "white" }}>
+                        {empData.checkedOut ? (
+                            <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: -1 }}>
+                                {empData.checkInTime} → {empData.checkOutTime}
+                            </div>
+                        ) : empData.checkedIn ? (
+                            <div style={{ fontSize: 38, fontWeight: 800, letterSpacing: -2, fontVariantNumeric: "tabular-nums", fontFamily: "monospace" }}>
+                                {fmtCountdown(countdown)}
+                            </div>
+                        ) : (
+                            <div style={{ fontSize: 32, fontWeight: 700 }}>
+                                {now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })}
+                            </div>
+                        )}
+
+                        {/* Subtitle */}
+                        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", marginTop: 2, marginBottom: 8 }}>
+                            {empData.checkedOut
+                                ? `Total: ${empData.workingHours && empData.workingHours > 0 ? `${(empData.workingHours).toFixed(1)}h worked` : "—"}`
+                                : empData.checkedIn
+                                    ? onBreak
+                                        ? `Break: ${fmtCountdown(breakElapsed)}  ·  Remaining work time`
+                                        : "Remaining work time"
+                                    : "Tap check in to start your day"}
+                        </div>
+
+                        {/* Progress bar (only when checked in) */}
+                        {empData.checkedIn && !empData.checkedOut && (
+                            <div style={{ height: 5, borderRadius: 99, background: "rgba(255,255,255,0.2)", marginBottom: 14, overflow: "hidden" }}>
+                                <div style={{
+                                    height: "100%", borderRadius: 99,
+                                    background: countdown === 0 ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.7)",
+                                    width: `${(countdown / WORK_SECS) * 100}%`,
+                                    transition: "width 1s linear",
+                                }} />
+                            </div>
+                        )}
+
+                        {/* Done banner */}
+                        {empData.checkedIn && !empData.checkedOut && countdown === 0 && (
+                            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.9)", marginBottom: 10, fontWeight: 600 }}>🎉 8-hour workday complete!</div>
+                        )}
+                    </div>
+
+                    {/* Error message */}
+                    {actionError && (
+                        <div style={{ margin: "0 20px 10px", padding: "8px 12px", borderRadius: 8, background: "rgba(0,0,0,0.25)", color: "#fecaca", fontSize: 12 }}>
+                            ⚠️ {actionError}
+                        </div>
+                    )}
+
+                    {/* Action buttons */}
+                    <div style={{ padding: "0 20px 16px", display: "flex", gap: 8 }}>
+                        {!empData.checkedIn && !empData.checkedOut && (
+                            <button
+                                onClick={handleCheckIn}
+                                disabled={actionLoading === "checkin"}
+                                style={{
+                                    flex: 1, padding: "10px 0", borderRadius: 10, border: "none",
+                                    background: "rgba(255,255,255,0.2)", color: "white",
+                                    fontWeight: 700, fontSize: 14, cursor: actionLoading ? "not-allowed" : "pointer",
+                                    backdropFilter: "blur(4px)",
+                                    opacity: actionLoading ? 0.7 : 1,
+                                    transition: "opacity 0.2s",
+                                }}
+                            >
+                                {actionLoading === "checkin" ? "Locating…" : "✅ Check In"}
+                            </button>
+                        )}
+
+                        {empData.checkedIn && !empData.checkedOut && (
+                            <>
+                                {onBreak ? (
+                                    <button
+                                        onClick={handleBreakEnd}
+                                        style={{
+                                            flex: 1, padding: "10px 0", borderRadius: 10, border: "1.5px solid rgba(255,255,255,0.5)",
+                                            background: "rgba(255,255,255,0.15)", color: "white",
+                                            fontWeight: 700, fontSize: 14, cursor: "pointer",
+                                        }}
+                                    >
+                                        ▶ Resume Work
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={handleBreakStart}
+                                        style={{
+                                            flex: 1, padding: "10px 0", borderRadius: 10, border: "1.5px solid rgba(255,255,255,0.5)",
+                                            background: "rgba(255,255,255,0.15)", color: "white",
+                                            fontWeight: 700, fontSize: 14, cursor: "pointer",
+                                        }}
+                                    >
+                                        ☕ Break
+                                    </button>
+                                )}
+                                <button
+                                    onClick={handleCheckOut}
+                                    disabled={actionLoading === "checkout"}
+                                    style={{
+                                        flex: 1, padding: "10px 0", borderRadius: 10, border: "none",
+                                        background: "rgba(220,38,38,0.75)", color: "white",
+                                        fontWeight: 700, fontSize: 14, cursor: actionLoading ? "not-allowed" : "pointer",
+                                        opacity: actionLoading ? 0.7 : 1,
+                                        transition: "opacity 0.2s",
+                                    }}
+                                >
+                                    {actionLoading === "checkout" ? "Checking out…" : "🔴 Check Out"}
+                                </button>
+                            </>
+                        )}
+
+                        {empData.checkedOut && (
+                            <Link href="/attendance"
+                                style={{
+                                    flex: 1, padding: "10px 0", borderRadius: 10, textAlign: "center",
+                                    border: "1.5px solid rgba(255,255,255,0.4)",
+                                    background: "rgba(255,255,255,0.15)", color: "white",
+                                    fontWeight: 700, fontSize: 14, textDecoration: "none",
+                                }}
+                            >
+                                View Details
+                            </Link>
+                        )}
+                    </div>
                 </div>
-                <div className="dash-checkin-time">
-                    {empData.checkedOut
-                        ? `${empData.checkInTime ?? "--:--"} → ${empData.checkOutTime ?? "--:--"}`
-                        : empData.checkedIn
-                            ? `Since ${empData.checkInTime ?? "--:--"}`
-                            : now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })}
-                </div>
-                <div className="dash-checkin-location">
-                    {empData.checkedOut
-                        ? `Total: ${empData.workingHours && empData.workingHours > 0 ? `${(empData.workingHours * 60).toFixed(0)} min (${empData.workingHours.toFixed(2)}h)` : "—"}`
-                        : empData.checkedIn ? `Working: ${liveWorking}` : "Tap below to check in"}
-                </div>
-                {!empData.checkedOut && (
-                    <Link href="/attendance" className="btn btn-primary"
-                        style={{ background: "rgba(255,255,255,0.2)", color: "white", borderColor: "rgba(255,255,255,0.3)" }}>
-                        {empData.checkedIn ? "View Attendance" : "Check In Now"}
-                    </Link>
-                )}
-                {empData.checkedOut && (
-                    <Link href="/attendance" className="btn btn-primary"
-                        style={{ background: "rgba(255,255,255,0.15)", color: "white", borderColor: "rgba(255,255,255,0.3)" }}>
-                        View Details
-                    </Link>
-                )}
-            </div>
+            )}
 
             <div className="dash-quick-actions animate-slideUp" style={{ animationDelay: "100ms" }}>
                 {[

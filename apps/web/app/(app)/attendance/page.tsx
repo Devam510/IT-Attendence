@@ -114,8 +114,8 @@ export default function AttendancePage() {
         return `${h}h ${m.toString().padStart(2, "0")}m ${s.toString().padStart(2, "0")}s`;
     };
 
-    // 9-hour countdown: how many seconds remain out of a 9h workday
-    const WORKDAY_SECS = 9 * 3600;
+    // 8-hour countdown: how many seconds remain out of an 8h workday
+    const WORKDAY_SECS = 8 * 3600;
     const countdownSecs = Math.max(0, WORKDAY_SECS - elapsed);
     const formatCountdown = (secs: number) => {
         const h = Math.floor(secs / 3600).toString().padStart(2, "0");
