@@ -22,6 +22,11 @@ async function handleManagerDashboard(
     const todayStart = new Date(Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - istOffsetMs);
     const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
+    // For PostgreSQL DATE columns, must compare against absolute 00:00:00Z
+    // to prevent the IST offset from drifting into the wrong calendar day
+    const todayIstStr = nowIst.toISOString().slice(0, 10); // "YYYY-MM-DD"
+    const todayUtc = new Date(`${todayIstStr}T00:00:00Z`);
+
     // ── Determine which employees to show ───────────────
     // HRA / SADM see ALL active employees in the entity
     // MGR sees their direct reports only
@@ -61,13 +66,13 @@ async function handleManagerDashboard(
             where: { userId: { in: employeeIds }, checkInAt: { gte: todayStart, lt: tomorrowStart } },
             select: { userId: true, status: true, checkInAt: true, checkOutAt: true },
         }),
-        // Team members on leave today
+        // Team members on leave today — compare DATE columns against exact UTC midnight
         prisma.leaveRequest.findMany({
             where: {
                 userId: { in: employeeIds },
                 status: "APPROVED",
-                startDate: { lte: now },
-                endDate: { gte: todayStart },
+                startDate: { lte: todayUtc },
+                endDate: { gte: todayUtc },
             },
             select: { userId: true, user: { select: { fullName: true } }, leaveType: { select: { name: true } } },
         }),
