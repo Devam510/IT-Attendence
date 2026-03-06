@@ -102,8 +102,8 @@ export async function api<T = unknown>(
             // 403 = Forbidden (role-based) — return error to caller, never redirect
             // 401 = handled above with token refresh
             return {
-                error: json.error?.message || json.message || `Request failed (${res.status})`,
-                code: json.error?.code || (res.status === 403 ? "FORBIDDEN" : res.status === 401 ? "UNAUTHORIZED" : "UNKNOWN"),
+                error: json.error?.message || (typeof json.error === "string" ? json.error : null) || json.message || `Request failed (${res.status})`,
+                code: json.error?.code || (res.status === 403 ? "FORBIDDEN" : res.status === 401 ? "UNAUTHORIZED" : res.status === 409 ? "CONFLICT" : "UNKNOWN"),
             };
         }
 
