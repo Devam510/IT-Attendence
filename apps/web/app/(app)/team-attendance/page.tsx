@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { apiGet } from "@/lib/api-client";
-import { ChevronLeft, ChevronRight, Users, UserCheck, UserX, CalendarDays, Download, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users, UserCheck, UserX, CalendarDays, Download, RefreshCw, Eye } from "lucide-react";
 
 type Status = "PRESENT" | "ABSENT" | "ON_LEAVE";
 type Filter = "ALL" | Status;
@@ -50,6 +51,227 @@ const STATUS_CONFIG: Record<Status, { label: string; bg: string; color: string; 
     ON_LEAVE: { label: "On Leave", bg: "#fef3c7", color: "#92400e", icon: "🏖️" },
 };
 
+// ─── Employee Month Modal ─────────────────────────────────────────────────────
+const MODAL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const MODAL_WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+interface EmpCalDay {
+    date: string;
+    status: string;
+    checkInAt: string | null;
+    checkOutAt: string | null;
+    totalHours: number | null;
+    verificationScore?: number | null;
+    remark?: string | null;
+}
+interface EmpHistoryData {
+    month: string;
+    employee: { id: string; fullName: string; employeeId: string; department?: string; designation?: string };
+    calendar: EmpCalDay[];
+    summary: { totalPresent: number; totalAbsent: number; totalHours: number; flaggedDays: number; daysInMonth: number };
+}
+
+function EmployeeMonthModal({ employee, onClose }: {
+    employee: { id: string; fullName: string; employeeId: string };
+    onClose: () => void;
+}) {
+    const now = new Date();
+    const [month, setMonth] = useState(now.getMonth());
+    const [year, setYear] = useState(now.getFullYear());
+    const [data, setData] = useState<EmpHistoryData | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [selectedDay, setSelectedDay] = useState<EmpCalDay | null>(null);
+
+    useEffect(() => {
+        setLoading(true);
+        setSelectedDay(null);
+        const monthStr = `${year}-${String(month + 1).padStart(2, "0")}`;
+        apiGet<EmpHistoryData>(`/api/attendance/employee-history?userId=${employee.id}&month=${monthStr}`)
+            .then(res => { if (res.data) setData(res.data); })
+            .finally(() => setLoading(false));
+    }, [employee.id, month, year]);
+
+    function prevMonth() {
+        if (month === 0) { setMonth(11); setYear(y => y - 1); }
+        else setMonth(m => m - 1);
+    }
+    function nextMonth() {
+        const isCurrentMonth = month === now.getMonth() && year === now.getFullYear();
+        if (isCurrentMonth) return;
+        if (month === 11) { setMonth(0); setYear(y => y + 1); }
+        else setMonth(m => m + 1);
+    }
+    const isCurrentMonth = month === now.getMonth() && year === now.getFullYear();
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    function getDayData(day: number): EmpCalDay | undefined {
+        const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        return data?.calendar.find(c => c.date === dateStr);
+    }
+
+    function dotColor(status: string): string {
+        if (["PRESENT", "VERIFIED", "REGULARIZED"].includes(status)) return "#16a34a";
+        if (status === "ABSENT") return "#dc2626";
+        if (status === "LEAVE" || status === "ON_LEAVE") return "#d97706";
+        if (status === "FLAGGED") return "#7c3aed";
+        if (status === "WEEKEND") return "#94a3b8";
+        return "transparent";
+    }
+
+    const s = data?.summary;
+
+    const modal = (
+        <div
+            onClick={onClose}
+            style={{
+                position: "fixed", inset: 0, zIndex: 9999,
+                background: "rgba(10,20,40,0.65)", backdropFilter: "blur(6px)",
+                display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+            }}
+        >
+            <div
+                onClick={e => e.stopPropagation()}
+                style={{
+                    background: "var(--bg-primary)", borderRadius: 16, padding: 24,
+                    width: "100%", maxWidth: 620, maxHeight: "90vh", overflowY: "auto",
+                    boxShadow: "0 24px 60px rgba(0,0,0,0.4)",
+                    border: "1px solid var(--border-primary)",
+                }}
+            >
+                {/* Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                    <div>
+                        <div style={{ fontWeight: 700, fontSize: 18 }}>📅 {employee.fullName}</div>
+                        <div style={{ fontSize: 12, color: "var(--text-secondary)", fontFamily: "monospace", marginTop: 2 }}>{employee.employeeId}</div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "var(--text-secondary)", padding: "0 4px", lineHeight: 1 }}
+                        aria-label="Close"
+                    >✕</button>
+                </div>
+
+                {/* Month nav */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 16 }}>
+                    <button onClick={prevMonth} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-primary)", display: "flex" }}>
+                        <ChevronLeft size={18} />
+                    </button>
+                    <span style={{ fontWeight: 600, fontSize: 15, minWidth: 150, textAlign: "center" }}>
+                        {MODAL_MONTHS[month]} {year}
+                    </span>
+                    <button onClick={nextMonth} disabled={isCurrentMonth} style={{ background: "none", border: "none", cursor: isCurrentMonth ? "not-allowed" : "pointer", opacity: isCurrentMonth ? 0.3 : 1, color: "var(--text-primary)", display: "flex" }}>
+                        <ChevronRight size={18} />
+                    </button>
+                </div>
+
+                {/* Summary pills */}
+                {s && (
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, justifyContent: "center" }}>
+                        {[
+                            { label: "Present", value: s.totalPresent, color: "#16a34a", bg: "#dcfce7" },
+                            { label: "Absent", value: s.totalAbsent, color: "#dc2626", bg: "#fee2e2" },
+                            { label: "Hours", value: `${s.totalHours.toFixed(1)}h`, color: "#2563eb", bg: "#dbeafe" },
+                            { label: "Flagged", value: s.flaggedDays, color: "#7c3aed", bg: "#ede9fe" },
+                        ].map(p => (
+                            <div key={p.label} style={{ background: p.bg, color: p.color, borderRadius: 20, padding: "4px 14px", fontSize: 13, fontWeight: 600 }}>
+                                {p.value} {p.label}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {loading ? (
+                    <div style={{ textAlign: "center", padding: 40, color: "var(--text-tertiary)" }}>Loading…</div>
+                ) : (
+                    <>
+                        {/* Calendar grid */}
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4, marginBottom: 16 }}>
+                            {MODAL_WEEKDAYS.map(d => (
+                                <div key={d} style={{ textAlign: "center", fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", paddingBottom: 4 }}>{d}</div>
+                            ))}
+                            {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} />)}
+                            {Array.from({ length: daysInMonth }).map((_, i) => {
+                                const day = i + 1;
+                                const dayData = getDayData(day);
+                                const status = dayData?.status || "UPCOMING";
+                                const color = dotColor(status);
+                                const isSelected = selectedDay?.date === dayData?.date;
+                                const isToday = day === now.getDate() && month === now.getMonth() && year === now.getFullYear();
+                                return (
+                                    <div
+                                        key={day}
+                                        onClick={() => dayData && setSelectedDay(isSelected ? null : dayData)}
+                                        style={{
+                                            textAlign: "center", padding: "6px 2px",
+                                            borderRadius: 8, cursor: dayData ? "pointer" : "default",
+                                            background: isSelected ? "var(--bg-secondary)" : isToday ? "rgba(37,99,235,0.08)" : "transparent",
+                                            border: isToday ? "1.5px solid #2563eb" : isSelected ? "1.5px solid var(--border-secondary)" : "1.5px solid transparent",
+                                            transition: "background 0.1s",
+                                        }}
+                                    >
+                                        <div style={{ fontSize: 13, fontWeight: isToday ? 700 : 400, color: "var(--text-primary)", lineHeight: 1.3 }}>{day}</div>
+                                        <div style={{ width: 7, height: 7, borderRadius: "50%", background: color, margin: "3px auto 0" }} />
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Day detail panel */}
+                        {selectedDay ? (
+                            <div style={{ background: "var(--bg-secondary)", borderRadius: 10, padding: "12px 16px", fontSize: 13, lineHeight: 2, border: "1px solid var(--border-primary)" }}>
+                                <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                                    {new Date(selectedDay.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                                </div>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 16px" }}>
+                                    <div style={{ color: "var(--text-secondary)" }}>Status</div>
+                                    <div style={{ fontWeight: 600, color: dotColor(selectedDay.status) }}>{selectedDay.status}</div>
+                                    <div style={{ color: "var(--text-secondary)" }}>Check In</div>
+                                    <div>{selectedDay.checkInAt ? new Date(selectedDay.checkInAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }) : "—"}</div>
+                                    <div style={{ color: "var(--text-secondary)" }}>Check Out</div>
+                                    <div>{selectedDay.checkOutAt ? new Date(selectedDay.checkOutAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }) : "—"}</div>
+                                    <div style={{ color: "var(--text-secondary)" }}>Hours</div>
+                                    <div>{selectedDay.totalHours != null ? `${selectedDay.totalHours.toFixed(1)}h` : "—"}</div>
+                                    {selectedDay.verificationScore != null && <>
+                                        <div style={{ color: "var(--text-secondary)" }}>Score</div>
+                                        <div>{selectedDay.verificationScore}/100</div>
+                                    </>}
+                                    {selectedDay.remark && <>
+                                        <div style={{ color: "var(--text-secondary)" }}>Remark</div>
+                                        <div style={{ fontStyle: "italic" }}>💬 {selectedDay.remark}</div>
+                                    </>}
+                                </div>
+                            </div>
+                        ) : (
+                            <div style={{ textAlign: "center", fontSize: 12, color: "var(--text-tertiary)", padding: "8px 0" }}>Click a day to see details</div>
+                        )}
+
+                        {/* Legend */}
+                        <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap", justifyContent: "center" }}>
+                            {[
+                                { label: "Present", color: "#16a34a" },
+                                { label: "Absent", color: "#dc2626" },
+                                { label: "Leave", color: "#d97706" },
+                                { label: "Flagged", color: "#7c3aed" },
+                                { label: "Weekend", color: "#94a3b8" },
+                            ].map(l => (
+                                <div key={l.label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--text-secondary)" }}>
+                                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: l.color }} />
+                                    {l.label}
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+
+    return createPortal(modal, document.body);
+}
+
+
 export default function TeamAttendancePage() {
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
     const [data, setData] = useState<DayData | null>(null);
@@ -58,6 +280,7 @@ export default function TeamAttendancePage() {
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
     const [filter, setFilter] = useState<Filter>("ALL");
     const [search, setSearch] = useState("");
+    const [viewingEmployee, setViewingEmployee] = useState<{ id: string; fullName: string; employeeId: string } | null>(null);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const loadData = useCallback(async (date: Date, silent = false) => {
@@ -297,7 +520,25 @@ export default function TeamAttendancePage() {
                                         ? `On Leave (${m.leaveType})` : cfg.label;
                                     return (
                                         <tr key={m.id} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? "transparent" : "var(--bg-secondary)" }}>
-                                            <td style={{ padding: "11px 14px", fontWeight: 500 }}>{m.fullName}</td>
+                                            <td style={{ padding: "11px 14px", fontWeight: 500 }}>
+                                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                                    {m.fullName}
+                                                    <button
+                                                        onClick={() => setViewingEmployee({ id: m.id, fullName: m.fullName, employeeId: m.employeeId })}
+                                                        title={`View ${m.fullName}'s monthly attendance`}
+                                                        style={{
+                                                            background: "none", border: "none", cursor: "pointer",
+                                                            color: "var(--text-tertiary)", display: "flex", alignItems: "center",
+                                                            padding: 0, borderRadius: 4, transition: "color 0.15s",
+                                                        }}
+                                                        onMouseEnter={e => (e.currentTarget.style.color = "#2563eb")}
+                                                        onMouseLeave={e => (e.currentTarget.style.color = "var(--text-tertiary)")}
+                                                        aria-label={`View ${m.fullName}'s attendance`}
+                                                    >
+                                                        <Eye size={14} />
+                                                    </button>
+                                                </div>
+                                            </td>
                                             <td style={{ padding: "11px 14px", fontFamily: "monospace", color: "var(--text-secondary)", fontSize: 13 }}>{m.employeeId}</td>
                                             <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>
                                                 {m.designation || "—"}
@@ -364,6 +605,14 @@ export default function TeamAttendancePage() {
                     {refreshing ? "Refreshing…" : "Refresh"}
                 </button>
             </div>
+
+            {/* Employee Month Modal */}
+            {viewingEmployee && (
+                <EmployeeMonthModal
+                    employee={viewingEmployee}
+                    onClose={() => setViewingEmployee(null)}
+                />
+            )}
         </div>
     );
 }
