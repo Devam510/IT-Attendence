@@ -23,14 +23,16 @@ export default function LoginPage() {
         const result = await login(email, password);
 
         if (result.mfaRequired) {
-            router.push("/mfa");
+            // Use window.location to avoid router/auth-state race condition
+            window.location.href = "/mfa";
         } else if (result.success) {
-            router.push("/dashboard");
+            // window.location forces a full page load so AuthContext re-initialises
+            // cleanly from the stored token — avoids the "need hard refresh" bug
+            window.location.href = "/dashboard";
         } else {
             setError(result.error || "Invalid credentials");
+            setLoading(false);
         }
-
-        setLoading(false);
     }
 
     return (
