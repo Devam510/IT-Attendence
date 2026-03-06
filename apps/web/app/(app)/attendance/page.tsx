@@ -71,18 +71,40 @@ export default function AttendancePage() {
     const tokenKey = `nexus-checkin-token-${user?.id || "guest"}`;
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Break log from dashboard localStorage (read-only here for display)
+    // Break log from dashboard localStorage — updated live via storage events
     interface BreakEntry { start: string; end: string | null; }
     const [attBreakLog, setAttBreakLog] = useState<BreakEntry[]>([]);
-    useEffect(() => {
-        if (!user?.id) return;
+    const [attOnBreak, setAttOnBreak] = useState(false);
+
+    function syncBreakState(uid: string) {
         try {
-            const raw = localStorage.getItem(`dash_break_${user.id}`);
+            const raw = localStorage.getItem(`dash_break_${uid}`);
             if (raw) {
                 const parsed = JSON.parse(raw);
-                setAttBreakLog(parsed.log ?? []);
+                const log: BreakEntry[] = parsed.log ?? [];
+                setAttBreakLog(log);
+                const last = log[log.length - 1];
+                setAttOnBreak(!!(last && !last.end));
+            } else {
+                setAttBreakLog([]);
+                setAttOnBreak(false);
             }
         } catch { /* ignore */ }
+    }
+
+    useEffect(() => {
+        if (!user?.id) return;
+        syncBreakState(user.id);
+
+        // Listen for changes from the dashboard tab
+        const handler = () => syncBreakState(user.id);
+        window.addEventListener("storage", handler);
+        // Also poll every 5s in case both tabs are same origin (same-tab storage events don't fire)
+        const poll = setInterval(handler, 5000);
+        return () => {
+            window.removeEventListener("storage", handler);
+            clearInterval(poll);
+        };
     }, [user?.id]);
 
     // Auto-dismiss toast
@@ -113,16 +135,20 @@ export default function AttendancePage() {
         load();
     }, [month, year]);
 
-    // Live timer when checked in
+    // Live timer when checked in — pauses automatically during breaks
     useEffect(() => {
         if (today.checkedIn && today.totalMinutes) {
             setElapsed(today.totalMinutes * 60);
+        }
+        if (today.checkedIn && today.totalMinutes && !attOnBreak) {
             intervalRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
+        } else {
+            if (intervalRef.current) clearInterval(intervalRef.current);
         }
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);
         };
-    }, [today.checkedIn, today.totalMinutes]);
+    }, [today.checkedIn, today.totalMinutes, attOnBreak]);
 
     const formatElapsed = (secs: number) => {
         const h = Math.floor(secs / 3600);

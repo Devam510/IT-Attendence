@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Users, UserCheck, UserX, CalendarDays, Downl
 
 type Status = "PRESENT" | "ABSENT" | "ON_LEAVE";
 type Filter = "ALL" | Status;
+type ToastType = "success" | "error" | "info";
 
 interface StaffMember {
     id: string;
@@ -331,7 +332,10 @@ function EmployeeMonthModal({ employee, onClose }: {
 }
 
 // ─── Advanced Export Modal ─────────────────────────────────────────────────────
-function AdvancedExportModal({ onClose }: { onClose: () => void }) {
+function AdvancedExportModal({ onClose, onToast }: {
+    onClose: () => void;
+    onToast: (t: { message: string; type: ToastType }) => void;
+}) {
     const [loading, setLoading] = useState(true);
     const [options, setOptions] = useState<{ employees: { id: string; fullName: string; employeeId: string }[]; departments: { id: string; name: string }[] }>({ employees: [], departments: [] });
 
@@ -357,6 +361,7 @@ function AdvancedExportModal({ onClose }: { onClose: () => void }) {
 
     const handleDownload = async () => {
         setDownloading(true);
+        onToast({ type: "info", message: "Generating CSV…" });
         try {
             const params = new URLSearchParams({
                 start, end, empId, deptId, role, stats: stats.toString()
@@ -376,12 +381,12 @@ function AdvancedExportModal({ onClose }: { onClose: () => void }) {
                 }
 
                 if (res.status === 401) {
-                    alert("Your session has expired. Please log in again.");
-                    window.location.href = "/login";
+                    onToast({ type: "error", message: "Session expired. Redirecting to login…" });
+                    setTimeout(() => { window.location.href = "/login"; }, 800);
                     return;
                 }
 
-                alert(message);
+                onToast({ type: "error", message });
                 return;
             }
 
@@ -392,9 +397,10 @@ function AdvancedExportModal({ onClose }: { onClose: () => void }) {
             a.download = `attendance-export-${start}-to-${end}.csv`;
             a.click();
             URL.revokeObjectURL(url);
+            onToast({ type: "success", message: "CSV exported successfully." });
             onClose();
         } catch (e: any) {
-            alert(`Error: ${e.message}`);
+            onToast({ type: "error", message: e?.message ? `Export error: ${e.message}` : "Export error" });
         } finally {
             setDownloading(false);
         }
@@ -509,6 +515,14 @@ export default function TeamAttendancePage() {
     const [viewingEmployee, setViewingEmployee] = useState<{ id: string; fullName: string; employeeId: string } | null>(null);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const [showExportModal, setShowExportModal] = useState(false);
+    const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+
+    useEffect(() => {
+        if (!toast) return;
+        if (toast.type === "info") return;
+        const t = setTimeout(() => setToast(null), 4500);
+        return () => clearTimeout(t);
+    }, [toast]);
 
     const loadData = useCallback(async (date: Date, silent = false) => {
         if (silent) setRefreshing(true);
@@ -570,6 +584,16 @@ export default function TeamAttendancePage() {
 
     return (
         <div>
+            {toast && (
+                <div className="toast-container" role="status" aria-live="polite">
+                    <div className={`toast toast-${toast.type}`}>
+                        <div className="toast-message">{toast.message}</div>
+                        <button className="toast-close" onClick={() => setToast(null)} aria-label="Dismiss notification">
+                            ✕
+                        </button>
+                    </div>
+                </div>
+            )}
             {/* Header */}
             <div className="dash-greeting animate-fadeIn" style={{ marginBottom: 0 }}>
                 <h1 style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -870,7 +894,10 @@ export default function TeamAttendancePage() {
 
             {/* Advanced Export Modal */}
             {showExportModal && (
-                <AdvancedExportModal onClose={() => setShowExportModal(false)} />
+                <AdvancedExportModal
+                    onClose={() => setShowExportModal(false)}
+                    onToast={setToast}
+                />
             )}
         </div>
     );
