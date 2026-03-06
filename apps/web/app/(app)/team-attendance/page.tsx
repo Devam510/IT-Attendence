@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { apiGet } from "@/lib/api-client";
+import { apiFetch, apiGet } from "@/lib/api-client";
 import { ChevronLeft, ChevronRight, Users, UserCheck, UserX, CalendarDays, Download, RefreshCw, Eye } from "lucide-react";
 
 type Status = "PRESENT" | "ABSENT" | "ON_LEAVE";
@@ -361,10 +361,27 @@ function AdvancedExportModal({ onClose }: { onClose: () => void }) {
             const params = new URLSearchParams({
                 start, end, empId, deptId, role, stats: stats.toString()
             });
-            const res = await fetch(`/api/attendance/export-advanced?${params.toString()}`);
+            const res = await apiFetch(`/api/attendance/export-advanced?${params.toString()}`, { method: "GET" });
             if (!res.ok) {
-                const text = await res.text();
-                alert(`Export failed: ${text}`);
+                // API errors are typically JSON, but fall back to text.
+                let message = `Export failed (${res.status})`;
+                try {
+                    const json = await res.json();
+                    message = json?.error?.message || json?.message || message;
+                } catch {
+                    try {
+                        const text = await res.text();
+                        if (text) message = text;
+                    } catch { /* ignore */ }
+                }
+
+                if (res.status === 401) {
+                    alert("Your session has expired. Please log in again.");
+                    window.location.href = "/login";
+                    return;
+                }
+
+                alert(message);
                 return;
             }
 

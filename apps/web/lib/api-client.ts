@@ -55,6 +55,54 @@ async function refreshToken(): Promise<boolean> {
     return false;
 }
 
+/**
+ * Low-level fetch wrapper that attaches Authorization header and performs
+ * one automatic refresh+retry on 401 (same behavior as `api()`), but returns
+ * the raw `Response` for non-JSON endpoints (CSV/file downloads, etc).
+ */
+export async function apiFetch(
+    path: string,
+    options: RequestInit = {}
+): Promise<Response> {
+    const token = getAccessToken();
+    const headers = new Headers(options.headers);
+
+    // Only set Content-Type when a body is present and caller didn't specify one.
+    if (options.body && !headers.has("Content-Type")) {
+        headers.set("Content-Type", "application/json");
+    }
+    if (token && !headers.has("Authorization")) {
+        headers.set("Authorization", `Bearer ${token}`);
+    }
+
+    let res = await fetch(`${BASE_URL}${path}`, {
+        ...options,
+        headers,
+    });
+
+    const isAuthEndpoint = path.includes("/api/auth/login") || path.includes("/api/auth/token");
+    if (res.status === 401 && token && !isAuthEndpoint) {
+        const refreshed = await refreshToken();
+        if (refreshed) {
+            const nextToken = getAccessToken();
+            if (nextToken) headers.set("Authorization", `Bearer ${nextToken}`);
+            res = await fetch(`${BASE_URL}${path}`, {
+                ...options,
+                headers,
+            });
+        } else {
+            // Clear tokens and redirect to login (same as `api()`)
+            setAccessToken(null);
+            localStorage.removeItem("nexus-refresh-token");
+            if (typeof window !== "undefined" && !path.includes("/api/auth/")) {
+                window.location.href = "/login";
+            }
+        }
+    }
+
+    return res;
+}
+
 export async function api<T = unknown>(
     path: string,
     options: RequestInit = {}
