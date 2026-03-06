@@ -506,32 +506,6 @@ export default function ProfilePage() {
                 </div>
             </SectionCard>
 
-            {/* ── Appearance ───────────────────────────────── */}
-            <SectionCard title="Appearance">
-                <div style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "var(--space-4) var(--space-5)",
-                }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-                        <IconBadge iconPath={darkMode ? ICONS.moon : ICONS.sun} iconBg={darkMode ? "linear-gradient(135deg,#1e1b4b,#4338ca)" : "linear-gradient(135deg,#F59E0B,#FBBF24)"} />
-                        <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-medium)" }}>
-                            {darkMode ? "Dark Mode" : "Light Mode"}
-                        </span>
-                    </div>
-                    <div
-                        className={`toggle-track ${darkMode ? "on" : ""}`}
-                        onClick={toggleTheme}
-                        role="switch"
-                        aria-checked={darkMode}
-                        aria-label="Toggle dark mode"
-                        tabIndex={0}
-                        onKeyDown={(e) => e.key === "Enter" && toggleTheme()}
-                    >
-                        <div className="toggle-thumb" />
-                    </div>
-                </div>
-            </SectionCard>
-
             {/* ── Account Security ─────────────────────────── */}
             <SectionCard title="Account Security">
                 <InfoRow
@@ -541,16 +515,7 @@ export default function ProfilePage() {
                     onClick={() => setShowChangePassword(true)}
                     chevron
                 />
-                <InfoRow
-                    iconPath={ICONS.shield}
-                    iconBg={data.mfaEnabled ? "linear-gradient(135deg,#0E9F6E,#31C48D)" : "linear-gradient(135deg,#9CA3AF,#D1D5DB)"}
-                    label="Two-Factor Authentication"
-                    rightSlot={
-                        <span className={`badge ${data.mfaEnabled ? "badge-success" : "badge-warning"}`}>
-                            {data.mfaEnabled ? "Active" : "Disabled"}
-                        </span>
-                    }
-                />
+
                 <InfoRow
                     iconPath={ICONS.monitor}
                     iconBg="linear-gradient(135deg,#7E3AF2,#A78BFA)"
