@@ -24,6 +24,8 @@ interface StaffMember {
     breaks?: { start: string; end?: string | null; duration?: number }[];
     earlyReason?: string | null;
     isHalfDay?: boolean;
+    leaveStart?: string | null;
+    leaveEnd?: string | null;
 }
 
 interface DayData {
@@ -768,7 +770,7 @@ export default function TeamAttendancePage() {
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                             <thead>
                                 <tr style={{ background: "var(--bg-secondary)", borderBottom: "1px solid var(--border)" }}>
-                                    {["Employee", "ID", "Dept / Role", "Status", "Check In", "Breaks", "Check Out", "Hours", "Remark"].map(h => (
+                                    {["Employee", "ID", "Dept / Role", "Status", "Check In", "Breaks", "Check Out", "Hours"].map(h => (
                                         <th key={h} style={{ padding: "10px 14px", fontWeight: 600, textAlign: "left", color: "var(--text-secondary)", fontSize: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                                             {h}
                                         </th>
@@ -807,12 +809,29 @@ export default function TeamAttendancePage() {
                                                 {m.department && <span style={{ display: "block", fontSize: 11, color: "var(--text-tertiary)" }}>{m.department}</span>}
                                             </td>
                                             <td style={{ padding: "11px 14px" }}>
-                                                <span style={{ background: cfg.bg, color: cfg.color, padding: "3px 10px", borderRadius: 12, fontWeight: 600, fontSize: 12, whiteSpace: "nowrap" }}>
-                                                    {cfg.icon} {label}
-                                                </span>
+                                                {(() => {
+                                                    const lvStart = m.leaveStart ? new Date(m.leaveStart).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null;
+                                                    const lvEnd = m.leaveEnd ? new Date(m.leaveEnd).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null;
+                                                    const tooltip = m.status === "ON_LEAVE" && lvStart && lvEnd
+                                                        ? `Leave period: ${lvStart} → ${lvEnd}`
+                                                        : undefined;
+                                                    return (
+                                                        <span
+                                                            title={tooltip}
+                                                            style={{ background: cfg.bg, color: cfg.color, padding: "3px 10px", borderRadius: 12, fontWeight: 600, fontSize: 12, whiteSpace: "nowrap", cursor: tooltip ? "help" : "default" }}
+                                                        >
+                                                            {cfg.icon} {label}
+                                                        </span>
+                                                    );
+                                                })()}
                                             </td>
                                             <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>
-                                                {fmtTime(m.checkInAt)}
+                                                <span
+                                                    title={m.remark || "No remark"}
+                                                    style={{ cursor: "help" }}
+                                                >
+                                                    {fmtTime(m.checkInAt)}
+                                                </span>
                                             </td>
                                             {/* ─── Breaks column ─── */}
                                             <td style={{ padding: "11px 14px" }}>
@@ -850,31 +869,16 @@ export default function TeamAttendancePage() {
                                                     );
                                                 })()}
                                             </td>
-                                            <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>{fmtTime(m.checkOutAt)}</td>
+                                            <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>
+                                                <span
+                                                    title={m.earlyReason ? `Early checkout: ${m.earlyReason}` : "No remark"}
+                                                    style={{ cursor: "help" }}
+                                                >
+                                                    {fmtTime(m.checkOutAt)}
+                                                </span>
+                                            </td>
                                             <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>
                                                 {fmtHours(m.totalHours)}
-                                            </td>
-                                            <td style={{ padding: "11px 14px", maxWidth: 220 }}>
-                                                {m.isHalfDay && (
-                                                    <span style={{ fontSize: 11, background: "#fef3c7", color: "#92400e", padding: "1px 6px", borderRadius: 4, fontWeight: 600, display: "inline-block", marginBottom: 3 }}>
-                                                        Half Day
-                                                    </span>
-                                                )}
-                                                {m.earlyReason && (
-                                                    <span title={m.earlyReason} style={{ fontSize: 12, color: "#dc2626", fontStyle: "italic", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                        Early: {m.earlyReason}
-                                                    </span>
-                                                )}
-                                                {m.remark && (
-                                                    <span title={m.remark} style={{
-                                                        fontSize: 12, color: "var(--text-secondary)", fontStyle: "italic", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                                    }}>
-                                                        💬 {m.remark}
-                                                    </span>
-                                                )}
-                                                {!m.isHalfDay && !m.earlyReason && !m.remark && (
-                                                    <span style={{ color: "var(--text-tertiary)", fontSize: 12 }}>—</span>
-                                                )}
                                             </td>
                                         </tr>
                                     );

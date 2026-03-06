@@ -80,6 +80,8 @@ async function handleTeamAttendance(
             },
             select: {
                 userId: true,
+                startDate: true,
+                endDate: true,
                 leaveType: { select: { name: true } },
             },
         }),
@@ -116,6 +118,8 @@ async function handleTeamAttendance(
             checkOutAt: onLeave ? null : att?.checkOutAt?.toISOString() || null,
             totalHours: onLeave ? null : att?.totalHours || null,
             leaveType: leave ? (leave as any).leaveType?.name : null,
+            leaveStart: leave ? (leave as any).startDate?.toISOString() || null : null,
+            leaveEnd: leave ? (leave as any).endDate?.toISOString() || null : null,
             remark: onLeave ? null : remark,
             breaks: onLeave ? [] : breaks,
             earlyReason: onLeave ? null : earlyReason,
