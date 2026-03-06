@@ -61,6 +61,14 @@ async function handleHistory(
 
         if (dayRecords.length > 0) {
             const rec = dayRecords[0]!;
+            // Extract breaks from anomalyFlags JSON
+            let breaks: { start: string; end: string | null }[] = [];
+            try {
+                const flags = rec.anomalyFlags as Record<string, unknown> | null;
+                if (flags && Array.isArray(flags["breaks"])) {
+                    breaks = flags["breaks"] as { start: string; end: string | null }[];
+                }
+            } catch { /* ignore */ }
             calendar.push({
                 date: dateStr,
                 status: rec.status,
@@ -71,6 +79,7 @@ async function handleHistory(
                 checkInMethod: rec.checkInMethod,
                 verificationScore: rec.verificationScore,
                 hasAnomaly: rec.anomalyFlags != null,
+                breaks,
             });
         } else {
             const dayDate = new Date(Date.UTC(year, mon - 1, day)); // treat as UTC date

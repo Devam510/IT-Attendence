@@ -22,6 +22,7 @@ interface CalendarDay {
     overtimeHours?: number | null;
     verificationScore?: number | null;
     checkInMethod?: string;
+    breaks?: { start: string; end: string | null }[];
 }
 
 interface HistoryResponse {
@@ -661,6 +662,27 @@ export default function AttendancePage() {
                                         {selectedCalDay.totalHours != null ? `${selectedCalDay.totalHours.toFixed(1)}h` : "—"}
                                     </span>
                                 </div>
+
+                                {/* Breaks for past day */}
+                                {selectedCalDay.breaks && selectedCalDay.breaks.length > 0 && (
+                                    <div className="att-today-row" style={{ alignItems: "flex-start" }}>
+                                        <span className="att-today-label">☕ Breaks</span>
+                                        <span className="att-today-value" style={{ textAlign: "right" }}>
+                                            {selectedCalDay.breaks.map((b, i) => {
+                                                const start = new Date(b.start);
+                                                const end = b.end ? new Date(b.end) : null;
+                                                const fmtT = (d: Date) => d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" });
+                                                const durMin = end ? Math.floor((end.getTime() - start.getTime()) / 60000) : null;
+                                                return (
+                                                    <div key={i} style={{ fontSize: "var(--text-xs)", marginBottom: 2 }}>
+                                                        {fmtT(start)} – {end ? fmtT(end) : "ongoing"}
+                                                        {durMin !== null && <span style={{ color: "var(--text-tertiary)", marginLeft: 6 }}>({durMin}m)</span>}
+                                                    </div>
+                                                );
+                                            })}
+                                        </span>
+                                    </div>
+                                )}
 
                                 {selectedCalDay.verificationScore != null && (
                                     <div className="att-today-row">
