@@ -74,7 +74,11 @@ async function handleEmployeeDashboard(
 
     // Compute month stats
     const monthDays = monthAttendance.length;
-    const monthPresent = monthAttendance.filter((a: any) => a.status === "VERIFIED" || a.status === "REGULARIZED").length;
+    // Count any day the employee actually showed up (regardless of verification state)
+    const monthPresent = monthAttendance.filter((a: any) =>
+        a.status === "VERIFIED" || a.status === "REGULARIZED" ||
+        a.status === "CHECKED_IN" || a.status === "CHECKED_OUT"
+    ).length;
     const monthFlagged = monthAttendance.filter((a: any) => a.status === "FLAGGED").length;
     const monthHours = monthAttendance.reduce((sum: number, a: any) => sum + (a.totalHours || 0), 0);
 

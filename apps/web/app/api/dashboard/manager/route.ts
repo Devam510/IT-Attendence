@@ -123,7 +123,6 @@ async function handleManagerDashboard(
             present: presentCount,
             onLeave: onLeaveCount,
             absent: absentCount,
-            remote: 0, // Remote detection requires future feature
             attendanceRate: employees.length > 0
                 ? +((presentCount / employees.length) * 100).toFixed(1)
                 : 0,
