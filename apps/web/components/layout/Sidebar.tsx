@@ -9,8 +9,6 @@ import {
     Clock,
     CalendarDays,
     CheckSquare,
-    Bell,
-    User,
     ClipboardList,
     HeartPulse,
     ShieldCheck,
@@ -22,7 +20,6 @@ const NAV_ITEMS = [
     { href: "/attendance", Icon: Clock, label: "Attendance" },
     { href: "/leaves", Icon: CalendarDays, label: "Leaves" },
     { href: "/approvals", Icon: CheckSquare, label: "Approvals" },
-    { href: "/notifications", Icon: Bell, label: "Notifications" },
 ];
 
 const ADMIN_ITEMS = [
@@ -51,6 +48,7 @@ export default function Sidebar() {
                         alt="Vibe Tech Labs"
                         width={140}
                         height={40}
+                        className="sidebar-logo-img"
                         style={{ objectFit: "contain" }}
                         priority
                     />
@@ -86,15 +84,6 @@ export default function Sidebar() {
                     </Link>
                 ))}
 
-                <Link
-                    href="/profile"
-                    className={`sidebar-link ${pathname === "/profile" ? "active" : ""}`}
-                >
-                    <span className="sidebar-link-icon">
-                        <User size={18} strokeWidth={1.8} />
-                    </span>
-                    Profile
-                </Link>
 
                 {isAdmin && (
                     <>
