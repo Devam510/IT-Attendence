@@ -531,9 +531,10 @@ export default function DashboardPage() {
 
     // ── Restore sessionToken + break log from localStorage on mount ──
     useEffect(() => {
-        const saved = localStorage.getItem("dash_sessionToken");
+        if (!user?.id) return;
+        const saved = localStorage.getItem(`dash_sessionToken_${user.id}`);
         if (saved) setSessionToken(saved);
-        const breakState = localStorage.getItem("dash_break");
+        const breakState = localStorage.getItem(`dash_break_${user.id}`);
         if (breakState) {
             try {
                 const parsed = JSON.parse(breakState);
@@ -551,7 +552,7 @@ export default function DashboardPage() {
                 }
             } catch { /* ignore corrupt data */ }
         }
-    }, []);
+    }, [user?.id]);
 
     // ── 8-hour countdown ticker — uses refs to avoid stale closures ──
     useEffect(() => {
@@ -614,7 +615,7 @@ export default function DashboardPage() {
                 const token = res.data?.sessionToken;
                 if (token) {
                     setSessionToken(token);
-                    localStorage.setItem("dash_sessionToken", token);
+                    if (user?.id) localStorage.setItem(`dash_sessionToken_${user.id}`, token);
                 }
                 await loadEmpData();
             }
@@ -645,15 +646,17 @@ export default function DashboardPage() {
             }
         }
         setActionLoading("checkout");
-        const token = sessionToken || localStorage.getItem("dash_sessionToken") || undefined;
+        const token = sessionToken || (user?.id ? localStorage.getItem(`dash_sessionToken_${user.id}`) : null) || undefined;
         const body: Record<string, unknown> = token ? { sessionToken: token } : {};
         if (reason) body.earlyReason = reason;
         const res = await apiPost<any>("/api/attendance/checkout", body);
         if (res.error) {
             setActionError(res.error || "Check-out failed");
         } else {
-            localStorage.removeItem("dash_sessionToken");
-            localStorage.removeItem("dash_break");
+            if (user?.id) {
+                localStorage.removeItem(`dash_sessionToken_${user.id}`);
+                localStorage.removeItem(`dash_break_${user.id}`);
+            }
             setSessionToken(null);
             setOnBreak(false);
             onBreakRef.current = false;
@@ -682,7 +685,7 @@ export default function DashboardPage() {
         onBreakRef.current = true;
         setBreakStartedAt(now);
         breakStartedAtRef.current = now;
-        localStorage.setItem("dash_break", JSON.stringify({ log: newLog }));
+        if (user?.id) localStorage.setItem(`dash_break_${user.id}`, JSON.stringify({ log: newLog }));
         // Persist to DB (fire-and-forget)
         apiPost("/api/attendance/break", { action: "start" }).catch(() => null);
     }
@@ -698,7 +701,7 @@ export default function DashboardPage() {
         onBreakRef.current = false;
         setBreakStartedAt(null);
         breakStartedAtRef.current = null;
-        localStorage.setItem("dash_break", JSON.stringify({ log: newLog }));
+        if (user?.id) localStorage.setItem(`dash_break_${user.id}`, JSON.stringify({ log: newLog }));
         // Persist to DB (fire-and-forget)
         apiPost("/api/attendance/break", { action: "end" }).catch(() => null);
     }

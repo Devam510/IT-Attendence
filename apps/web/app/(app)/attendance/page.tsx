@@ -75,14 +75,15 @@ export default function AttendancePage() {
     interface BreakEntry { start: string; end: string | null; }
     const [attBreakLog, setAttBreakLog] = useState<BreakEntry[]>([]);
     useEffect(() => {
+        if (!user?.id) return;
         try {
-            const raw = localStorage.getItem("dash_break");
+            const raw = localStorage.getItem(`dash_break_${user.id}`);
             if (raw) {
                 const parsed = JSON.parse(raw);
                 setAttBreakLog(parsed.log ?? []);
             }
         } catch { /* ignore */ }
-    }, []);
+    }, [user?.id]);
 
     // Auto-dismiss toast
     useEffect(() => {
