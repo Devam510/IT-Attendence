@@ -63,11 +63,11 @@ const ICONS = {
 };
 
 /* ─── IconBadge ───────────────────────────────────────── */
-function IconBadge({ iconPath, bg }: { iconPath: string; bg: string }) {
+function IconBadge({ iconPath, iconBg }: { iconPath: string; iconBg: string }) {
     return (
         <span style={{
             display: "inline-flex", alignItems: "center", justifyContent: "center",
-            width: 34, height: 34, borderRadius: 10, background: bg, flexShrink: 0,
+            width: 34, height: 34, borderRadius: 10, background: iconBg, flexShrink: 0,
         }}>
             <Icon d={iconPath} size={15} color="white" />
         </span>
@@ -394,7 +394,7 @@ export default function ProfilePage() {
                 onKeyDown={onClick ? (e) => e.key === "Enter" && onClick() : undefined}
             >
                 <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flex: 1, minWidth: 0 }}>
-                    <IconBadge iconPath={iconPath} bg={iconBg} />
+                    <IconBadge iconPath={iconPath} iconBg={iconBg} />
                     <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-medium)", color: "var(--text-primary)" }}>
                         {label}
                     </span>
@@ -482,7 +482,7 @@ export default function ProfilePage() {
                             {data.department}
                         </span>
                         <span style={{ color: "var(--border-secondary)", fontSize: "var(--text-xs)" }}>·</span>
-                        <span style={{ fontSize: "var(--text-sm)", color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)" }}>
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
                             {data.employeeId}
                         </span>
                     </div>
