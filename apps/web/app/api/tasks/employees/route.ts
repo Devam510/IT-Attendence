@@ -1,7 +1,7 @@
 // Vibe Tech Labs — Assignable Employees API
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@vibetech/db";
+import { prisma, Role } from "@vibetech/db";
 import { withAuth } from "@/lib/auth";
 import type { JwtPayload } from "@vibetech/shared";
 
@@ -16,16 +16,24 @@ export const GET = withAuth(async (req: NextRequest, { auth }: { auth: JwtPayloa
         let users;
 
         if (auth.role === "MGR") {
-            // Managers can only assign to their direct reports
+            // Managers can only assign to their direct reports (excluding themselves)
             users = await prisma.user.findMany({
-                where: { managerId: auth.sub, status: "ACTIVE" },
+                where: { managerId: auth.sub, status: "ACTIVE", id: { not: auth.sub } },
                 select: { id: true, fullName: true, designation: true, employeeId: true },
                 orderBy: { fullName: "asc" },
             });
         } else {
-            // HR / Admin: all active employees in entity (including managers)
+            // HR / Admin: all active employees in entity, excluding:
+            //   - The caller themselves (so they don't see their own name)
+            //   - SADM role (HR/HRBP should not be able to assign tasks to admins)
+            const excludeRoles: Role[] = ["SADM"];
             users = await prisma.user.findMany({
-                where: { entityId: auth.entityId, status: "ACTIVE" },
+                where: {
+                    entityId: auth.entityId,
+                    status: "ACTIVE",
+                    id: { not: auth.sub },
+                    role: { notIn: excludeRoles },
+                },
                 select: { id: true, fullName: true, designation: true, employeeId: true },
                 orderBy: { fullName: "asc" },
             });
