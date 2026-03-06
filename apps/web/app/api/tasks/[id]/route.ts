@@ -5,12 +5,18 @@ import { prisma } from "@vibetech/db";
 import { withAuth } from "@/lib/auth";
 import type { JwtPayload } from "@vibetech/shared";
 
+// Helper: extract id from the request URL (/api/tasks/<id>)
+function getTaskId(req: NextRequest): string {
+    const parts = req.nextUrl.pathname.split("/");
+    return parts[parts.length - 1];
+}
+
 // PATCH /api/tasks/[id] — update status (e.g. mark complete)
 export const PATCH = withAuth(async (
     req: NextRequest,
-    { auth, params }: { auth: JwtPayload; params?: Record<string, string> }
+    { auth }: { auth: JwtPayload }
 ) => {
-    const id = params?.id;
+    const id = getTaskId(req);
     if (!id) return NextResponse.json({ error: "Missing task id" }, { status: 400 });
 
     try {
@@ -74,9 +80,9 @@ export const PATCH = withAuth(async (
 // DELETE /api/tasks/[id] — delete a task (assigner or admin only)
 export const DELETE = withAuth(async (
     req: NextRequest,
-    { auth, params }: { auth: JwtPayload; params?: Record<string, string> }
+    { auth }: { auth: JwtPayload }
 ) => {
-    const id = params?.id;
+    const id = getTaskId(req);
     if (!id) return NextResponse.json({ error: "Missing task id" }, { status: 400 });
 
     try {
