@@ -62,7 +62,7 @@ export const PATCH = withAuth(async (
             await prisma.notification.create({
                 data: {
                     userId: task.assignedById,
-                    type: "approval",
+                    type: "task",
                     title: "✅ Task Completed",
                     body: `${task.assignedTo.fullName} completed the task: "${task.title}"`,
                     data: { taskId: id },
@@ -75,7 +75,7 @@ export const PATCH = withAuth(async (
             await prisma.notification.create({
                 data: {
                     userId: task.assignedById,
-                    type: "message",
+                    type: "task",
                     title: "▶️ Task Started",
                     body: `${task.assignedTo.fullName} started working on: "${task.title}"`,
                     data: { taskId: id },

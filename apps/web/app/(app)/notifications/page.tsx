@@ -4,11 +4,11 @@ import { useState, useEffect } from "react";
 import { apiGet, api } from "@/lib/api-client";
 import "@/styles/admin.css";
 
-type NotifCategory = "all" | "attendance" | "approval" | "alert" | "message";
+type NotifCategory = "all" | "approval" | "task";
 
 interface Notification {
     id: string;
-    type: "attendance" | "approval" | "alert" | "message" | "system";
+    type: "attendance" | "approval" | "alert" | "message" | "task" | "system";
     title: string;
     subtitle: string;
     time: string;
@@ -21,6 +21,7 @@ const CATEGORY_ICONS: Record<string, string> = {
     approval: "✅",
     alert: "⚠️",
     message: "💬",
+    task: "📋",
     system: "🔔",
 };
 
@@ -133,13 +134,15 @@ export default function NotificationsPage() {
 
             {/* Filter chips */}
             <div className="approval-filters" style={{ marginBottom: "var(--space-5)" }}>
-                {(["all", "attendance", "approval", "alert", "message"] as NotifCategory[]).map(f => (
+                {(["all", "approval", "task"] as NotifCategory[]).map(f => (
                     <button
                         key={f}
                         className={`filter-chip ${filter === f ? "active" : ""}`}
                         onClick={() => setFilter(f)}
                     >
-                        {f === "all" ? "All" : `${CATEGORY_ICONS[f]} ${f.charAt(0).toUpperCase() + f.slice(1)}`}
+                        {f === "all" ? "All"
+                            : f === "approval" ? `${CATEGORY_ICONS.approval} Approvals`
+                                : `${CATEGORY_ICONS.task} Tasks`}
                     </button>
                 ))}
             </div>
