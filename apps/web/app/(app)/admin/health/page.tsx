@@ -132,10 +132,13 @@ export default function AdminHealthPage() {
             {/* Service Status Cards */}
             <div className="health-grid animate-slideUp">
                 {services.map(svc => (
-                    <div key={svc.name} className="health-card">
+                    <div key={svc.name} className="health-card" style={{ position: "relative" }}>
                         <div className="health-card-top">
-                            <span className="health-service-name">
+                            <span className="health-service-name" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                 {SERVICE_ICONS[svc.name] || "🔧"} {svc.name}
+                                {svc.status === "healthy" && (
+                                    <span className="pulse-dot" style={{ width: 8, height: 8, background: "var(--color-success)", borderRadius: "50%", boxShadow: "0 0 0 0 rgba(14, 159, 110, 0.7)", animation: "pulse 2s infinite" }} />
+                                )}
                             </span>
                             <span className={`badge ${svc.status === "healthy" ? "badge-success" : svc.status === "degraded" ? "badge-warning" : "badge-danger"}`}>
                                 {svc.status.charAt(0).toUpperCase() + svc.status.slice(1)}
@@ -143,6 +146,11 @@ export default function AdminHealthPage() {
                         </div>
                         <div className="health-metric">{svc.responseMs}ms</div>
                         <div className="health-meta">{svc.uptime}% uptime</div>
+                        {(svc as any).detail && (
+                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: 6 }}>
+                                {(svc as any).detail}
+                            </div>
+                        )}
                     </div>
                 ))}
             </div>
