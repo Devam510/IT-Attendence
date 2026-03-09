@@ -7,11 +7,131 @@ import { withRole } from "@/lib/auth";
 import { success } from "@/lib/errors";
 import type { JwtPayload } from "@vibetech/shared";
 
+// ─── Security View Handler ────────────────────────────────────────────────────
+// Called when ?view=security — returns metrics, security events, and anomalies
+// shaped for the Security Dashboard page.
+
+async function handleSecurityView(req: NextRequest): Promise<NextResponse> {
+    const url = new URL(req.url);
+    const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get("limit") || "20", 10)));
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Fetch recent audit events with actor info
+    const rawEvents = await prisma.auditEvent.findMany({
+        orderBy: { timestamp: "desc" },
+        take: limit,
+        include: {
+            actor: {
+                select: {
+                    fullName: true,
+                    email: true,
+                },
+            },
+        },
+    });
+
+    // Count failed logins today
+    const failedLoginsToday = await prisma.auditEvent.count({
+        where: {
+            action: { contains: "auth.login" },
+            riskScore: { gte: 50 },
+            timestamp: { gte: today },
+        },
+    });
+
+    // Count trusted devices
+    const trustedDevices = await prisma.device.count({
+        where: { trustScore: { gte: 70 } },
+    });
+
+    // Compute risk score: average of top-risk events (last 50)
+    const topEvents = await prisma.auditEvent.findMany({
+        orderBy: { timestamp: "desc" },
+        take: 50,
+        select: { riskScore: true },
+    });
+    const riskScores = topEvents.map((e) => e.riskScore ?? 0);
+    const avgRisk =
+        riskScores.length > 0
+            ? Math.round(riskScores.reduce((a, b) => a + b, 0) / riskScores.length)
+            : 0;
+
+    // Active threats = high-risk events in last 24h
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const activeThreats = await prisma.auditEvent.count({
+        where: {
+            riskScore: { gte: 75 },
+            timestamp: { gte: since24h },
+        },
+    });
+
+    // Map severity from riskScore
+    function getSeverity(score: number | null): "critical" | "high" | "medium" | "low" {
+        if (!score) return "low";
+        if (score >= 80) return "critical";
+        if (score >= 60) return "high";
+        if (score >= 35) return "medium";
+        return "low";
+    }
+
+    // Transform raw events into SecurityEvent shape
+    const events = rawEvents.map((e) => {
+        const geo = e.geoLocation as Record<string, string> | null;
+        const meta = e.metadata as Record<string, string> | null;
+        return {
+            id: e.id,
+            time: e.timestamp.toISOString(),
+            eventType: e.action,
+            userName: e.actor?.fullName ?? (e.actorId ? `User ${e.actorId.slice(0, 6)}` : "Unknown"),
+            userEmail: e.actor?.email ?? "",
+            location: geo?.city && geo?.country ? `${geo.city}, ${geo.country}` : (geo?.country ?? "Unknown"),
+            device: meta?.device || meta?.platform || e.deviceId?.slice(0, 8) || "Unknown",
+            severity: getSeverity(e.riskScore),
+            ipAddress: e.ipAddress ?? "",
+        };
+    });
+
+    // Derive anomalies from high-risk events (riskScore >= 60)
+    const anomalies = rawEvents
+        .filter((e) => (e.riskScore ?? 0) >= 60)
+        .slice(0, 10)
+        .map((e) => {
+            const meta = e.metadata as Record<string, string> | null;
+            return {
+                id: e.id,
+                title: meta?.anomalyTitle || `Suspicious: ${e.action}`,
+                meta: meta?.anomalyDetail || `Actor: ${e.actor?.fullName ?? e.actorId ?? "unknown"} — IP: ${e.ipAddress ?? "n/a"}`,
+                severity: getSeverity(e.riskScore),
+                time: e.timestamp.toISOString(),
+            };
+        });
+
+    return success({
+        metrics: {
+            riskScore: avgRisk,
+            activeThreats,
+            trustedDevices,
+            failedLoginsToday,
+        },
+        events,
+        anomalies,
+    });
+}
+
+// ─── Standard Audit Log Handler ───────────────────────────────────────────────
+
 async function handleAuditLogs(
     req: NextRequest,
     context: { auth: JwtPayload }
 ): Promise<NextResponse> {
     const url = new URL(req.url);
+
+    // Delegate to security view if requested
+    if (url.searchParams.get("view") === "security") {
+        return handleSecurityView(req);
+    }
 
     // Pagination
     const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));

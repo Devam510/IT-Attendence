@@ -240,7 +240,7 @@ export default function SecurityPage() {
                                                 <td>
                                                     <div className="audit-user">
                                                         <div className="audit-avatar" style={{ background: avatarColors[idx % avatarColors.length] }}>
-                                                            {ev.userName.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                                                            {(ev.userName || "?").split(" ").map((n: string) => n[0] || "").join("").slice(0, 2) || "?"}
                                                         </div>
                                                         <div>
                                                             <div style={{ fontWeight: "var(--font-medium)", fontSize: "var(--text-xs)" }}>{ev.userName}</div>
