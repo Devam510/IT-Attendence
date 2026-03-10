@@ -111,8 +111,8 @@ export default function UpdatesPage() {
                 </div>
             </div>
 
-            {/* Post update section (only on "Today") */}
-            {isToday && (
+            {/* Post update section (only on "Today" and NOT for Super Admins) */}
+            {isToday && user?.role !== "SADM" && (
                 <div className="update-composer animate-slideUp" style={{
                     background: "white",
                     borderRadius: "12px",
