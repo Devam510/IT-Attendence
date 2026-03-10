@@ -45,6 +45,15 @@ export default function UpdatesPage() {
     const [loading, setLoading] = useState(true);
     const [myUpdate, setMyUpdate] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [toast, setToast] = useState<{ message: string; type: "error" | "success" } | null>(null);
+
+    // Auto-dismiss toast
+    useEffect(() => {
+        if (toast) {
+            const t = setTimeout(() => setToast(null), 5000);
+            return () => clearTimeout(t);
+        }
+    }, [toast]);
 
     // Date filter
     const today = new Date().toISOString().split("T")[0] || "";
@@ -79,11 +88,11 @@ export default function UpdatesPage() {
         setIsSubmitting(true);
         const res = await apiPost<DailyUpdate>("/api/updates", { content: myUpdate });
         if (res.error) {
-            alert(res.error);
+            setToast({ message: res.error, type: "error" });
         } else if (res.data) {
+            setToast({ message: "Update posted successfully!", type: "success" });
             // Refresh to put it in the list (or update if edited)
             await loadUpdates(selectedDate);
-            // Show toast or highlight
         }
         setIsSubmitting(false);
     }
@@ -92,6 +101,33 @@ export default function UpdatesPage() {
 
     return (
         <div style={{ maxWidth: "800px", margin: "0 auto", paddingBottom: "var(--space-8)" }}>
+            {/* Toast Notification */}
+            {toast && (
+                <div
+                    style={{
+                        position: "fixed",
+                        top: 80,
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        zIndex: 9999,
+                        padding: "12px 24px",
+                        borderRadius: "12px",
+                        background: toast.type === "error" ? "#dc2626" : "#16a34a",
+                        color: "white",
+                        fontSize: "var(--text-sm)",
+                        fontWeight: "var(--font-medium)",
+                        boxShadow: "0 8px 30px rgba(0,0,0,0.3)",
+                        maxWidth: 420,
+                        textAlign: "center",
+                        animation: "slideDown 0.3s ease-out",
+                        cursor: "pointer",
+                    }}
+                    onClick={() => setToast(null)}
+                >
+                    {toast.message}
+                </div>
+            )}
+
             <div className="leave-header animate-fadeIn" style={{ marginBottom: "var(--space-6)" }}>
                 <div>
                     <h1 style={{ fontSize: "var(--text-2xl)", fontWeight: "var(--font-bold)" }}>
