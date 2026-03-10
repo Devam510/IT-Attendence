@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { apiGet, apiPost } from "@/lib/api-client";
 import { useAuth } from "@/context/AuthContext";
-import "@/styles/tasks.css"; // We'll just reuse task styles for buttons/loaders or inline styles for feed
+// import "@/styles/tasks.css"; // We'll just reuse task styles for buttons/loaders or inline styles for feed
 
 interface UserProfile {
     id: string;
