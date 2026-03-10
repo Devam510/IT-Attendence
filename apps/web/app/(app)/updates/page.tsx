@@ -78,7 +78,9 @@ export default function UpdatesPage() {
 
         setIsSubmitting(true);
         const res = await apiPost<DailyUpdate>("/api/updates", { content: myUpdate });
-        if (res.data) {
+        if (res.error) {
+            alert(res.error);
+        } else if (res.data) {
             // Refresh to put it in the list (or update if edited)
             await loadUpdates(selectedDate);
             // Show toast or highlight

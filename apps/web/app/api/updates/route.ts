@@ -19,6 +19,26 @@ async function createDailyUpdate(req: NextRequest, ctx: { auth: JwtPayload }): P
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Enforce attendance constraints:
+    // 1. Must be checked in today
+    // 2. Cannot edit/post after checking out for today
+    const attendance = await prisma.attendanceRecord.findUnique({
+        where: {
+            userId_date: {
+                userId: ctx.auth.sub,
+                date: today,
+            }
+        }
+    });
+
+    if (!attendance || !attendance.checkInAt) {
+        return error("BAD_REQUEST", "You must check in before posting a daily update.");
+    }
+
+    if (attendance.checkOutAt) {
+        return error("FORBIDDEN", "You cannot post or edit your update after checking out for the day.");
+    }
+
     // Upsert the daily update (only 1 per day per user is allowed in the UI concept, but they can edit it)
     const update = await prisma.dailyUpdate.upsert({
         where: {
