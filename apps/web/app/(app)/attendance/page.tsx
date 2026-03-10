@@ -1,5 +1,7 @@
 "use client";
 
+// This tool call is just to put thoughts in the plan. I will grep for dashboard checkout next.
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import { apiGet, apiPost } from "@/lib/api-client";
 import { useAuth } from "@/context/AuthContext";
