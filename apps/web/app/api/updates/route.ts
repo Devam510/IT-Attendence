@@ -58,20 +58,35 @@ async function getDailyUpdates(req: NextRequest, ctx: { auth: JwtPayload }): Pro
     }
 
     // Role-based filtering:
-    // HR, Admin, Super Admin can see everyone's updates.
-    // Managers might see their reports.
-    // Employees ideally see the whole team or their specific department. For this phase, we let everyone see the feed of their entity.
+    // HR, Admin, Super Admin can see everyone's updates in their entity.
+    // Managers see their own updates and their reports' updates.
+    // Employees ideally see only their own updates.
 
     const userRole = ctx.auth.role;
-    // By default, showing the whole company's updates or we could scope by department. Let's show all for the entity.
     const userEntityId = ctx.auth.entityId;
+    const userId = ctx.auth.sub;
+
+    let userFilter: any = { entityId: userEntityId }; // Default for Admins/HR
+
+    if (userRole === "MGR") {
+        userFilter = {
+            entityId: userEntityId,
+            OR: [
+                { id: userId },
+                { managerId: userId }
+            ]
+        };
+    } else if (!["SADM", "HRA", "HRBP"].includes(userRole as string)) {
+        // Regular EMP or others
+        userFilter = {
+            id: userId
+        };
+    }
 
     const updates = await prisma.dailyUpdate.findMany({
         where: {
             date: targetDate,
-            user: {
-                entityId: userEntityId,
-            }
+            user: userFilter,
         },
         include: {
             user: {
