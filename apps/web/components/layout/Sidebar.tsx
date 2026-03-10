@@ -19,7 +19,7 @@ import {
 const NAV_ITEMS = [
     { href: "/dashboard", Icon: LayoutDashboard, label: "Dashboard" },
     { href: "/attendance", Icon: Clock, label: "Attendance" },
-    { href: "/tasks", Icon: ClipboardCheck, label: "Tasks" },
+    { href: "/updates", Icon: ClipboardCheck, label: "Daily Updates" },
     { href: "/leaves", Icon: CalendarDays, label: "Leaves" },
     { href: "/approvals", Icon: CheckSquare, label: "Approvals" },
 ];

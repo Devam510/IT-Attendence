@@ -67,6 +67,7 @@ export default function AttendancePage() {
     const [showEarlyModal, setShowEarlyModal] = useState(false);
     const [earlyReason, setEarlyReason] = useState("");
     const [earlyReasonError, setEarlyReasonError] = useState(false);
+    const [showComplianceModal, setShowComplianceModal] = useState(false);
     const { user } = useAuth();
     // Token key is scoped per user so switching accounts never mixes tokens
     const tokenKey = `nexus-checkin-token-${user?.id || "guest"}`;
@@ -211,6 +212,24 @@ export default function AttendancePage() {
         }
         setActionLoading(false);
     }, []);
+
+    const handleCheckOutClick = async () => {
+        setActionLoading(true);
+        // Check compliance first
+        try {
+            const compRes = await apiGet<{ hasSubmittedToday: boolean }>("/api/updates/check-compliance");
+            if (compRes.data && !compRes.data.hasSubmittedToday) {
+                setShowComplianceModal(true);
+                setActionLoading(false);
+                return;
+            }
+        } catch {
+            // If it fails, we let them proceed to checkout anyway
+        }
+        setActionLoading(false);
+        // Proceed to normal checkout logic
+        handleCheckOut();
+    };
 
     const handleCheckOut = useCallback(async (force = false, reason = "") => {
         setActionLoading(true);
@@ -365,6 +384,38 @@ export default function AttendancePage() {
     return (
         <div>
             {/* Toast Notification */}
+
+            {/* Compliance Modal */}
+            {showComplianceModal && (
+                <div style={{
+                    position: "fixed", inset: 0, zIndex: 9999,
+                    background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
+                    display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+                }}>
+                    <div style={{
+                        background: "var(--bg-primary)", borderRadius: 16, padding: "28px 32px",
+                        maxWidth: 440, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+                        border: "1.5px solid #d97706",
+                    }}>
+                        <div style={{ fontSize: 32, marginBottom: 8, textAlign: "center" }}>⚠️</div>
+                        <h3 style={{ fontSize: "var(--text-lg)", fontWeight: 700, color: "#d97706", textAlign: "center", margin: "0 0 8px" }}>Missing Daily Update</h3>
+                        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", textAlign: "center", margin: "0 0 20px" }}>
+                            You haven't submitted your <strong>Daily Update</strong> for today. Please post your update so your team knows what you accomplished!
+                        </p>
+                        <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                            <button onClick={() => setShowComplianceModal(false)}
+                                style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "1.5px solid var(--border-primary)", background: "var(--bg-secondary)", color: "var(--text-primary)", fontWeight: 600, cursor: "pointer" }}>
+                                Cancel Check Out
+                            </button>
+                            <a href="/updates"
+                                style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "none", background: "#d97706", color: "white", fontWeight: 700, cursor: "pointer", textAlign: "center", textDecoration: "none", display: "inline-block" }}>
+                                Go to Updates
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Early Checkout Modal */}
             {showEarlyModal && (
                 <div style={{
@@ -589,7 +640,7 @@ export default function AttendancePage() {
 
                         <div style={{ marginTop: "var(--space-6)" }}>
                             {today.checkedIn ? (
-                                <button className="btn btn-danger btn-full" onClick={() => handleCheckOut()} disabled={actionLoading}>
+                                <button className="btn btn-danger btn-full" onClick={() => handleCheckOutClick()} disabled={actionLoading}>
                                     {actionLoading ? <><span className="spinner" /> Checking out...</> : "Check Out"}
                                 </button>
                             ) : (

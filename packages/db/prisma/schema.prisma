@@ -165,6 +165,7 @@ model User {
   auditEvents       AuditEvent[]
   assignedTasks     Task[]              @relation("TaskAssignee")
   createdTasks      Task[]              @relation("TaskAssigner")
+  dailyUpdates      DailyUpdate[]
 
   @@index([entityId])
   @@index([departmentId])
@@ -417,3 +418,20 @@ model Task {
   @@map("tasks")
 }
 
+// ─── DAILY UPDATES ──────────────────────────────────────
+
+model DailyUpdate {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  date      DateTime @db.Date
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+  @@map("daily_updates")
+}
