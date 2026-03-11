@@ -27,6 +27,7 @@ interface UserData {
 export default function UsersPage() {
     const { user: currentUser } = useAuth();
     const [users, setUsers] = useState<UserData[]>([]);
+    const [searchQuery, setSearchQuery] = useState("");
     const [loading, setLoading] = useState(true);
     const [departments, setDepartments] = useState<Department[]>([]);
     const [managers, setManagers] = useState<{ id: string; fullName: string; role: string }[]>([]);
@@ -157,6 +158,25 @@ export default function UsersPage() {
                 </button>
             </div>
 
+            {/* Search Input */}
+            <div style={{ marginBottom: "var(--space-4)" }}>
+                <input
+                    type="text"
+                    placeholder="Search by name, email, or ID..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    style={{
+                        width: "100%",
+                        maxWidth: "400px",
+                        padding: "10px 16px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--border-light)",
+                        background: "var(--bg-card)",
+                        fontSize: "var(--text-sm)",
+                    }}
+                />
+            </div>
+
             {/* Users Table */}
             <div style={{ background: "white", borderRadius: "12px", border: "1px solid var(--border-light)", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
@@ -173,7 +193,14 @@ export default function UsersPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {users.map(u => (
+                        {users
+                            .filter(u => 
+                                !searchQuery || 
+                                u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                u.email.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                u.employeeId.toLowerCase().includes(searchQuery.toLowerCase())
+                            )
+                            .map(u => (
                             <tr key={u.id} style={{ borderBottom: "1px solid var(--border-light)", fontSize: "var(--text-sm)" }}>
                                 <td style={{ padding: "16px 20px" }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
