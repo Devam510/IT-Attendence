@@ -59,16 +59,13 @@ async function main() {
     console.log("✅ Location:", location.name);
 
     // ─── 3. Departments ─────────────────────────────────
-    const engineering = await prisma.department.create({
-        data: { name: "Vibe Tech Labs", entityId: entity.id },
+    const sales = await prisma.department.create({
+        data: { name: "Sales", entityId: entity.id },
     });
-    const hr = await prisma.department.create({
-        data: { name: "Human Resources", entityId: entity.id },
+    const developers = await prisma.department.create({
+        data: { name: "Developers", entityId: entity.id },
     });
-    const product = await prisma.department.create({
-        data: { name: "Product", entityId: entity.id },
-    });
-    console.log("✅ Departments: Engineering, HR, Product");
+    console.log("✅ Departments: Sales, Developers");
 
     // ─── 4. Shift ───────────────────────────────────────
     const shift = await prisma.shift.create({
@@ -91,7 +88,7 @@ async function main() {
             email: "admin@nexus.dev",
             fullName: "Arjun Mehta",
             role: "SADM",
-            departmentId: hr.id,
+            departmentId: sales.id,
             designation: "System Administrator",
             entityId: entity.id,
             locationId: location.id,
@@ -106,7 +103,7 @@ async function main() {
             email: "priya@nexus.dev",
             fullName: "Priya Sharma",
             role: "HRA",
-            departmentId: hr.id,
+            departmentId: sales.id,
             designation: "HR Manager",
             entityId: entity.id,
             locationId: location.id,
@@ -121,7 +118,7 @@ async function main() {
             email: "rahul@nexus.dev",
             fullName: "Rahul Verma",
             role: "MGR",
-            departmentId: engineering.id,
+            departmentId: developers.id,
             designation: "Engineering Manager",
             entityId: entity.id,
             locationId: location.id,
@@ -136,7 +133,7 @@ async function main() {
             email: "neha@nexus.dev",
             fullName: "Neha Gupta",
             role: "EMP",
-            departmentId: engineering.id,
+            departmentId: developers.id,
             designation: "Senior Developer",
             managerId: manager.id,
             entityId: entity.id,
@@ -152,7 +149,7 @@ async function main() {
             email: "amit@nexus.dev",
             fullName: "Amit Patel",
             role: "EMP",
-            departmentId: engineering.id,
+            departmentId: developers.id,
             designation: "Full Stack Developer",
             managerId: manager.id,
             entityId: entity.id,
@@ -168,7 +165,7 @@ async function main() {
             email: "sara@nexus.dev",
             fullName: "Sara Khan",
             role: "EMP",
-            departmentId: product.id,
+            departmentId: sales.id,
             designation: "Product Designer",
             managerId: manager.id,
             entityId: entity.id,
@@ -179,8 +176,8 @@ async function main() {
     });
 
     // Update department heads
-    await prisma.department.update({ where: { id: engineering.id }, data: { headId: manager.id } });
-    await prisma.department.update({ where: { id: hr.id }, data: { headId: hrManager.id } });
+    await prisma.department.update({ where: { id: developers.id }, data: { headId: manager.id } });
+    await prisma.department.update({ where: { id: sales.id }, data: { headId: hrManager.id } });
 
     console.log("✅ Users: 6 created (admin, HR, manager, 3 employees)");
 
