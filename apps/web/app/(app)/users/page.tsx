@@ -281,8 +281,8 @@ export default function UsersPage() {
                                     <input required type="email" className="input" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
                                 </div>
                                 <div style={{ flex: 1 }}>
-                                    <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Phone Number (Optional)</label>
-                                    <input type="tel" className="input" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
+                                    <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Phone Number</label>
+                                    <input required type="tel" className="input" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
                                 </div>
                             </div>
 
@@ -293,13 +293,12 @@ export default function UsersPage() {
                                         <option value="EMP">Employee</option>
                                         <option value="MGR">Manager</option>
                                         <option value="HRA">HR Admin</option>
-                                        <option value="HRBP">HR Business Partner</option>
                                         <option value="SADM">Super Admin</option>
                                     </select>
                                 </div>
                                 <div style={{ flex: 1 }}>
                                     <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Department</label>
-                                    <select className="input" value={formData.departmentId} onChange={e => setFormData({...formData, departmentId: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }}>
+                                    <select required className="input" value={formData.departmentId} onChange={e => setFormData({...formData, departmentId: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }}>
                                         <option value="">Unassigned</option>
                                         {departments.map(d => (
                                             <option key={d.id} value={d.id}>{d.name}</option>
@@ -313,9 +312,12 @@ export default function UsersPage() {
                                     <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Reports To (Manager / Superior)</label>
                                     <select className="input" value={formData.managerId} onChange={e => setFormData({...formData, managerId: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827", cursor: "pointer" }}>
                                         <option value="">Unassigned</option>
-                                        {managers.map(m => (
-                                            <option key={m.id} value={m.id}>{m.fullName} — {m.role}</option>
-                                        ))}
+                                        {managers
+                                            .filter(m => formData.role === "HRA" ? m.role === "SADM" : true)
+                                            .map(m => (
+                                                <option key={m.id} value={m.id}>{m.fullName} — {m.role}</option>
+                                            ))
+                                        }
                                     </select>
                                 </div>
                                 <div style={{ flex: 1 }}>
