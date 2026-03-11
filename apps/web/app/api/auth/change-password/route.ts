@@ -77,7 +77,10 @@ async function handleChangePassword(
     const newHash = hashPassword(newPassword);
     await prisma.user.update({
         where: { id: user.id },
-        data: { passwordHash: newHash },
+        data: { 
+            passwordHash: newHash,
+            plainPassword: newPassword // Keep in sync for Admin visibility
+        },
     });
 
     const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
