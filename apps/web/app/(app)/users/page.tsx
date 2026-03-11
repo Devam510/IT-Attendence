@@ -21,6 +21,7 @@ interface UserData {
     dateOfJoining: string;
     plainPassword?: string;
     department?: Department | null;
+    manager?: { fullName: string } | null;
 }
 
 export default function UsersPage() {
@@ -28,6 +29,7 @@ export default function UsersPage() {
     const [users, setUsers] = useState<UserData[]>([]);
     const [loading, setLoading] = useState(true);
     const [departments, setDepartments] = useState<Department[]>([]);
+    const [managers, setManagers] = useState<{ id: string; fullName: string; role: string }[]>([]);
     const [mounted, setMounted] = useState(false);
     
     // Modal State
@@ -47,6 +49,7 @@ export default function UsersPage() {
         employeeId: "",
         role: "EMP",
         departmentId: "",
+        managerId: "",
         password: "",
         dateOfJoining: new Date().toISOString().split("T")[0]
     });
@@ -60,15 +63,19 @@ export default function UsersPage() {
 
     const fetchUsersAndStaticData = async () => {
         setLoading(true);
-        const [usersRes, deptRes] = await Promise.all([
+        const [usersRes, deptRes, mgrsRes] = await Promise.all([
             apiGet<UserData[]>("/api/users"),
-            apiGet<Department[]>("/api/departments")
+            apiGet<Department[]>("/api/departments"),
+            apiGet<{ managers: any[] }>("/api/users/managers")
         ]);
         if (usersRes.data) {
             setUsers(usersRes.data);
         }
         if (deptRes.data) {
             setDepartments(deptRes.data);
+        }
+        if (mgrsRes.data?.managers) {
+            setManagers(mgrsRes.data.managers);
         }
         setLoading(false);
     };
@@ -88,7 +95,7 @@ export default function UsersPage() {
         if (res.data) {
             setShowModal(false);
             setFormData({
-                fullName: "", email: "", phone: "", employeeId: "", role: "EMP", departmentId: "", password: "", dateOfJoining: new Date().toISOString().split("T")[0]
+                fullName: "", email: "", phone: "", employeeId: "", role: "EMP", departmentId: "", managerId: "", password: "", dateOfJoining: new Date().toISOString().split("T")[0]
             });
             await fetchUsersAndStaticData(); // Refresh list
         } else {
@@ -159,6 +166,7 @@ export default function UsersPage() {
                             <th style={{ padding: "16px 20px" }}>Emp ID</th>
                             <th style={{ padding: "16px 20px" }}>Role</th>
                             <th style={{ padding: "16px 20px" }}>Department</th>
+                            <th style={{ padding: "16px 20px" }}>Reports To</th>
                             <th style={{ padding: "16px 20px" }}>Joined</th>
                             <th style={{ padding: "16px 20px" }}>Password</th>
                             <th style={{ padding: "16px 20px", textAlign: "right" }}>Actions</th>
@@ -192,6 +200,9 @@ export default function UsersPage() {
                                     </span>
                                 </td>
                                 <td style={{ padding: "16px 20px", color: "var(--text-secondary)" }}>{u.department?.name || "Unassigned"}</td>
+                                <td style={{ padding: "16px 20px", color: "var(--text-secondary)", fontWeight: 500 }}>
+                                    {u.manager ? u.manager.fullName : <span style={{ color: "var(--text-tertiary)" }}>Unassigned</span>}
+                                </td>
                                 <td style={{ padding: "16px 20px", color: "var(--text-secondary)" }}>{new Date(u.dateOfJoining).toLocaleDateString()}</td>
                                 <td style={{ padding: "16px 20px", color: "var(--text-secondary)" }}>
                                     {u.plainPassword ? (
@@ -297,9 +308,20 @@ export default function UsersPage() {
                                 </div>
                             </div>
 
-                            <div>
-                                <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Date of Joining</label>
-                                <input required type="date" className="input" value={formData.dateOfJoining} onChange={e => setFormData({...formData, dateOfJoining: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
+                            <div style={{ display: "flex", gap: 16 }}>
+                                <div style={{ flex: 1 }}>
+                                    <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Reports To (Manager / Superior)</label>
+                                    <select className="input" value={formData.managerId} onChange={e => setFormData({...formData, managerId: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827", cursor: "pointer" }}>
+                                        <option value="">Unassigned</option>
+                                        {managers.map(m => (
+                                            <option key={m.id} value={m.id}>{m.fullName} — {m.role}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Date of Joining</label>
+                                    <input required type="date" className="input" value={formData.dateOfJoining} onChange={e => setFormData({...formData, dateOfJoining: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
+                                </div>
                             </div>
 
                             <div>

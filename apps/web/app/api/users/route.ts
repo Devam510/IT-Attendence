@@ -33,6 +33,9 @@ async function getUsers(req: NextRequest, ctx: { auth: JwtPayload }): Promise<Ne
             plainPassword: userRole === "SADM" || userRole === "HRA" || userRole === "HRBP" ? true : false,
             department: {
                 select: { id: true, name: true }
+            },
+            manager: {
+                select: { fullName: true }
             }
         },
         orderBy: {
@@ -48,7 +51,7 @@ async function createUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
     const userEntityId = ctx.auth.entityId;
     
     const body = await req.json().catch(() => ({}));
-    const { fullName, email, phone, employeeId, role, departmentId, dateOfJoining, password } = body;
+    const { fullName, email, phone, employeeId, role, departmentId, managerId, dateOfJoining, password } = body;
 
     if (!fullName || !email || !employeeId || !role || !password) {
         return error("BAD_REQUEST", "Missing required fields (fullName, email, employeeId, role, password)");
@@ -64,6 +67,7 @@ async function createUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
                 role,
                 entityId: userEntityId,
                 departmentId: departmentId || null,
+                managerId: managerId || null,
                 dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : new Date(),
                 passwordHash: hashPassword(password),
                 plainPassword: password, // As requested by user for admin visibility
