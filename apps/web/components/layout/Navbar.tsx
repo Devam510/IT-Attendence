@@ -68,9 +68,6 @@ export default function Navbar() {
                         priority
                     />
                 </Link>
-                <div className="navbar-search" role="search" tabIndex={0}>
-                    🔍 Search...
-                </div>
             </div>
 
             <div className="navbar-right">
