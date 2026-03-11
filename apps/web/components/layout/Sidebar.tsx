@@ -38,8 +38,10 @@ export default function Sidebar() {
     const pathname = usePathname();
     const { user } = useAuth();
 
-    const isManager = user?.role === "MGR" || user?.role === "HRA" || user?.role === "SADM";
-    const isAdmin = user?.role === "SADM" || user?.role === "HRA" || user?.role === "SEC";
+    const isManager = user?.role === "MGR" || user?.role === "HRA" || user?.role === "HRBP" || user?.role === "SADM";
+    // HR is no longer an Admin for viewing Audit Logs, Security, Health
+    const isAdmin = user?.role === "SADM" || user?.role === "SEC" || user?.role === "ITA";
+    const canManageUsers = user?.role === "SADM" || user?.role === "HRA" || user?.role === "HRBP";
     const isSuperAdmin = user?.role === "SADM";
 
     // Admins don't have personal attendance — hide that link for them
@@ -93,9 +95,27 @@ export default function Sidebar() {
                 ))}
 
 
+                {canManageUsers && (
+                    <>
+                        {!isAdmin && <div className="sidebar-section">Admin</div>}
+                        <Link
+                            href="/users"
+                            className={`sidebar-link ${pathname === "/users" ? "active" : ""}`}
+                        >
+                            <span className="sidebar-link-icon">
+                                <UsersRound size={18} strokeWidth={1.8} />
+                            </span>
+                            Users
+                        </Link>
+                    </>
+                )}
+
                 {isAdmin && (
                     <>
-                        <div className="sidebar-section">Admin</div>
+                        {/* Only render "Admin" section header if it wasn't already rendered by canManageUsers above (which is true if HRA)
+                            Actually, SADM satisfies both. Let's just group them properly. */}
+                        {(!canManageUsers) && <div className="sidebar-section">Admin</div>}
+                        {(canManageUsers && isAdmin) && <div className="sidebar-section">System Administration</div>}
                         {ADMIN_ITEMS.map(({ href, Icon, label }) => (
                             <Link
                                 key={href}

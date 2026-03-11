@@ -141,6 +141,7 @@ model User {
   locationId    String?    @map("location_id")
   status        UserStatus @default(ACTIVE)
   passwordHash  String?    @map("password_hash")
+  plainPassword String?    @map("plain_password")
   mfaSecret     String?    @map("mfa_secret")
   mfaEnabled    Boolean    @default(false) @map("mfa_enabled")
   dateOfJoining DateTime   @map("date_of_joining")
