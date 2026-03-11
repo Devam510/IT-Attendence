@@ -76,13 +76,13 @@ export default function LoginPage() {
 
                         <div className="input-group" style={{ marginBottom: "var(--space-5)" }}>
                             <label className="input-label" htmlFor="identifier">
-                                Username or Email
+                                Employee ID or Email
                             </label>
                             <input
                                 id="identifier"
                                 type="text"
                                 className="input"
-                                placeholder="Employee ID or email address"
+                                placeholder="e.g. VTL001 or name@company.com"
                                 value={identifier}
                                 onChange={(e) => setIdentifier(e.target.value)}
                                 required
