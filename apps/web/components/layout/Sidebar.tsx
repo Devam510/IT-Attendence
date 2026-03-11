@@ -40,7 +40,8 @@ export default function Sidebar() {
 
     const isManager = user?.role === "MGR" || user?.role === "HRA" || user?.role === "HRBP" || user?.role === "SADM";
     // HR is no longer an Admin for viewing Audit Logs, Security, Health
-    const isAdmin = user?.role === "SADM" || user?.role === "SEC" || user?.role === "ITA";
+    // strict evaluation to prevent role misidentification
+    const isAdmin = Boolean(user && (user.role === "SADM" || user.role === "SEC" || user.role === "ITA"));
     const canManageUsers = user?.role === "SADM" || user?.role === "HRA" || user?.role === "HRBP";
     const isSuperAdmin = user?.role === "SADM";
 
