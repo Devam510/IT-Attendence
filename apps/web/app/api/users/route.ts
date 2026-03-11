@@ -26,6 +26,7 @@ async function getUsers(req: NextRequest, ctx: { auth: JwtPayload }): Promise<Ne
             id: true,
             fullName: true,
             email: true,
+            phone: true,
             employeeId: true,
             role: true,
             status: true,
