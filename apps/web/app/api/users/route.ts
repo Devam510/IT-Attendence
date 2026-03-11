@@ -48,7 +48,7 @@ async function createUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
     const userEntityId = ctx.auth.entityId;
     
     const body = await req.json().catch(() => ({}));
-    const { fullName, email, employeeId, role, departmentId, dateOfJoining, password } = body;
+    const { fullName, email, phone, employeeId, role, departmentId, dateOfJoining, password } = body;
 
     if (!fullName || !email || !employeeId || !role || !password) {
         return error("BAD_REQUEST", "Missing required fields (fullName, email, employeeId, role, password)");
@@ -59,6 +59,7 @@ async function createUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
             data: {
                 fullName,
                 email: email.toLowerCase(),
+                phone: phone || null,
                 employeeId,
                 role,
                 entityId: userEntityId,

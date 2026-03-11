@@ -14,6 +14,7 @@ interface UserData {
     id: string;
     fullName: string;
     email: string;
+    phone?: string | null;
     employeeId: string;
     role: string;
     status: string;
@@ -42,6 +43,7 @@ export default function UsersPage() {
     const [formData, setFormData] = useState({
         fullName: "",
         email: "",
+        phone: "",
         employeeId: "",
         role: "EMP",
         departmentId: "",
@@ -86,7 +88,7 @@ export default function UsersPage() {
         if (res.data) {
             setShowModal(false);
             setFormData({
-                fullName: "", email: "", employeeId: "", role: "EMP", departmentId: "", password: "", dateOfJoining: new Date().toISOString().split("T")[0]
+                fullName: "", email: "", phone: "", employeeId: "", role: "EMP", departmentId: "", password: "", dateOfJoining: new Date().toISOString().split("T")[0]
             });
             await fetchUsersAndStaticData(); // Refresh list
         } else {
@@ -262,9 +264,15 @@ export default function UsersPage() {
                                 </div>
                             </div>
 
-                            <div>
-                                <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Email Address</label>
-                                <input required type="email" className="input" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
+                            <div style={{ display: "flex", gap: 16 }}>
+                                <div style={{ flex: 1 }}>
+                                    <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Email Address</label>
+                                    <input required type="email" className="input" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Phone Number (Optional)</label>
+                                    <input type="tel" className="input" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
+                                </div>
                             </div>
 
                             <div style={{ display: "flex", gap: 16 }}>

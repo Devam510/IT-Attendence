@@ -343,9 +343,8 @@ export default function ProfilePage() {
         department: str(profile?.department || "–"),
         role: str(profile?.role || user?.role || "EMP"),
         employeeId: str(profile?.employeeId || "–"),
-        manager: str(profile?.manager || "–"),
         joinDate: str(profile?.joinDate || "–"),
-        workLocation: str(profile?.workLocation || "–"),
+        workLocation: str(profile?.workLocation || "Vibe Tech Labs"),
         mfaEnabled: Boolean(profile?.mfaEnabled),
         activeSessions: Number(profile?.activeSessions || 1),
     };
@@ -499,10 +498,9 @@ export default function ProfilePage() {
                 <InfoRow iconPath={ICONS.mail} iconBg="linear-gradient(135deg,#1A56DB,#3F83F8)" label="Email" value={data.email} />
                 <InfoRow iconPath={ICONS.phone} iconBg="linear-gradient(135deg,#0E9F6E,#31C48D)" label="Phone" value={data.phone} />
                 <InfoRow iconPath={ICONS.building} iconBg="linear-gradient(135deg,#7E3AF2,#A78BFA)" label="Department" value={data.department} />
-                <InfoRow iconPath={ICONS.user} iconBg="linear-gradient(135deg,#FF8A4C,#FCA172)" label="Manager" value={data.manager} />
-                <InfoRow iconPath={ICONS.calendar} iconBg="linear-gradient(135deg,#E02424,#F98080)" label="Join Date" value={joinDateDisplay} />
+                <InfoRow iconPath={ICONS.mapPin} iconBg="linear-gradient(135deg,#0891B2,#22D3EE)" label="Work Location" value={data.workLocation} />
                 <div style={{ borderBottom: "none" }}>
-                    <InfoRow iconPath={ICONS.mapPin} iconBg="linear-gradient(135deg,#0891B2,#22D3EE)" label="Work Location" value={data.workLocation} />
+                    <InfoRow iconPath={ICONS.calendar} iconBg="linear-gradient(135deg,#E02424,#F98080)" label="Join Date" value={joinDateDisplay} />
                 </div>
             </SectionCard>
 

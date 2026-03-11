@@ -132,6 +132,7 @@ model User {
   id            String     @id @default(uuid())
   employeeId    String     @unique @map("employee_id")
   email         String     @unique
+  phone         String?
   fullName      String     @map("full_name")
   departmentId  String?    @map("department_id")
   designation   String?
