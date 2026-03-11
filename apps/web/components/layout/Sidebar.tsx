@@ -96,9 +96,9 @@ export default function Sidebar() {
                 ))}
 
 
-                {canManageUsers && (
+                {canManageUsers && !isAdmin && (
                     <>
-                        {!isAdmin && <div className="sidebar-section">Admin</div>}
+                        <div className="sidebar-section">Admin</div>
                         <Link
                             href="/users"
                             className={`sidebar-link ${pathname === "/users" ? "active" : ""}`}
@@ -113,10 +113,18 @@ export default function Sidebar() {
 
                 {isAdmin && (
                     <>
-                        {/* Only render "Admin" section header if it wasn't already rendered by canManageUsers above (which is true if HRA)
-                            Actually, SADM satisfies both. Let's just group them properly. */}
-                        {(!canManageUsers) && <div className="sidebar-section">Admin</div>}
-                        {(canManageUsers && isAdmin) && <div className="sidebar-section">System Administration</div>}
+                        <div className="sidebar-section">System Administration</div>
+                        {canManageUsers && (
+                            <Link
+                                href="/users"
+                                className={`sidebar-link ${pathname === "/users" ? "active" : ""}`}
+                            >
+                                <span className="sidebar-link-icon">
+                                    <UsersRound size={18} strokeWidth={1.8} />
+                                </span>
+                                Users
+                            </Link>
+                        )}
                         {ADMIN_ITEMS.map(({ href, Icon, label }) => (
                             <Link
                                 key={href}
