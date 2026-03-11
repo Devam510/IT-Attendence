@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { apiGet, api } from "@/lib/api-client";
 import "@/styles/admin.css";
 
-type NotifCategory = "all" | "approval" | "task";
+type NotifCategory = "all" | "approval";
 
 interface Notification {
     id: string;
@@ -134,15 +134,13 @@ export default function NotificationsPage() {
 
             {/* Filter chips */}
             <div className="approval-filters" style={{ marginBottom: "var(--space-5)" }}>
-                {(["all", "approval", "task"] as NotifCategory[]).map(f => (
+                {(["all", "approval"] as NotifCategory[]).map(f => (
                     <button
                         key={f}
                         className={`filter-chip ${filter === f ? "active" : ""}`}
                         onClick={() => setFilter(f)}
                     >
-                        {f === "all" ? "All"
-                            : f === "approval" ? `${CATEGORY_ICONS.approval} Approvals`
-                                : `${CATEGORY_ICONS.task} Tasks`}
+                        {f === "all" ? "All" : `${CATEGORY_ICONS.approval} Approvals`}
                     </button>
                 ))}
             </div>
