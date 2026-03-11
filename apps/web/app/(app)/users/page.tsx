@@ -223,14 +223,16 @@ export default function UsersPage() {
                                     )}
                                 </td>
                                 <td style={{ padding: "16px 20px", textAlign: "right" }}>
-                                    <button
-                                        onClick={() => setUserToDelete(u)}
-                                        style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "14px", fontWeight: 600, padding: "8px", borderRadius: "6px" }}
-                                        title="Delete User"
-                                        disabled={u.id === currentUser?.id} // Prevent self-deletion
-                                    >
-                                        Delete
-                                    </button>
+                                    {!(currentUser?.role === "HRA" && u.role === "SADM") && (
+                                        <button
+                                            onClick={() => setUserToDelete(u)}
+                                            style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "14px", fontWeight: 600, padding: "8px", borderRadius: "6px" }}
+                                            title="Delete User"
+                                            disabled={u.id === currentUser?.id} // Prevent self-deletion
+                                        >
+                                            Delete
+                                        </button>
+                                    )}
                                 </td>
                             </tr>
                         ))}
@@ -310,8 +312,8 @@ export default function UsersPage() {
                             <div style={{ display: "flex", gap: 16 }}>
                                 <div style={{ flex: 1 }}>
                                     <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Reports To (Manager / Superior)</label>
-                                    <select className="input" value={formData.managerId} onChange={e => setFormData({...formData, managerId: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827", cursor: "pointer" }}>
-                                        <option value="">Unassigned</option>
+                                    <select required className="input" value={formData.managerId} onChange={e => setFormData({...formData, managerId: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827", cursor: "pointer" }}>
+                                        <option value="">Select Superior</option>
                                         {managers
                                             .filter(m => formData.role === "HRA" ? m.role === "SADM" : true)
                                             .map(m => (
