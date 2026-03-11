@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { apiGet, apiPost } from "@/lib/api-client";
 import { useAuth } from "@/context/AuthContext";
-
 
 interface Department {
     id: string;
@@ -26,6 +26,8 @@ export default function UsersPage() {
     const { user: currentUser } = useAuth();
     const [users, setUsers] = useState<UserData[]>([]);
     const [loading, setLoading] = useState(true);
+    const [departments, setDepartments] = useState<Department[]>([]);
+    const [mounted, setMounted] = useState(false);
     
     // Modal State
     const [showModal, setShowModal] = useState(false);
@@ -38,6 +40,7 @@ export default function UsersPage() {
         email: "",
         employeeId: "",
         role: "EMP",
+        departmentId: "",
         password: "",
         dateOfJoining: new Date().toISOString().split("T")[0]
     });
@@ -49,17 +52,24 @@ export default function UsersPage() {
         setVisiblePasswords(prev => ({ ...prev, [id]: !prev[id] }));
     };
 
-    const fetchUsers = async () => {
+    const fetchUsersAndStaticData = async () => {
         setLoading(true);
-        const res = await apiGet<UserData[]>("/api/users");
-        if (res.data) {
-            setUsers(res.data);
+        const [usersRes, deptRes] = await Promise.all([
+            apiGet<UserData[]>("/api/users"),
+            apiGet<Department[]>("/api/departments")
+        ]);
+        if (usersRes.data) {
+            setUsers(usersRes.data);
+        }
+        if (deptRes.data) {
+            setDepartments(deptRes.data);
         }
         setLoading(false);
     };
 
     useEffect(() => {
-        fetchUsers();
+        setMounted(true);
+        fetchUsersAndStaticData();
     }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -72,9 +82,9 @@ export default function UsersPage() {
         if (res.data) {
             setShowModal(false);
             setFormData({
-                fullName: "", email: "", employeeId: "", role: "EMP", password: "", dateOfJoining: new Date().toISOString().split("T")[0]
+                fullName: "", email: "", employeeId: "", role: "EMP", departmentId: "", password: "", dateOfJoining: new Date().toISOString().split("T")[0]
             });
-            await fetchUsers(); // Refresh list
+            await fetchUsersAndStaticData(); // Refresh list
         } else {
             setError(res.error || "Failed to create user");
         }
@@ -191,20 +201,20 @@ export default function UsersPage() {
             </div>
 
             {/* Add Employee Modal */}
-            {showModal && (
+            {showModal && mounted && createPortal(
                 <div style={{
-                    position: "fixed", inset: 0, zIndex: 9999,
+                    position: "fixed", inset: 0, zIndex: 99999,
                     background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
                     display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
                 }}>
                     <div className="animate-slideUp" style={{
                         background: "var(--bg-primary)", borderRadius: 16, padding: "32px",
-                        maxWidth: 500, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+                        maxWidth: 600, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
                         maxHeight: "90vh", overflowY: "auto"
                     }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
                             <h2 style={{ fontSize: "var(--text-xl)", fontWeight: "var(--font-bold)", margin: 0 }}>Add New Employee</h2>
-                            <button onClick={() => setShowModal(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "var(--text-tertiary)" }}>×</button>
+                            <button onClick={() => setShowModal(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 24, padding: "0 8px", color: "var(--text-tertiary)" }}>×</button>
                         </div>
                         
                         {error && <div style={{ padding: 12, background: "#fee2e2", color: "#991b1b", borderRadius: 8, marginBottom: 20, fontSize: "var(--text-sm)" }}>{error}</div>}
@@ -214,23 +224,23 @@ export default function UsersPage() {
                             <div style={{ display: "flex", gap: 16 }}>
                                 <div style={{ flex: 1 }}>
                                     <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Full Name</label>
-                                    <input required type="text" className="input" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid var(--border-light)" }} />
+                                    <input required type="text" className="input" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
                                 </div>
                                 <div style={{ flex: 1 }}>
                                     <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Employee ID</label>
-                                    <input required type="text" className="input" value={formData.employeeId} onChange={e => setFormData({...formData, employeeId: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid var(--border-light)" }} />
+                                    <input required type="text" className="input" value={formData.employeeId} onChange={e => setFormData({...formData, employeeId: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
                                 </div>
                             </div>
 
                             <div>
                                 <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Email Address</label>
-                                <input required type="email" className="input" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid var(--border-light)" }} />
+                                <input required type="email" className="input" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
                             </div>
 
                             <div style={{ display: "flex", gap: 16 }}>
                                 <div style={{ flex: 1 }}>
                                     <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Role</label>
-                                    <select required className="input" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid var(--border-light)", background: "white" }}>
+                                    <select required className="input" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }}>
                                         <option value="EMP">Employee</option>
                                         <option value="MGR">Manager</option>
                                         <option value="HRA">HR Admin</option>
@@ -239,9 +249,19 @@ export default function UsersPage() {
                                     </select>
                                 </div>
                                 <div style={{ flex: 1 }}>
-                                    <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Date of Joining</label>
-                                    <input required type="date" className="input" value={formData.dateOfJoining} onChange={e => setFormData({...formData, dateOfJoining: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid var(--border-light)" }} />
+                                    <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Department</label>
+                                    <select className="input" value={formData.departmentId} onChange={e => setFormData({...formData, departmentId: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }}>
+                                        <option value="">Unassigned</option>
+                                        {departments.map(d => (
+                                            <option key={d.id} value={d.id}>{d.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
+                            </div>
+
+                            <div>
+                                <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Date of Joining</label>
+                                <input required type="date" className="input" value={formData.dateOfJoining} onChange={e => setFormData({...formData, dateOfJoining: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
                             </div>
 
                             <div>
@@ -249,11 +269,11 @@ export default function UsersPage() {
                                     Initial Password
                                     <button type="button" onClick={generatePassword} style={{ background: "none", border: "none", color: "var(--color-primary)", fontSize: "var(--text-xs)", cursor: "pointer", fontWeight: 600 }}>Generate</button>
                                 </label>
-                                <input required type="text" className="input" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} placeholder="Set password for user" style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid var(--border-light)" }} />
+                                <input required type="text" className="input" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} placeholder="Set password for user" style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
                             </div>
 
                             <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
-                                <button type="button" onClick={() => setShowModal(false)} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "1px solid var(--border-primary)", background: "transparent", color: "var(--text-primary)", fontWeight: 600, cursor: "pointer" }}>
+                                <button type="button" onClick={() => setShowModal(false)} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "1px solid #d1d5db", background: "white", color: "#374151", fontWeight: 600, cursor: "pointer" }}>
                                     Cancel
                                 </button>
                                 <button type="submit" disabled={isSubmitting} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "none", background: "var(--color-primary)", color: "white", fontWeight: 600, cursor: isSubmitting ? "not-allowed" : "pointer", opacity: isSubmitting ? 0.7 : 1 }}>
@@ -262,7 +282,8 @@ export default function UsersPage() {
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>, 
+                document.body
             )}
         </div>
     );
