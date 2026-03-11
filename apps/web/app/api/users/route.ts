@@ -91,7 +91,48 @@ async function createUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
     }
 }
 
+// DELETE: Remove a user (soft delete by setting status to INACTIVE)
+async function deleteUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<NextResponse> {
+    const userRole = ctx.auth.role;
+    const userEntityId = ctx.auth.entityId;
+
+    if (userRole !== "SADM" && userRole !== "HRA" && userRole !== "HRBP") {
+        return error("FORBIDDEN", "You do not have permission to delete users");
+    }
+
+    const { searchParams } = new URL(req.url);
+    const userId = searchParams.get("id");
+
+    if (!userId) {
+        return error("BAD_REQUEST", "User ID is required");
+    }
+
+    try {
+        // Soft delete user by setting status to INACTIVE
+        const updatedUser = await prisma.user.updateMany({
+            where: {
+                id: userId,
+                entityId: userEntityId,
+            },
+            data: {
+                status: "INACTIVE",
+                // Option: We could clear the email or employeeId to allow re-use, but keeping them protects historical data.
+            }
+        });
+
+        if (updatedUser.count === 0) {
+            return error("NOT_FOUND", "User not found or you don't have permission to delete them", 404);
+        }
+
+        return success({}, 200, "User successfully removed");
+    } catch (e) {
+        console.error(e);
+        return error("INTERNAL_ERROR", "Failed to delete user", 500);
+    }
+}
+
 // Export auth-wrapped handlers
 // Only SADM, HRA, HRBP can view or manage users
 export const GET = withRole("SADM", "HRA", "HRBP")(getUsers);
 export const POST = withRole("SADM", "HRA", "HRBP")(createUser);
+export const DELETE = withRole("SADM", "HRA", "HRBP")(deleteUser);
