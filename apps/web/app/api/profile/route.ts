@@ -73,10 +73,13 @@ async function handleUpdateProfile(
         return error("INVALID_JSON", "Request body must be valid JSON", 400);
     }
 
-    // Only allow updating designation (other fields need admin approval)
+    // Allow updating designation and fullName
     const allowedFields: Record<string, unknown> = {};
     if (typeof body["designation"] === "string" && body["designation"].length <= 100) {
         allowedFields["designation"] = body["designation"];
+    }
+    if (typeof body["fullName"] === "string" && body["fullName"].trim().length > 0 && body["fullName"].length <= 100) {
+        allowedFields["fullName"] = body["fullName"].trim();
     }
 
     if (Object.keys(allowedFields).length === 0) {

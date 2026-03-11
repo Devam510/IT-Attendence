@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyToken, generateAccessToken } from "@/lib/auth";
 import { getSession, setSession, checkRateLimit } from "@/lib/redis";
 import { error, success, withErrorHandler, logger } from "@/lib/errors";
+import { prisma } from "@vibetech/db";
 
 async function handleRefresh(req: NextRequest): Promise<NextResponse> {
     const ip = req.headers.get("x-forwarded-for") || "unknown";
@@ -47,10 +48,21 @@ async function handleRefresh(req: NextRequest): Promise<NextResponse> {
         return error("SESSION_INVALID", "Session not found or token mismatch", 401);
     }
 
+    // Ensure we fetch the most up-to-date role and status from the DB
+    // so if an admin changes a user's role, the next access token reflects it instantly.
+    const user = await prisma.user.findUnique({
+        where: { id: payload.sub },
+        select: { role: true, entityId: true, status: true }
+    });
+
+    if (!user || user.status !== "ACTIVE") {
+        return error("USER_INACTIVE", "Account is disabled or deleted", 401);
+    }
+
     const newAccessToken = await generateAccessToken({
         sub: payload.sub,
-        role: payload.role,
-        entityId: payload.entityId,
+        role: user.role,
+        entityId: user.entityId,
         deviceId: payload.deviceId,
     });
 

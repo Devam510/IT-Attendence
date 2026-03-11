@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { apiGet, apiPost } from "@/lib/api-client";
+import { apiGet, apiPost, apiPatch } from "@/lib/api-client";
 import { useAuth } from "@/context/AuthContext";
 import "@/styles/admin.css";
 
@@ -61,6 +61,7 @@ const ICONS = {
     x: "M18 6L6 18M6 6l12 12",
     chevronRight: "M9 18l6-6-6-6",
     lock: "M19 11H5a2 2 0 00-2 2v7a2 2 0 002 2h14a2 2 0 002-2v-7a2 2 0 00-2-2zM7 11V7a5 5 0 0110 0v4",
+    pencil: "M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z",
 };
 
 /* ─── IconBadge ───────────────────────────────────────── */
@@ -327,6 +328,11 @@ export default function ProfilePage() {
     const [loading, setLoading] = useState(true);
     const [darkMode, setDarkMode] = useState(false);
     const [showChangePassword, setShowChangePassword] = useState(false);
+    
+    // Name editing state
+    const [editingName, setEditingName] = useState(false);
+    const [newName, setNewName] = useState("");
+    const [savingName, setSavingName] = useState(false);
 
     useEffect(() => {
         setDarkMode(document.documentElement.getAttribute("data-theme") === "dark");
@@ -362,6 +368,22 @@ export default function ProfilePage() {
     const joinDateDisplay = data.joinDate !== "–"
         ? (() => { try { return new Date(data.joinDate).toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" }); } catch { return data.joinDate; } })()
         : "–";
+
+    async function handleNameSave(e: React.FormEvent) {
+        e.preventDefault();
+        const trimmed = newName.trim();
+        if (!trimmed || trimmed === data.fullName) {
+            setEditingName(false);
+            return;
+        }
+        setSavingName(true);
+        const res = await apiPatch<{ updated: Record<string, unknown> }>("/api/profile", { fullName: trimmed });
+        setSavingName(false);
+        if (!res.error && res.data?.updated) {
+            setProfile(prev => prev ? { ...prev, fullName: trimmed } : null);
+            setEditingName(false);
+        }
+    }
 
     if (loading) {
         return (
@@ -471,8 +493,40 @@ export default function ProfilePage() {
                     }}>
                         {initials}
                     </div>
-                    <div style={{ fontSize: "var(--text-xl)", fontWeight: "var(--font-bold)", color: "var(--text-primary)" }}>
-                        {data.fullName}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        {editingName ? (
+                            <form onSubmit={handleNameSave} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                                <input
+                                    autoFocus
+                                    className="input"
+                                    style={{ padding: "4px 10px", fontSize: "var(--text-lg)", fontWeight: "var(--font-bold)", borderRadius: 6, border: "1px solid var(--border-primary)", maxWidth: 220, textAlign: "center" }}
+                                    value={newName}
+                                    onChange={e => setNewName(e.target.value)}
+                                    disabled={savingName}
+                                />
+                                <button type="submit" disabled={savingName} style={{ background: "var(--color-primary)", color: "white", border: "none", borderRadius: 4, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                                    <Icon d={ICONS.check} size={16} />
+                                </button>
+                                <button type="button" onClick={() => setEditingName(false)} disabled={savingName} style={{ background: "var(--bg-secondary)", color: "var(--text-secondary)", border: "none", borderRadius: 4, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                                    <Icon d={ICONS.x} size={16} />
+                                </button>
+                            </form>
+                        ) : (
+                            <>
+                                <div style={{ fontSize: "var(--text-xl)", fontWeight: "var(--font-bold)", color: "var(--text-primary)" }}>
+                                    {data.fullName}
+                                </div>
+                                <button 
+                                    onClick={() => { setNewName(data.fullName); setEditingName(true); }} 
+                                    style={{ background: "var(--bg-secondary)", border: "1px solid var(--border-primary)", color: "var(--text-tertiary)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 6, borderRadius: "50%", transition: "all 0.2s" }} 
+                                    title="Edit Name"
+                                    onMouseEnter={e => { e.currentTarget.style.color = "var(--color-primary)"; e.currentTarget.style.borderColor = "var(--color-primary)"; }}
+                                    onMouseLeave={e => { e.currentTarget.style.color = "var(--text-tertiary)"; e.currentTarget.style.borderColor = "var(--border-primary)"; }}
+                                >
+                                    <Icon d={ICONS.pencil} size={14} />
+                                </button>
+                            </>
+                        )}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginTop: "var(--space-2)", flexWrap: "wrap", justifyContent: "center" }}>
                         <span style={{
