@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { apiGet, apiPost } from "@/lib/api-client";
 import { useAuth } from "@/context/AuthContext";
-import "@/styles/tasks.css"; // Reuse card/input styles
+
 
 interface Department {
     id: string;
