@@ -1,6 +1,3 @@
-// NEXUS Enterprise Workforce Platform — Database Schema
-// 14 Core Models for Phase 1 MVP
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,17 +7,321 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── ENUMS ──────────────────────────────────────────────
+model Entity {
+  id          String       @id @default(uuid())
+  name        String
+  code        String       @unique
+  country     String
+  timezone    String
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  departments Department[]
+  leaveTypes  LeaveType[]
+  locations   Location[]
+  shifts      Shift[]
+  users       User[]
+
+  @@map("entities")
+}
+
+model Department {
+  id       String  @id @default(uuid())
+  name     String
+  entityId String  @map("entity_id")
+  headId   String? @map("head_id")
+  entity   Entity  @relation(fields: [entityId], references: [id])
+  head     User?   @relation("DepartmentHead", fields: [headId], references: [id])
+  users    User[]  @relation("DepartmentMembers")
+
+  @@map("departments")
+}
+
+model User {
+  id                String             @id @default(uuid())
+  employeeId        String             @unique @map("employee_id")
+  email             String             @unique
+  fullName          String             @map("full_name")
+  departmentId      String?            @map("department_id")
+  designation       String?
+  managerId         String?            @map("manager_id")
+  role              Role               @default(EMP)
+  entityId          String             @map("entity_id")
+  locationId        String?            @map("location_id")
+  status            UserStatus         @default(ACTIVE)
+  passwordHash      String?            @map("password_hash")
+  mfaSecret         String?            @map("mfa_secret")
+  mfaEnabled        Boolean            @default(false) @map("mfa_enabled")
+  dateOfJoining     DateTime           @map("date_of_joining")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  plainPassword     String?            @map("plain_password")
+  phone             String?
+  approvalRequests  ApprovalWorkflow[] @relation("ApprovalRequester")
+  attendanceRecords AttendanceRecord[]
+  auditEvents       AuditEvent[]
+  dailyUpdates      DailyUpdate[]
+  departmentsHeaded Department[]       @relation("DepartmentHead")
+  devices           Device[]
+  leaveBalances     LeaveBalance[]
+  approvedLeaves    LeaveRequest[]     @relation("LeaveApprover")
+  leaveRequests     LeaveRequest[]     @relation("LeaveRequester")
+  notifications     Notification[]
+  createdTasks      Task[]             @relation("TaskAssigner")
+  assignedTasks     Task[]             @relation("TaskAssignee")
+  department        Department?        @relation("DepartmentMembers", fields: [departmentId], references: [id])
+  entity            Entity             @relation(fields: [entityId], references: [id])
+  location          Location?          @relation(fields: [locationId], references: [id])
+  manager           User?              @relation("ManagerReports", fields: [managerId], references: [id])
+  reports           User[]             @relation("ManagerReports")
+
+  @@index([entityId])
+  @@index([departmentId])
+  @@index([managerId])
+  @@map("users")
+}
+
+model Device {
+  id                String             @id @default(uuid())
+  userId            String             @map("user_id")
+  deviceFingerprint String             @unique @map("device_fingerprint")
+  platform          Platform
+  osVersion         String?            @map("os_version")
+  model             String?
+  trustScore        Int                @default(0) @map("trust_score")
+  isJailbroken      Boolean            @default(false) @map("is_jailbroken")
+  mdmEnrolled       Boolean            @default(false) @map("mdm_enrolled")
+  attestationKey    String?            @map("attestation_key")
+  lastSeenAt        DateTime?          @map("last_seen_at")
+  registeredAt      DateTime           @default(now()) @map("registered_at")
+  attendanceRecords AttendanceRecord[]
+  user              User               @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("devices")
+}
+
+model Location {
+  id                String             @id @default(uuid())
+  name              String
+  address           String?
+  latitude          Float
+  longitude         Float
+  altitudeM         Float?             @map("altitude_m")
+  radiusM           Float              @default(200) @map("radius_m")
+  geofencePolygon   Json?              @map("geofence_polygon")
+  wifiBssids        String[]           @map("wifi_bssids")
+  entityId          String             @map("entity_id")
+  isActive          Boolean            @default(true) @map("is_active")
+  attendanceRecords AttendanceRecord[]
+  entity            Entity             @relation(fields: [entityId], references: [id])
+  users             User[]
+
+  @@map("locations")
+}
+
+model Shift {
+  id                String             @id @default(uuid())
+  name              String
+  startTime         String             @map("start_time")
+  endTime           String             @map("end_time")
+  graceMinutes      Int                @default(15) @map("grace_minutes")
+  entityId          String             @map("entity_id")
+  attendanceRecords AttendanceRecord[]
+  entity            Entity             @relation(fields: [entityId], references: [id])
+
+  @@map("shifts")
+}
+
+model AttendanceRecord {
+  id                String           @id @default(uuid())
+  userId            String           @map("user_id")
+  date              DateTime         @db.Date
+  checkInAt         DateTime?        @map("check_in_at")
+  checkOutAt        DateTime?        @map("check_out_at")
+  checkInLat        Float?           @map("check_in_lat")
+  checkInLng        Float?           @map("check_in_lng")
+  checkOutLat       Float?           @map("check_out_lat")
+  checkOutLng       Float?           @map("check_out_lng")
+  checkInMethod     CheckInMethod?   @map("check_in_method")
+  verificationScore Int?             @map("verification_score")
+  deviceId          String?          @map("device_id")
+  locationId        String?          @map("location_id")
+  shiftId           String?          @map("shift_id")
+  status            AttendanceStatus @default(PENDING)
+  anomalyFlags      Json?            @map("anomaly_flags")
+  totalHours        Float?           @map("total_hours")
+  overtimeHours     Float?           @map("overtime_hours")
+  offlineSync       Boolean          @default(false) @map("offline_sync")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+  device            Device?          @relation(fields: [deviceId], references: [id])
+  location          Location?        @relation(fields: [locationId], references: [id])
+  shift             Shift?           @relation(fields: [shiftId], references: [id])
+  user              User             @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@index([status])
+  @@map("attendance_records")
+}
+
+model LeaveType {
+  id              String           @id @default(uuid())
+  name            String
+  code            String
+  defaultBalance  Float            @map("default_balance")
+  accrualType     LeaveAccrualType @default(YEARLY) @map("accrual_type")
+  carryForwardMax Float?           @map("carry_forward_max")
+  entityId        String           @map("entity_id")
+  balances        LeaveBalance[]
+  requests        LeaveRequest[]
+  entity          Entity           @relation(fields: [entityId], references: [id])
+
+  @@unique([code, entityId])
+  @@map("leave_types")
+}
+
+model LeaveBalance {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  leaveTypeId String    @map("leave_type_id")
+  year        Int
+  opening     Float     @default(0)
+  accrued     Float     @default(0)
+  used        Float     @default(0)
+  pending     Float     @default(0)
+  closing     Float     @default(0)
+  leaveType   LeaveType @relation(fields: [leaveTypeId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@unique([userId, leaveTypeId, year])
+  @@map("leave_balances")
+}
+
+model LeaveRequest {
+  id            String      @id @default(uuid())
+  userId        String      @map("user_id")
+  leaveTypeId   String      @map("leave_type_id")
+  startDate     DateTime    @map("start_date") @db.Date
+  endDate       DateTime    @map("end_date") @db.Date
+  halfDay       HalfDay     @default(NONE) @map("half_day")
+  reason        String?
+  status        LeaveStatus @default(PENDING)
+  approvedBy    String?     @map("approved_by")
+  approvalChain Json?       @map("approval_chain")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  approver      User?       @relation("LeaveApprover", fields: [approvedBy], references: [id])
+  leaveType     LeaveType   @relation(fields: [leaveTypeId], references: [id])
+  user          User        @relation("LeaveRequester", fields: [userId], references: [id])
+
+  @@index([userId, status])
+  @@map("leave_requests")
+}
+
+model ApprovalWorkflow {
+  id              String         @id @default(uuid())
+  entityType      String         @map("entity_type")
+  entityId        String         @map("entity_id")
+  requesterId     String         @map("requester_id")
+  currentStep     Int            @default(0) @map("current_step")
+  steps           Json
+  status          ApprovalStatus @default(PENDING)
+  slaDeadline     DateTime?      @map("sla_deadline")
+  escalationCount Int            @default(0) @map("escalation_count")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  completedAt     DateTime?      @map("completed_at")
+  requester       User           @relation("ApprovalRequester", fields: [requesterId], references: [id])
+
+  @@index([requesterId])
+  @@index([status])
+  @@map("approval_workflows")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  type      String
+  title     String
+  body      String
+  data      Json?
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model AuditEvent {
+  id           String   @id @default(uuid())
+  timestamp    DateTime @default(now())
+  actorId      String?  @map("actor_id")
+  actorRole    String?  @map("actor_role")
+  action       String
+  resourceType String   @map("resource_type")
+  resourceId   String?  @map("resource_id")
+  beforeState  Json?    @map("before_state")
+  afterState   Json?    @map("after_state")
+  ipAddress    String?  @map("ip_address")
+  deviceId     String?  @map("device_id")
+  geoLocation  Json?    @map("geo_location")
+  riskScore    Int?     @map("risk_score")
+  hashChain    String?  @map("hash_chain")
+  metadata     Json?
+  actor        User?    @relation(fields: [actorId], references: [id])
+
+  @@index([timestamp])
+  @@index([actorId])
+  @@index([action])
+  @@index([resourceType, resourceId])
+  @@map("audit_events")
+}
+
+model Task {
+  id           String       @id @default(uuid())
+  title        String
+  description  String?
+  assignedToId String       @map("assigned_to_id")
+  assignedById String       @map("assigned_by_id")
+  priority     TaskPriority @default(MEDIUM)
+  status       TaskStatus   @default(PENDING)
+  dueDate      DateTime?    @map("due_date") @db.Date
+  completedAt  DateTime?    @map("completed_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  assignedBy   User         @relation("TaskAssigner", fields: [assignedById], references: [id])
+  assignedTo   User         @relation("TaskAssignee", fields: [assignedToId], references: [id])
+
+  @@index([assignedToId, status])
+  @@index([assignedById])
+  @@map("tasks")
+}
+
+model DailyUpdate {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  date      DateTime @db.Date
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+  @@map("daily_updates")
+}
 
 enum Role {
-  EMP   // Employee
-  MGR   // Manager
-  HRBP  // HR Business Partner
-  HRA   // HR Admin
-  ITA   // IT Administrator
-  SEC   // Security Officer
-  COMP  // Compliance Officer
-  SADM  // Super Admin
+  EMP
+  MGR
+  HRBP
+  HRA
+  ITA
+  SEC
+  COMP
+  SADM
 }
 
 enum UserStatus {
@@ -91,349 +392,4 @@ enum TaskPriority {
   LOW
   MEDIUM
   HIGH
-}
-
-// ─── ORGANIZATION ───────────────────────────────────────
-
-model Entity {
-  id        String   @id @default(uuid())
-  name      String
-  code      String   @unique
-  country   String
-  timezone  String
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  departments Department[]
-  locations   Location[]
-  shifts      Shift[]
-  leaveTypes  LeaveType[]
-  users       User[]
-
-  @@map("entities")
-}
-
-model Department {
-  id       String  @id @default(uuid())
-  name     String
-  entityId String  @map("entity_id")
-  headId   String? @map("head_id")
-
-  entity Entity @relation(fields: [entityId], references: [id])
-  head   User?  @relation("DepartmentHead", fields: [headId], references: [id])
-  users  User[] @relation("DepartmentMembers")
-
-  @@map("departments")
-}
-
-// ─── USERS ──────────────────────────────────────────────
-
-model User {
-  id            String     @id @default(uuid())
-  employeeId    String     @unique @map("employee_id")
-  email         String     @unique
-  phone         String?
-  fullName      String     @map("full_name")
-  departmentId  String?    @map("department_id")
-  designation   String?
-  managerId     String?    @map("manager_id")
-  role          Role       @default(EMP)
-  entityId      String     @map("entity_id")
-  locationId    String?    @map("location_id")
-  status        UserStatus @default(ACTIVE)
-  passwordHash  String?    @map("password_hash")
-  plainPassword String?    @map("plain_password")
-  mfaSecret     String?    @map("mfa_secret")
-  mfaEnabled    Boolean    @default(false) @map("mfa_enabled")
-  dateOfJoining DateTime   @map("date_of_joining")
-  createdAt     DateTime   @default(now()) @map("created_at")
-  updatedAt     DateTime   @updatedAt @map("updated_at")
-
-  entity     Entity      @relation(fields: [entityId], references: [id])
-  department Department? @relation("DepartmentMembers", fields: [departmentId], references: [id])
-  manager    User?       @relation("ManagerReports", fields: [managerId], references: [id])
-  location   Location?   @relation(fields: [locationId], references: [id])
-
-  // Reverse relations
-  reports           User[]              @relation("ManagerReports")
-  departmentsHeaded Department[]        @relation("DepartmentHead")
-  devices           Device[]
-  attendanceRecords AttendanceRecord[]
-  leaveBalances     LeaveBalance[]
-  leaveRequests     LeaveRequest[]      @relation("LeaveRequester")
-  approvedLeaves    LeaveRequest[]      @relation("LeaveApprover")
-  approvalRequests  ApprovalWorkflow[]  @relation("ApprovalRequester")
-  notifications     Notification[]
-  auditEvents       AuditEvent[]
-  assignedTasks     Task[]              @relation("TaskAssignee")
-  createdTasks      Task[]              @relation("TaskAssigner")
-  dailyUpdates      DailyUpdate[]
-
-  @@index([entityId])
-  @@index([departmentId])
-  @@index([managerId])
-  @@map("users")
-}
-
-// ─── DEVICES ────────────────────────────────────────────
-
-model Device {
-  id                String   @id @default(uuid())
-  userId            String   @map("user_id")
-  deviceFingerprint String   @unique @map("device_fingerprint")
-  platform          Platform
-  osVersion         String?  @map("os_version")
-  model             String?
-  trustScore        Int      @default(0) @map("trust_score")
-  isJailbroken      Boolean  @default(false) @map("is_jailbroken")
-  mdmEnrolled       Boolean  @default(false) @map("mdm_enrolled")
-  attestationKey    String?  @map("attestation_key")
-  lastSeenAt        DateTime? @map("last_seen_at")
-  registeredAt      DateTime @default(now()) @map("registered_at")
-
-  user              User               @relation(fields: [userId], references: [id])
-  attendanceRecords AttendanceRecord[]
-
-  @@index([userId])
-  @@map("devices")
-}
-
-// ─── LOCATIONS & SHIFTS ─────────────────────────────────
-
-model Location {
-  id               String  @id @default(uuid())
-  name             String
-  address          String?
-  latitude         Float
-  longitude        Float
-  altitudeM        Float?  @map("altitude_m")
-  radiusM          Float   @default(200) @map("radius_m")
-  geofencePolygon  Json?   @map("geofence_polygon")
-  wifiBssids       String[] @map("wifi_bssids")
-  entityId         String  @map("entity_id")
-  isActive         Boolean @default(true) @map("is_active")
-
-  entity            Entity             @relation(fields: [entityId], references: [id])
-  users             User[]
-  attendanceRecords AttendanceRecord[]
-
-  @@map("locations")
-}
-
-model Shift {
-  id            String @id @default(uuid())
-  name          String
-  startTime     String @map("start_time") // "09:00"
-  endTime       String @map("end_time")   // "18:00"
-  graceMinutes  Int    @default(15) @map("grace_minutes")
-  entityId      String @map("entity_id")
-
-  entity            Entity             @relation(fields: [entityId], references: [id])
-  attendanceRecords AttendanceRecord[]
-
-  @@map("shifts")
-}
-
-// ─── ATTENDANCE ─────────────────────────────────────────
-
-model AttendanceRecord {
-  id                String           @id @default(uuid())
-  userId            String           @map("user_id")
-  date              DateTime         @db.Date
-  checkInAt         DateTime?        @map("check_in_at")
-  checkOutAt        DateTime?        @map("check_out_at")
-  checkInLat        Float?           @map("check_in_lat")
-  checkInLng        Float?           @map("check_in_lng")
-  checkOutLat       Float?           @map("check_out_lat")
-  checkOutLng       Float?           @map("check_out_lng")
-  checkInMethod     CheckInMethod?   @map("check_in_method")
-  verificationScore Int?             @map("verification_score")
-  deviceId          String?          @map("device_id")
-  locationId        String?          @map("location_id")
-  shiftId           String?          @map("shift_id")
-  status            AttendanceStatus @default(PENDING)
-  anomalyFlags      Json?            @map("anomaly_flags")
-  totalHours        Float?           @map("total_hours")
-  overtimeHours     Float?           @map("overtime_hours")
-  offlineSync       Boolean          @default(false) @map("offline_sync")
-  createdAt         DateTime         @default(now()) @map("created_at")
-  updatedAt         DateTime         @updatedAt @map("updated_at")
-
-  user     User      @relation(fields: [userId], references: [id])
-  device   Device?   @relation(fields: [deviceId], references: [id])
-  location Location? @relation(fields: [locationId], references: [id])
-  shift    Shift?    @relation(fields: [shiftId], references: [id])
-
-  @@unique([userId, date])
-  @@index([userId, date])
-  @@index([status])
-  @@map("attendance_records")
-}
-
-// ─── LEAVE ──────────────────────────────────────────────
-
-model LeaveType {
-  id              String          @id @default(uuid())
-  name            String
-  code            String
-  defaultBalance  Float           @map("default_balance")
-  accrualType     LeaveAccrualType @default(YEARLY) @map("accrual_type")
-  carryForwardMax Float?          @map("carry_forward_max")
-  entityId        String          @map("entity_id")
-
-  entity   Entity         @relation(fields: [entityId], references: [id])
-  balances LeaveBalance[]
-  requests LeaveRequest[]
-
-  @@unique([code, entityId])
-  @@map("leave_types")
-}
-
-model LeaveBalance {
-  id          String @id @default(uuid())
-  userId      String @map("user_id")
-  leaveTypeId String @map("leave_type_id")
-  year        Int
-  opening     Float  @default(0)
-  accrued     Float  @default(0)
-  used        Float  @default(0)
-  pending     Float  @default(0)
-  closing     Float  @default(0)
-
-  user      User      @relation(fields: [userId], references: [id])
-  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
-
-  @@unique([userId, leaveTypeId, year])
-  @@map("leave_balances")
-}
-
-model LeaveRequest {
-  id            String      @id @default(uuid())
-  userId        String      @map("user_id")
-  leaveTypeId   String      @map("leave_type_id")
-  startDate     DateTime    @map("start_date") @db.Date
-  endDate       DateTime    @map("end_date") @db.Date
-  halfDay       HalfDay     @default(NONE) @map("half_day")
-  reason        String?
-  status        LeaveStatus @default(PENDING)
-  approvedBy    String?     @map("approved_by")
-  approvalChain Json?       @map("approval_chain")
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
-
-  user     User      @relation("LeaveRequester", fields: [userId], references: [id])
-  approver User?     @relation("LeaveApprover", fields: [approvedBy], references: [id])
-  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
-
-  @@index([userId, status])
-  @@map("leave_requests")
-}
-
-// ─── APPROVALS ──────────────────────────────────────────
-
-model ApprovalWorkflow {
-  id              String         @id @default(uuid())
-  entityType      String         @map("entity_type") // "leave", "expense", "regularization"
-  entityId        String         @map("entity_id")
-  requesterId     String         @map("requester_id")
-  currentStep     Int            @default(0) @map("current_step")
-  steps           Json           // DAG definition: [{approver_id, status, acted_at, comment}]
-  status          ApprovalStatus @default(PENDING)
-  slaDeadline     DateTime?      @map("sla_deadline")
-  escalationCount Int            @default(0) @map("escalation_count")
-  createdAt       DateTime       @default(now()) @map("created_at")
-  completedAt     DateTime?      @map("completed_at")
-
-  requester User @relation("ApprovalRequester", fields: [requesterId], references: [id])
-
-  @@index([requesterId])
-  @@index([status])
-  @@map("approval_workflows")
-}
-
-// ─── NOTIFICATIONS ──────────────────────────────────────
-
-model Notification {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  type      String   // "leave_approved", "checkin_reminder", "sla_warning", etc.
-  title     String
-  body      String
-  data      Json?
-  isRead    Boolean  @default(false) @map("is_read")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@index([userId, isRead])
-  @@map("notifications")
-}
-
-// ─── AUDIT ──────────────────────────────────────────────
-
-model AuditEvent {
-  id           String   @id @default(uuid())
-  timestamp    DateTime @default(now())
-  actorId      String?  @map("actor_id")
-  actorRole    String?  @map("actor_role")
-  action       String   // "auth.login", "attendance.checkin", "leave.apply", etc.
-  resourceType String   @map("resource_type")
-  resourceId   String?  @map("resource_id")
-  beforeState  Json?    @map("before_state")
-  afterState   Json?    @map("after_state")
-  ipAddress    String?  @map("ip_address")
-  deviceId     String?  @map("device_id")
-  geoLocation  Json?    @map("geo_location")
-  riskScore    Int?     @map("risk_score")
-  hashChain    String?  @map("hash_chain")
-  metadata     Json?
-
-  actor User? @relation(fields: [actorId], references: [id])
-
-  @@index([timestamp])
-  @@index([actorId])
-  @@index([action])
-  @@index([resourceType, resourceId])
-  @@map("audit_events")
-}
-
-// ─── TASKS ──────────────────────────────────────────────
-
-model Task {
-  id           String       @id @default(uuid())
-  title        String
-  description  String?
-  assignedToId String       @map("assigned_to_id")
-  assignedById String       @map("assigned_by_id")
-  priority     TaskPriority @default(MEDIUM)
-  status       TaskStatus   @default(PENDING)
-  dueDate      DateTime?    @map("due_date") @db.Date
-  completedAt  DateTime?    @map("completed_at")
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
-
-  assignedTo User @relation("TaskAssignee", fields: [assignedToId], references: [id])
-  assignedBy User @relation("TaskAssigner", fields: [assignedById], references: [id])
-
-  @@index([assignedToId, status])
-  @@index([assignedById])
-  @@map("tasks")
-}
-
-// ─── DAILY UPDATES ──────────────────────────────────────
-
-model DailyUpdate {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  date      DateTime @db.Date
-  content   String   @db.Text
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@unique([userId, date])
-  @@index([userId])
-  @@index([date])
-  @@map("daily_updates")
 }

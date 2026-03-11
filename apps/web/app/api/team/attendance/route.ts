@@ -8,6 +8,8 @@ import { withRole } from "@/lib/auth";
 import { success, error } from "@/lib/errors";
 import type { JwtPayload } from "@vibetech/shared";
 
+export const dynamic = "force-dynamic";
+
 async function handleTeamAttendance(
     req: NextRequest,
     context: { auth: JwtPayload }

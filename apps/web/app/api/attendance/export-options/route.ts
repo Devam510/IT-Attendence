@@ -7,6 +7,8 @@ import { withAuth } from "@/lib/auth";
 import { success, error } from "@/lib/errors";
 import type { JwtPayload } from "@vibetech/shared";
 
+export const dynamic = "force-dynamic";
+
 async function handleGetExportOptions(
     req: NextRequest,
     context: { auth: JwtPayload }

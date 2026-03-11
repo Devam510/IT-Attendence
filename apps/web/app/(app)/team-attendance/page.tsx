@@ -479,7 +479,8 @@ function AdvancedExportModal({ onClose, onToast }: {
                                     <option value="all">All Roles</option>
                                     <option value="EMP">Employee (EMP)</option>
                                     <option value="MGR">Manager (MGR)</option>
-                                    <option value="HRBP">HR Business Partner</option>
+                                    <option value="HRA">HR Admin (HRA)</option>
+                                    <option value="SADM">Super Admin (SADM)</option>
                                 </select>
                             </div>
                             <div>
