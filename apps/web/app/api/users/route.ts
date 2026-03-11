@@ -113,21 +113,28 @@ async function deleteUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
     }
 
     try {
-        // Soft delete user by setting status to INACTIVE
-        const updatedUser = await prisma.user.updateMany({
+        // Fetch the user first to ensure they exist and we can get their current email/id
+        const user = await prisma.user.findFirst({
             where: {
                 id: userId,
                 entityId: userEntityId,
-            },
-            data: {
-                status: "INACTIVE",
-                // Option: We could clear the email or employeeId to allow re-use, but keeping them protects historical data.
             }
         });
 
-        if (updatedUser.count === 0) {
+        if (!user) {
             return error("NOT_FOUND", "User not found or you don't have permission to delete them", 404);
         }
+
+        const timestamp = Date.now();
+        // Soft delete user by setting status to INACTIVE, and mangling unique fields
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                status: "INACTIVE",
+                email: `${user.email}_deleted_${timestamp}`,
+                employeeId: `${user.employeeId}_deleted_${timestamp}`,
+            }
+        });
 
         return success({ message: "User successfully removed" });
     } catch (e) {
