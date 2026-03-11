@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { apiGet, apiPost, apiDelete } from "@/lib/api-client";
+import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api-client";
 import { useAuth } from "@/context/AuthContext";
 
 interface Department {
@@ -35,6 +35,7 @@ export default function UsersPage() {
     
     // Modal State
     const [showModal, setShowModal] = useState(false);
+    const [editingUser, setEditingUser] = useState<UserData | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -91,19 +92,47 @@ export default function UsersPage() {
         setIsSubmitting(true);
         setError(null);
 
-        const res = await apiPost<UserData>("/api/users", formData);
-        
-        if (res.data) {
-            setShowModal(false);
-            setFormData({
-                fullName: "", email: "", phone: "", employeeId: "", role: "EMP", departmentId: "", managerId: "", password: "", dateOfJoining: new Date().toISOString().split("T")[0]
-            });
-            await fetchUsersAndStaticData(); // Refresh list
-        } else {
-            setError(res.error || "Failed to create user");
+        try {
+            const { password, ...rest } = formData;
+            const payload = editingUser ? { ...rest, id: editingUser.id, ...(password ? { password } : {}) } : formData;
+
+            const res = editingUser 
+                ? await apiPatch<UserData>("/api/users", payload) 
+                : await apiPost<UserData>("/api/users", payload);
+            
+            if (res.data) {
+                setShowModal(false);
+                setEditingUser(null);
+                setFormData({
+                    fullName: "", email: "", phone: "", employeeId: "", role: "EMP", departmentId: "", managerId: "", password: "", dateOfJoining: new Date().toISOString().split("T")[0]
+                });
+                await fetchUsersAndStaticData(); // Refresh list
+            } else {
+                setError(res.error || `Failed to ${editingUser ? "update" : "create"} user`);
+            }
+        } catch (err) {
+            setError("An unexpected error occurred");
         }
         setIsSubmitting(false);
     };
+
+    const handleEditClick = (user: UserData) => {
+        setEditingUser(user);
+        const mgr = managers.find(m => m.fullName === user.manager?.fullName);
+        setFormData({
+            fullName: user.fullName || "",
+            email: user.email || "",
+            phone: user.phone || "",
+            employeeId: user.employeeId || "",
+            role: user.role || "EMP",
+            departmentId: user.department?.id || "",
+            managerId: mgr ? mgr.id : "",
+            password: "", 
+            dateOfJoining: user.dateOfJoining ? new Date(user.dateOfJoining).toISOString().split("T")[0] : new Date().toISOString().split("T")[0]
+        });
+        setShowModal(true);
+    };
+
 
     const handleDelete = async () => {
         if (!userToDelete) return;
@@ -111,7 +140,7 @@ export default function UsersPage() {
         setError(null);
 
         const res = await apiDelete(`/api/users?id=${userToDelete.id}`);
-        if (res.data || res.success) { // Handle both cases for success formatting
+        if (res.data || (res as any).success) { // Handle both cases for success formatting
             setUserToDelete(null);
             await fetchUsersAndStaticData();
         } else {
@@ -152,7 +181,13 @@ export default function UsersPage() {
                 </div>
                 <button 
                     className="btn btn-primary"
-                    onClick={() => setShowModal(true)}
+                    onClick={() => {
+                        setEditingUser(null);
+                        setFormData({
+                            fullName: "", email: "", phone: "", employeeId: "", role: "EMP", departmentId: "", managerId: "", password: "", dateOfJoining: new Date().toISOString().split("T")[0]
+                        });
+                        setShowModal(true);
+                    }}
                 >
                     + Add Employee
                 </button>
@@ -250,16 +285,24 @@ export default function UsersPage() {
                                     )}
                                 </td>
                                 <td style={{ padding: "16px 20px", textAlign: "right" }}>
-                                    {!(currentUser?.role === "HRA" && u.role === "SADM") && (
-                                        <button
-                                            onClick={() => setUserToDelete(u)}
-                                            style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "14px", fontWeight: 600, padding: "8px", borderRadius: "6px" }}
-                                            title="Delete User"
-                                            disabled={u.id === currentUser?.id} // Prevent self-deletion
+                                    <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                                        <button 
+                                            onClick={() => handleEditClick(u)}
+                                            style={{ background: "none", border: "none", color: "var(--color-primary)", cursor: "pointer", fontSize: "14px", fontWeight: 600, padding: "8px", borderRadius: "6px" }}
                                         >
-                                            Delete
+                                            Edit
                                         </button>
-                                    )}
+                                        {!(currentUser?.role === "HRA" && u.role === "SADM") && (
+                                            <button
+                                                onClick={() => setUserToDelete(u)}
+                                                style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "14px", fontWeight: 600, padding: "8px", borderRadius: "6px" }}
+                                                title="Delete User"
+                                                disabled={u.id === currentUser?.id} // Prevent self-deletion
+                                            >
+                                                Delete
+                                            </button>
+                                        )}
+                                    </div>
                                 </td>
                             </tr>
                         ))}
@@ -285,7 +328,7 @@ export default function UsersPage() {
                         maxHeight: "90vh", overflowY: "auto"
                     }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-                            <h2 style={{ fontSize: "var(--text-xl)", fontWeight: "var(--font-bold)", margin: 0 }}>Add New Employee</h2>
+                            <h2 style={{ fontSize: "var(--text-xl)", fontWeight: "var(--font-bold)", margin: 0 }}>{editingUser ? "Edit Employee" : "Add New Employee"}</h2>
                             <button onClick={() => setShowModal(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 24, padding: "0 8px", color: "var(--text-tertiary)" }}>×</button>
                         </div>
                         
@@ -360,7 +403,7 @@ export default function UsersPage() {
                                     Initial Password
                                     <button type="button" onClick={generatePassword} style={{ background: "none", border: "none", color: "var(--color-primary)", fontSize: "var(--text-xs)", cursor: "pointer", fontWeight: 600 }}>Generate</button>
                                 </label>
-                                <input required type="text" className="input" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} placeholder="Set password for user" style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
+                                <input required={!editingUser} type="text" className="input" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} placeholder={editingUser ? "Leave blank to keep password" : "Set password for user"} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
                             </div>
 
                             <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
@@ -368,7 +411,7 @@ export default function UsersPage() {
                                     Cancel
                                 </button>
                                 <button type="submit" disabled={isSubmitting} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "none", background: "var(--color-primary)", color: "white", fontWeight: 600, cursor: isSubmitting ? "not-allowed" : "pointer", opacity: isSubmitting ? 0.7 : 1 }}>
-                                    {isSubmitting ? "Creating..." : "Add Employee"}
+                                    {isSubmitting ? (editingUser ? "Saving..." : "Creating...") : (editingUser ? "Save Changes" : "Add Employee")}
                                 </button>
                             </div>
                         </form>

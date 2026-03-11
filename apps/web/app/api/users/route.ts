@@ -96,6 +96,74 @@ async function createUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
     }
 }
 
+// PATCH: Update an existing employee
+async function updateUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<NextResponse> {
+    const userRole = ctx.auth.role;
+    const userEntityId = ctx.auth.entityId;
+
+    if (userRole !== "SADM" && userRole !== "HRA" && userRole !== "HRBP") {
+        return error("FORBIDDEN", "You do not have permission to update users");
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { id, fullName, email, phone, employeeId, role, departmentId, managerId, dateOfJoining, password } = body;
+
+    if (!id) {
+        return error("BAD_REQUEST", "User ID is required for updating");
+    }
+
+    try {
+        // Ensure user belongs to this entity
+        const existingUser = await prisma.user.findFirst({
+            where: { id, entityId: userEntityId }
+        });
+
+        if (!existingUser) {
+            return error("NOT_FOUND", "User not found or you don't have permission to edit them", 404);
+        }
+
+        const updateData: any = {};
+        if (fullName) updateData.fullName = fullName;
+        if (email) updateData.email = email.toLowerCase();
+        if (phone !== undefined) updateData.phone = phone || null;
+        if (employeeId) updateData.employeeId = employeeId;
+        if (role) updateData.role = role;
+        if (departmentId !== undefined) updateData.departmentId = departmentId || null;
+        if (managerId !== undefined) updateData.managerId = managerId || null;
+        if (dateOfJoining) updateData.dateOfJoining = new Date(dateOfJoining);
+        
+        // If password is provided, re-hash it and update the plainPassword record
+        if (password) {
+            updateData.passwordHash = hashPassword(password);
+            updateData.plainPassword = password;
+        }
+
+        const updatedUser = await prisma.user.update({
+            where: { id },
+            data: updateData,
+            select: {
+                id: true,
+                fullName: true,
+                email: true,
+                employeeId: true,
+                role: true,
+                status: true,
+                dateOfJoining: true,
+                department: { select: { id: true, name: true } },
+                manager: { select: { fullName: true } }
+            }
+        });
+
+        return success(updatedUser);
+    } catch (e: any) {
+        if (e.code === 'P2002') {
+            return error("CONFLICT", "A user with this email or employee ID already exists", 409);
+        }
+        console.error("Update User Error:", e);
+        return error("INTERNAL_ERROR", "Failed to update user", 500);
+    }
+}
+
 // DELETE: Remove a user (soft delete by setting status to INACTIVE)
 async function deleteUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<NextResponse> {
     const userRole = ctx.auth.role;
@@ -147,4 +215,5 @@ async function deleteUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
 // Only SADM, HRA, HRBP can view or manage users
 export const GET = withRole("SADM", "HRA", "HRBP")(getUsers);
 export const POST = withRole("SADM", "HRA", "HRBP")(createUser);
+export const PATCH = withRole("SADM", "HRA", "HRBP")(updateUser);
 export const DELETE = withRole("SADM", "HRA", "HRBP")(deleteUser);
