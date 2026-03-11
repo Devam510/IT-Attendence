@@ -124,7 +124,7 @@ async function deleteUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
             return error("NOT_FOUND", "User not found or you don't have permission to delete them", 404);
         }
 
-        return success({}, 200, "User successfully removed");
+        return success({ message: "User successfully removed" });
     } catch (e) {
         console.error(e);
         return error("INTERNAL_ERROR", "Failed to delete user", 500);
