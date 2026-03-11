@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { apiGet, apiPost } from "@/lib/api-client";
+import { apiGet, apiPost, apiDelete } from "@/lib/api-client";
 import { useAuth } from "@/context/AuthContext";
 
 interface Department {
@@ -33,6 +33,10 @@ export default function UsersPage() {
     const [showModal, setShowModal] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Delete Modal State
+    const [userToDelete, setUserToDelete] = useState<UserData | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -91,6 +95,21 @@ export default function UsersPage() {
         setIsSubmitting(false);
     };
 
+    const handleDelete = async () => {
+        if (!userToDelete) return;
+        setIsDeleting(true);
+        setError(null);
+
+        const res = await apiDelete(`/api/users?id=${userToDelete.id}`);
+        if (res.data || res.success) { // Handle both cases for success formatting
+            setUserToDelete(null);
+            await fetchUsersAndStaticData();
+        } else {
+            setError(res.error || "Failed to delete user");
+        }
+        setIsDeleting(false);
+    };
+
     const generatePassword = () => {
         const length = 12;
         const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
@@ -140,6 +159,7 @@ export default function UsersPage() {
                             <th style={{ padding: "16px 20px" }}>Department</th>
                             <th style={{ padding: "16px 20px" }}>Joined</th>
                             <th style={{ padding: "16px 20px" }}>Password</th>
+                            <th style={{ padding: "16px 20px", textAlign: "right" }}>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -188,6 +208,16 @@ export default function UsersPage() {
                                     ) : (
                                         <span style={{ color: "var(--text-tertiary)" }}>{`<Encrypted>`}</span>
                                     )}
+                                </td>
+                                <td style={{ padding: "16px 20px", textAlign: "right" }}>
+                                    <button
+                                        onClick={() => setUserToDelete(u)}
+                                        style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "14px", fontWeight: 600, padding: "8px", borderRadius: "6px" }}
+                                        title="Delete User"
+                                        disabled={u.id === currentUser?.id} // Prevent self-deletion
+                                    >
+                                        Delete
+                                    </button>
                                 </td>
                             </tr>
                         ))}
@@ -281,6 +311,37 @@ export default function UsersPage() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>, 
+                document.body
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {userToDelete && mounted && createPortal(
+                <div style={{
+                    position: "fixed", inset: 0, zIndex: 99999,
+                    background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
+                    display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+                }}>
+                    <div className="animate-slideUp" style={{
+                        background: "var(--bg-primary)", borderRadius: 16, padding: "32px",
+                        maxWidth: 400, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.4)"
+                    }}>
+                        <h2 style={{ fontSize: "var(--text-xl)", fontWeight: "var(--font-bold)", margin: 0, color: "#991b1b", marginBottom: 12 }}>Remove Employee</h2>
+                        <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", lineHeight: 1.5, marginBottom: 24 }}>
+                            Are you sure you want to remove <strong>{userToDelete.fullName}</strong>? This will revoke their access to the system. This action cannot be undone.
+                        </p>
+                        
+                        {error && <div style={{ padding: 12, background: "#fee2e2", color: "#991b1b", borderRadius: 8, marginBottom: 20, fontSize: "var(--text-sm)" }}>{error}</div>}
+
+                        <div style={{ display: "flex", gap: 12 }}>
+                            <button type="button" onClick={() => { setUserToDelete(null); setError(null); }} disabled={isDeleting} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "1px solid #d1d5db", background: "white", color: "#374151", fontWeight: 600, cursor: "pointer" }}>
+                                Cancel
+                            </button>
+                            <button type="button" onClick={handleDelete} disabled={isDeleting} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "none", background: "#ef4444", color: "white", fontWeight: 600, cursor: isDeleting ? "not-allowed" : "pointer", opacity: isDeleting ? 0.7 : 1 }}>
+                                {isDeleting ? "Removing..." : "Remove"}
+                            </button>
+                        </div>
                     </div>
                 </div>, 
                 document.body
