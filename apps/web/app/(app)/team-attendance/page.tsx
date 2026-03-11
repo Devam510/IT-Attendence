@@ -13,6 +13,7 @@ interface StaffMember {
     id: string;
     fullName: string;
     employeeId: string;
+    role: string;
     designation?: string;
     department?: string;
     status: Status;
@@ -807,7 +808,7 @@ export default function TeamAttendancePage() {
                                             </td>
                                             <td style={{ padding: "11px 14px", fontFamily: "monospace", color: "var(--text-secondary)", fontSize: 13 }}>{m.employeeId}</td>
                                             <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>
-                                                {m.designation || "—"}
+                                                {m.designation || ({"EMP": "Employee", "MGR": "Manager", "HRA": "HR Admin", "HRBP": "HR Business Partner", "SADM": "Super Admin", "ITA": "IT Admin", "SEC": "Security", "COMP": "Compliance"} as Record<string, string>)[m.role] || m.role}
                                                 {m.department && <span style={{ display: "block", fontSize: 11, color: "var(--text-tertiary)" }}>{m.department}</span>}
                                             </td>
                                             <td style={{ padding: "11px 14px" }}>
