@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useRef, useState, useCallback } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import Webcam from "react-webcam";
 import { Camera, CheckCircle, AlertCircle, RefreshCw, ScanFace } from "lucide-react";
 import { apiPost } from "@/lib/api-client";
@@ -21,6 +22,11 @@ export function FaceVerificationModal({
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const captureFrame = useCallback(() => {
     const imageSrc = webcamRef.current?.getScreenshot();
@@ -75,9 +81,9 @@ export function FaceVerificationModal({
     onClose();
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
+  return createPortal(
     <div style={{
         position: "fixed", inset: 0, zIndex: 999999, // Super high z-index to cover sidebar
         background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", // Strong blur
@@ -122,10 +128,9 @@ export function FaceVerificationModal({
                     ref={webcamRef}
                     screenshotFormat="image/jpeg"
                     videoConstraints={{
-                      width: 480,
-                      height: 640,
                       facingMode: "user",
                     }}
+                    onUserMediaError={(err: string | Error) => setError(`Camera Error: ${typeof err === 'string' ? err : err.message}`)}
                     style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }} // Mirror effect
                   />
                 )}
@@ -182,6 +187,7 @@ export function FaceVerificationModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
