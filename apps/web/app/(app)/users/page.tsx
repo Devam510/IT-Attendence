@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api-client";
 import { useAuth } from "@/context/AuthContext";
-import { User, Shield } from "lucide-react";
+import { User, Shield, CheckCircle, Camera } from "lucide-react";
 import { FaceEnrollmentModal } from "@/components/admin/FaceEnrollmentModal";
 
 interface Department {
@@ -22,6 +22,7 @@ interface UserData {
     status: string;
     dateOfJoining: string;
     plainPassword?: string;
+    faceProfile?: { id: string } | null;
     department?: Department | null;
     manager?: { fullName: string } | null;
 }
@@ -292,16 +293,25 @@ export default function UsersPage() {
                                 </td>
                                 <td style={{ padding: "16px 20px", textAlign: "right", minWidth: 200 }}>
                                     <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                                        <button 
-                                            onClick={() => {
-                                                setFaceUserId(u.id);
-                                                setFaceUserName(u.fullName);
-                                            }}
-                                            style={{ background: "var(--color-primary-light)", border: "none", color: "var(--color-primary)", cursor: "pointer", fontSize: "14px", fontWeight: 600, padding: "8px 12px", borderRadius: "6px", display: "flex", alignItems: "center", gap: 4 }}
-                                            title="Register Face biometric"
-                                        >
-                                            <User size={14} /> Face
-                                        </button>
+                                        {u.faceProfile ? (
+                                            <span 
+                                                style={{ padding: "8px 12px", background: "#dcfce7", color: "#16a34a", fontSize: "13px", fontWeight: 600, borderRadius: "6px", display: "flex", alignItems: "center", gap: 4 }}
+                                                title="Face biometric registered"
+                                            >
+                                                <CheckCircle size={14} /> Enrolled
+                                            </span>
+                                        ) : (
+                                            <button 
+                                                onClick={() => {
+                                                    setFaceUserId(u.id);
+                                                    setFaceUserName(u.fullName);
+                                                }}
+                                                style={{ background: "var(--color-primary-light)", border: "none", color: "var(--color-primary)", cursor: "pointer", fontSize: "14px", fontWeight: 600, padding: "8px 12px", borderRadius: "6px", display: "flex", alignItems: "center", gap: 4 }}
+                                                title="Register Face biometric"
+                                            >
+                                                <User size={14} /> Add Face
+                                            </button>
+                                        )}
                                         <button 
                                             onClick={() => handleEditClick(u)}
                                             style={{ background: "none", border: "none", color: "var(--color-primary)", cursor: "pointer", fontSize: "14px", fontWeight: 600, padding: "8px", borderRadius: "6px" }}
@@ -422,6 +432,31 @@ export default function UsersPage() {
                                 <input required={!editingUser} type="text" className="input" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} placeholder={editingUser ? "Leave blank to keep password" : "Set password for user"} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
                             </div>
 
+                            {editingUser && (
+                                <div style={{ marginTop: 8, padding: "16px", background: "var(--bg-secondary)", borderRadius: 8, border: "1px solid var(--border-light)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <div style={{ flex: 1, paddingRight: 16 }}>
+                                        <h4 style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-primary)", margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+                                            Face Biometric
+                                            {editingUser.faceProfile && <CheckCircle size={14} color="#16a34a" />}
+                                        </h4>
+                                        <p style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", marginTop: 4, margin: 0, lineHeight: 1.4 }}>
+                                            {editingUser.faceProfile ? "Face data is successfully registered for this employee." : "No face data found for this employee."}
+                                        </p>
+                                    </div>
+                                    <button 
+                                        type="button"
+                                        onClick={() => {
+                                            // Make sure modal states don't conflict, wait for one to render
+                                            setFaceUserId(editingUser.id);
+                                            setFaceUserName(editingUser.fullName);
+                                        }}
+                                        style={{ whiteSpace: "nowrap", background: editingUser.faceProfile ? "white" : "var(--color-primary)", border: editingUser.faceProfile ? "1px solid #d1d5db" : "none", color: editingUser.faceProfile ? "#374151" : "white", cursor: "pointer", fontSize: "13px", fontWeight: 600, padding: "8px 16px", borderRadius: "6px", display: "flex", alignItems: "center", gap: 6 }}
+                                    >
+                                        <Camera size={14} /> {editingUser.faceProfile ? "Update Face" : "Register Face"}
+                                    </button>
+                                </div>
+                            )}
+
                             <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
                                 <button type="button" onClick={() => setShowModal(false)} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "1px solid #d1d5db", background: "white", color: "#374151", fontWeight: 600, cursor: "pointer" }}>
                                     Cancel
@@ -470,9 +505,13 @@ export default function UsersPage() {
             {faceUserId && mounted && (
                 <FaceEnrollmentModal
                     isOpen={!!faceUserId}
-                    onClose={() => setFaceUserId(null)}
+                    onClose={() => { setFaceUserId(null); fetchUsersAndStaticData(); }}
                     userId={faceUserId}
                     userName={faceUserName}
+                    onEnrollmentSuccess={() => {
+                        setFaceUserId(null);
+                        fetchUsersAndStaticData();
+                    }}
                 />
             )}
         </div>

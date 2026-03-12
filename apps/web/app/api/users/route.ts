@@ -32,6 +32,9 @@ async function getUsers(req: NextRequest, ctx: { auth: JwtPayload }): Promise<Ne
             status: true,
             dateOfJoining: true,
             plainPassword: userRole === "SADM" || userRole === "HRA" || userRole === "HRBP" ? true : false,
+            faceProfile: {
+                select: { id: true }
+            },
             department: {
                 select: { id: true, name: true }
             },
@@ -89,6 +92,9 @@ async function createUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
                 role: true,
                 status: true,
                 dateOfJoining: true,
+                faceProfile: {
+                    select: { id: true }
+                },
                 department: {
                     select: { id: true, name: true }
                 }
@@ -158,6 +164,7 @@ async function updateUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
                 role: true,
                 status: true,
                 dateOfJoining: true,
+                faceProfile: { select: { id: true } },
                 department: { select: { id: true, name: true } },
                 manager: { select: { fullName: true } }
             }
