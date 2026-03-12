@@ -79,8 +79,8 @@ export function FaceEnrollmentModal({
 
   return (
     <div style={{
-        position: "fixed", inset: 0, zIndex: 99999,
-        background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
+        position: "fixed", inset: 0, zIndex: 999999, // Super high z-index to block sidebar/navbar
+        background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)", // Stronger blur
         display: "flex", alignItems: "center", justifyContent: "center", padding: 20
     }}>
       <div className="animate-slideUp" style={{
@@ -104,7 +104,7 @@ export function FaceEnrollmentModal({
             </div>
           ) : (
             <div style={{ width: "100%" }}>
-              <div style={{ position: "relative", width: "100%", aspectRatio: "4/3", backgroundColor: "black", borderRadius: 12, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ position: "relative", width: "100%", height: "360px", backgroundColor: "black", borderRadius: 12, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {capturedImage ? (
                   <img src={capturedImage} alt="Captured" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 ) : (
@@ -117,13 +117,13 @@ export function FaceEnrollmentModal({
                       height: 480,
                       facingMode: "user",
                     }}
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }}
                   />
                 )}
                 
                 {/* Targeting Overlay */}
                 {!capturedImage && (
-                  <div style={{ position: "absolute", inset: 0, border: "2px solid rgba(139, 92, 246, 0.5)", margin: 32, borderRadius: 12, pointerEvents: "none", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ position: "absolute", inset: 0, border: "2px solid rgba(139, 92, 246, 0.5)", margin: 16, borderRadius: 12, pointerEvents: "none", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                     <div style={{ width: 160, height: 200, border: "2px dashed rgba(255,255,255,0.7)", borderRadius: "100%" }}></div>
                   </div>
                 )}

@@ -79,8 +79,8 @@ export function FaceVerificationModal({
 
   return (
     <div style={{
-        position: "fixed", inset: 0, zIndex: 99999,
-        background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)",
+        position: "fixed", inset: 0, zIndex: 999999, // Super high z-index to cover sidebar
+        background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", // Strong blur
         display: "flex", alignItems: "center", justifyContent: "center", padding: 20
     }}>
       <div className="animate-slideUp" style={{
@@ -109,7 +109,7 @@ export function FaceVerificationModal({
           ) : (
             <div style={{ width: "100%" }}>
               <div style={{ 
-                position: "relative", width: "100%", aspectRatio: "3/4", 
+                position: "relative", width: "100%", height: "360px",
                 backgroundColor: "black", borderRadius: 16, overflow: "hidden", 
                 display: "flex", alignItems: "center", justifyContent: "center",
                 border: "4px solid var(--surface-secondary)"
