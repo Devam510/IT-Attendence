@@ -23,6 +23,7 @@ export function FaceVerificationModal({
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isCameraReady, setIsCameraReady] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -78,6 +79,7 @@ export function FaceVerificationModal({
     setCapturedImage(null);
     setError(null);
     setIsSuccess(false);
+    setIsCameraReady(false);
     onClose();
   };
 
@@ -123,20 +125,41 @@ export function FaceVerificationModal({
                 {capturedImage ? (
                   <img src={capturedImage} alt="Captured" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 ) : (
-                  <Webcam
-                    audio={false}
-                    ref={webcamRef}
-                    screenshotFormat="image/jpeg"
-                    videoConstraints={{
-                      facingMode: "user",
-                    }}
-                    onUserMediaError={(err: string | Error) => setError(`Camera Error: ${typeof err === 'string' ? err : err.message}`)}
-                    style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }} // Mirror effect
-                  />
+                  <>
+                    {!isCameraReady && (
+                      <div style={{ position: "absolute", zIndex: 10, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)" }}>
+                        <RefreshCw size={24} className="animate-spin" style={{ marginBottom: 8 }} />
+                        <span style={{ fontSize: "14px" }}>Starting camera...</span>
+                      </div>
+                    )}
+                    <Webcam
+                      audio={false}
+                      ref={webcamRef}
+                      screenshotFormat="image/jpeg"
+                      videoConstraints={{
+                        facingMode: "user",
+                        width: 640,
+                        height: 480
+                      }}
+                      mirrored={true}
+                      onUserMedia={() => setIsCameraReady(true)}
+                      onUserMediaError={(err: string | Error) => {
+                        setIsCameraReady(false);
+                        setError(`Camera Error: ${typeof err === 'string' ? err : err.message}`);
+                      }}
+                      style={{ 
+                        width: "100%", 
+                        height: "100%", 
+                        objectFit: "cover", 
+                        opacity: isCameraReady ? 1 : 0,
+                        transition: "opacity 0.3s ease" 
+                      }}
+                    />
+                  </>
                 )}
                 
                 {/* Visual Scanning Animation Overlay */}
-                {!capturedImage && (
+                {(!capturedImage && isCameraReady) && (
                   <div style={{ position: "absolute", inset: 0, pointerEvents: "none", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                     <div style={{ 
                       width: "60%", height: "60%", 
@@ -178,7 +201,7 @@ export function FaceVerificationModal({
                   <button onClick={handleClose} disabled={isVerifying} style={{ flex: 1, padding: "14px 0", borderRadius: 12, border: "1px solid #d1d5db", background: "white", color: "#374151", fontWeight: 600, cursor: "pointer" }}>
                     Cancel Check-in
                   </button>
-                  <button onClick={captureFrame} disabled={isVerifying} style={{ flex: 1, padding: "14px 0", borderRadius: 12, border: "none", background: "var(--color-primary)", color: "white", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 4px 14px rgba(99,102,241,0.4)" }}>
+                  <button onClick={captureFrame} disabled={isVerifying || !isCameraReady} style={{ flex: 1, padding: "14px 0", borderRadius: 12, border: "none", background: "var(--color-primary)", color: "white", fontWeight: 600, cursor: isCameraReady && !isVerifying ? "pointer" : "not-allowed", opacity: isCameraReady && !isVerifying ? 1 : 0.5, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 4px 14px rgba(99,102,241,0.4)" }}>
                     <Camera size={18} /> Verify Identity
                   </button>
                 </>

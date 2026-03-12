@@ -27,6 +27,7 @@ export function FaceEnrollmentModal({
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isCameraReady, setIsCameraReady] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -78,6 +79,7 @@ export function FaceEnrollmentModal({
     setError(null);
     setIsSuccess(false);
     setIsCapturing(false);
+    setIsCameraReady(false);
     onClose();
   };
 
@@ -114,20 +116,41 @@ export function FaceEnrollmentModal({
                 {capturedImage ? (
                   <img src={capturedImage} alt="Captured" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 ) : (
-                  <Webcam
-                    audio={false}
-                    ref={webcamRef}
-                    screenshotFormat="image/jpeg"
-                    videoConstraints={{
-                      facingMode: "user",
-                    }}
-                    onUserMediaError={(err: string | Error) => setError(`Camera Error: ${typeof err === 'string' ? err : err.message}`)}
-                    style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }}
-                  />
+                  <>
+                    {!isCameraReady && (
+                      <div style={{ position: "absolute", zIndex: 10, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)" }}>
+                        <RefreshCw size={24} className="animate-spin" style={{ marginBottom: 8 }} />
+                        <span style={{ fontSize: "14px" }}>Starting camera...</span>
+                      </div>
+                    )}
+                    <Webcam
+                      audio={false}
+                      ref={webcamRef}
+                      screenshotFormat="image/jpeg"
+                      videoConstraints={{
+                        facingMode: "user",
+                        width: 640,
+                        height: 480
+                      }}
+                      mirrored={true}
+                      onUserMedia={() => setIsCameraReady(true)}
+                      onUserMediaError={(err: string | Error) => {
+                        setIsCameraReady(false);
+                        setError(`Camera Error: ${typeof err === 'string' ? err : err.message}`);
+                      }}
+                      style={{ 
+                        width: "100%", 
+                        height: "100%", 
+                        objectFit: "cover", 
+                        opacity: isCameraReady ? 1 : 0,
+                        transition: "opacity 0.3s ease" 
+                      }}
+                    />
+                  </>
                 )}
                 
                 {/* Targeting Overlay */}
-                {!capturedImage && (
+                {(!capturedImage && isCameraReady) && (
                   <div style={{ position: "absolute", inset: 0, border: "2px solid rgba(139, 92, 246, 0.5)", margin: 16, borderRadius: 12, pointerEvents: "none", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                     <div style={{ width: 160, height: 200, border: "2px dashed rgba(255,255,255,0.7)", borderRadius: "100%" }}></div>
                   </div>
@@ -161,7 +184,7 @@ export function FaceEnrollmentModal({
                   <button onClick={handleClose} disabled={isCapturing} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "1px solid #d1d5db", background: "white", color: "#374151", fontWeight: 600, cursor: "pointer" }}>
                     Cancel
                   </button>
-                  <button onClick={captureFrame} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "none", background: "var(--color-primary)", color: "white", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <button onClick={captureFrame} disabled={!isCameraReady} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "none", background: "var(--color-primary)", color: "white", fontWeight: 600, cursor: isCameraReady ? "pointer" : "not-allowed", opacity: isCameraReady ? 1 : 0.5, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                     <Camera size={16} /> Capture Face
                   </button>
                 </>
