@@ -59,6 +59,13 @@ async function createUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
     }
 
     try {
+        let defaultLocationId = body.locationId;
+        if (!defaultLocationId) {
+            const defaultLoc = await prisma.location.findFirst({
+                where: { entityId: userEntityId, name: { contains: "Vibe Tech" } }
+            });
+            defaultLocationId = defaultLoc?.id || (await prisma.location.findFirst({ where: { entityId: userEntityId } }))?.id;
+        }
         const newUser = await prisma.user.create({
             data: {
                 fullName,
@@ -69,6 +76,7 @@ async function createUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
                 entityId: userEntityId,
                 departmentId: departmentId || null,
                 managerId: managerId || null,
+                locationId: defaultLocationId || null,
                 dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : new Date(),
                 passwordHash: hashPassword(password),
                 plainPassword: password, // As requested by user for admin visibility
