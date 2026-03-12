@@ -137,15 +137,22 @@ export function FaceVerificationModal({
                       ref={webcamRef}
                       screenshotFormat="image/jpeg"
                       videoConstraints={{
-                        facingMode: "user",
-                        width: 640,
-                        height: 480
+                        facingMode: "user"
                       }}
                       mirrored={true}
                       onUserMedia={() => setIsCameraReady(true)}
-                      onUserMediaError={(err: string | Error) => {
+                      onUserMediaError={(err: any) => {
                         setIsCameraReady(false);
-                        setError(`Camera Error: ${typeof err === 'string' ? err : err.message}`);
+                        console.error("Camera Error:", err);
+                        let detailedError = "";
+                        if (typeof err === 'string') {
+                          detailedError = err;
+                        } else if (err instanceof Error || (err && err.name && err.message)) {
+                          detailedError = `${err.name}: ${err.message}`;
+                        } else {
+                          detailedError = "Unknown camera error. Please ensure permissions are granted and no other app is using the camera.";
+                        }
+                        setError(`Camera Error: ${detailedError}`);
                       }}
                       style={{ 
                         width: "100%", 
