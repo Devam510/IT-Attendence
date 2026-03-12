@@ -73,6 +73,8 @@ model User {
   location          Location?          @relation(fields: [locationId], references: [id])
   manager           User?              @relation("ManagerReports", fields: [managerId], references: [id])
   reports           User[]             @relation("ManagerReports")
+  faceProfile       FaceProfile?
+  faceLogs          FaceVerificationLog[]
 
   @@index([entityId])
   @@index([departmentId])
@@ -158,6 +160,7 @@ model AttendanceRecord {
   location          Location?        @relation(fields: [locationId], references: [id])
   shift             Shift?           @relation(fields: [shiftId], references: [id])
   user              User             @relation(fields: [userId], references: [id])
+  faceLogs          FaceVerificationLog[]
 
   @@unique([userId, date])
   @@index([userId, date])
@@ -392,4 +395,39 @@ enum TaskPriority {
   LOW
   MEDIUM
   HIGH
+}
+
+model FaceProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique @map("user_id")
+  embeddingVector Json     @map("embedding_vector")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("face_profiles")
+}
+
+model FaceVerificationLog {
+  id               String   @id @default(uuid())
+  userId           String   @map("user_id")
+  attendanceId     String?  @map("attendance_id")
+  confidenceScore  Float    @map("confidence_score")
+  status           VerificationStatus
+  spoofProbability Float?   @map("spoof_probability")
+  ipAddress        String?
+  timestamp        DateTime @default(now())
+
+  user             User               @relation(fields: [userId], references: [id])
+  attendance       AttendanceRecord?  @relation(fields: [attendanceId], references: [id])
+  
+  @@index([userId, timestamp])
+  @@map("face_verification_logs")
+}
+
+enum VerificationStatus {
+  SUCCESS
+  FAILED_MATCH
+  FAILED_LIVENESS
 }

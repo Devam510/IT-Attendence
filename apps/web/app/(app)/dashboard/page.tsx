@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { apiGet, apiPost } from "@/lib/api-client";
+import { FaceVerificationModal } from "@/components/attendance/FaceVerificationModal";
 
 /* ─── Types ──────────────────────────────────────────────────── */
 interface DashboardData {
@@ -451,6 +452,9 @@ export default function DashboardPage() {
     // Compliance check modal
     const [showComplianceModal, setShowComplianceModal] = useState(false);
 
+    // Face Verification Check-In Modal
+    const [showFaceVerification, setShowFaceVerification] = useState(false);
+
     // 8-hour countdown (in seconds)
     const WORK_SECS = 8 * 3600;
     const [countdown, setCountdown] = useState(WORK_SECS);
@@ -604,7 +608,12 @@ export default function DashboardPage() {
         return `${h}:${m}:${s}`;
     }
 
-    async function handleCheckIn() {
+    async function initiateCheckIn() {
+        setShowFaceVerification(true);
+    }
+
+    async function handleCheckIn(faceToken: string) {
+        setShowFaceVerification(false);
         setActionError(null);
         setActionLoading("checkin");
         try {
@@ -614,6 +623,7 @@ export default function DashboardPage() {
             const res = await apiPost<any>("/api/attendance/checkin", {
                 lat: pos.coords.latitude,
                 lng: pos.coords.longitude,
+                faceToken // Pass token to API
             });
             if (res.error) {
                 setActionError(res.error || "Check-in failed");
@@ -781,7 +791,6 @@ export default function DashboardPage() {
         </div>
     ) : null;
 
-    // ── Early Checkout Modal ───────────────────────────────────────
     const EarlyCheckoutModal = showEarlyModal ? (
         <div style={{
             position: "fixed", inset: 0, zIndex: 9999,
@@ -798,46 +807,31 @@ export default function DashboardPage() {
                     Early Check-Out
                 </h3>
                 <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", textAlign: "center", margin: "0 0 20px" }}>
-                    You have worked less than <strong>4 hours</strong> today.
-                    Leaving this early will be counted as a <strong>Half Day</strong>.
-                    Please provide a reason for leaving early.
+                    You have not completed your 8-hour shift. Please provide a reason.
                 </p>
                 <textarea
                     value={earlyReason}
-                    onChange={e => { setEarlyReason(e.target.value); setEarlyReasonError(false); }}
-                    placeholder="Enter your reason for leaving early…"
+                    onChange={(e) => {
+                        setEarlyReason(e.target.value);
+                        if (e.target.value.trim()) setEarlyReasonError(false);
+                    }}
+                    placeholder="E.g., Doctor appointment, Family emergency..."
                     rows={3}
                     style={{
-                        width: "100%", padding: "10px 12px", borderRadius: 8,
-                        border: `1.5px solid ${earlyReasonError ? "#dc2626" : "var(--border-primary)"}`,
-                        backgroundColor: "var(--bg-secondary)", color: "var(--text-primary)",
-                        fontSize: "var(--text-sm)", resize: "none", boxSizing: "border-box",
-                        outline: "none",
+                        width: "100%", padding: "12px", borderRadius: 8, border: `1px solid ${earlyReasonError ? "#ef4444" : "var(--border-light)"}`,
+                        background: "var(--bg-secondary)", color: "var(--text-primary)", fontSize: "var(--text-sm)", resize: "none",
+                        marginBottom: 16
                     }}
                 />
-                {earlyReasonError && <p style={{ color: "#dc2626", fontSize: 12, margin: "4px 0 0" }}>Reason is required to proceed.</p>}
-                <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-                    <button
-                        onClick={() => setShowEarlyModal(false)}
-                        style={{
-                            flex: 1, padding: "10px 0", borderRadius: 8,
-                            border: "1.5px solid var(--border-primary)", background: "var(--bg-secondary)",
-                            color: "var(--text-primary)", fontWeight: 600, cursor: "pointer",
-                        }}
-                    >
-                        Cancel — Stay
+                {earlyReasonError && <div style={{ color: "#ef4444", fontSize: "12px", marginTop: "-12px", marginBottom: "16px" }}>Reason is required.</div>}
+                <div style={{ display: "flex", gap: 10 }}>
+                    <button onClick={() => setShowEarlyModal(false)}
+                        style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "1.5px solid var(--border-primary)", background: "var(--bg-secondary)", color: "var(--text-primary)", fontWeight: 600, cursor: "pointer" }}>
+                        Cancel
                     </button>
-                    <button
-                        onClick={confirmEarlyCheckout}
-                        disabled={actionLoading === "checkout"}
-                        style={{
-                            flex: 1, padding: "10px 0", borderRadius: 8, border: "none",
-                            background: "#dc2626", color: "white", fontWeight: 700,
-                            cursor: actionLoading ? "not-allowed" : "pointer",
-                            opacity: actionLoading ? 0.7 : 1,
-                        }}
-                    >
-                        {actionLoading === "checkout" ? "Checking out…" : "Confirm Half Day Check-Out"}
+                    <button onClick={confirmEarlyCheckout}
+                        style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "none", background: "#ef4444", color: "white", fontWeight: 700, cursor: "pointer" }}>
+                        Confirm Early Checkout
                     </button>
                 </div>
             </div>
@@ -845,11 +839,18 @@ export default function DashboardPage() {
     ) : null;
 
     // Admin gets the full redesign
+
+    // Admin gets the full redesign
     if (isAdmin) return <AdminDashboard user={user} md={managerData} />;
 
     // Everyone else (EMP / MGR / HR) keeps the original layout
     return (
         <div>
+            <FaceVerificationModal 
+               isOpen={showFaceVerification} 
+               onClose={() => setShowFaceVerification(false)} 
+               onVerificationSuccess={handleCheckIn} 
+            />
             {ComplianceModal}
             {EarlyCheckoutModal}
             <div className="dash-greeting animate-fadeIn">
@@ -984,7 +985,7 @@ export default function DashboardPage() {
                     <div style={{ padding: "0 20px 16px", display: "flex", gap: 8 }}>
                         {!empData.checkedIn && !empData.checkedOut && (
                             <button
-                                onClick={handleCheckIn}
+                                onClick={initiateCheckIn}
                                 disabled={actionLoading === "checkin"}
                                 style={{
                                     flex: 1, padding: "10px 0", borderRadius: 10, border: "none",

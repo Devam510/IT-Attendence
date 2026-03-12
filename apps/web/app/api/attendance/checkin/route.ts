@@ -39,6 +39,8 @@ async function handleCheckIn(
     // Optional remark (e.g. reason for late arrival)
     const remark = typeof body.remark === "string" ? body.remark.trim().slice(0, 500) : undefined;
 
+    // Check for faceToken required for biometric verification
+    const faceToken = typeof body.faceToken === "string" ? body.faceToken : undefined;
 
     const now = new Date();
     // Calculate "today" in IST (UTC+5:30), not in server's UTC timezone
@@ -136,6 +138,7 @@ async function handleCheckIn(
                 checkInDevice: deviceType,
                 checkInUserAgent: userAgent,
                 checkInIp: ip,
+                faceTokenAssigned: !!faceToken, // Tag indicating whether they supplied face verification token or bypassed
                 ...(remark ? { remark } : {}),
             })),
         },

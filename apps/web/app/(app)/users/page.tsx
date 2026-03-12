@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api-client";
 import { useAuth } from "@/context/AuthContext";
+import { User, Shield } from "lucide-react";
+import { FaceEnrollmentModal } from "@/components/admin/FaceEnrollmentModal";
 
 interface Department {
     id: string;
@@ -35,6 +37,10 @@ export default function UsersPage() {
     
     // Modal State
     const [showModal, setShowModal] = useState(false);
+    
+    // Face Registration State
+    const [faceUserId, setFaceUserId] = useState<string | null>(null);
+    const [faceUserName, setFaceUserName] = useState<string>("");
     const [editingUser, setEditingUser] = useState<UserData | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -284,8 +290,18 @@ export default function UsersPage() {
                                         <span style={{ color: "var(--text-tertiary)" }}>{`<Encrypted>`}</span>
                                     )}
                                 </td>
-                                <td style={{ padding: "16px 20px", textAlign: "right" }}>
+                                <td style={{ padding: "16px 20px", textAlign: "right", minWidth: 200 }}>
                                     <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                                        <button 
+                                            onClick={() => {
+                                                setFaceUserId(u.id);
+                                                setFaceUserName(u.fullName);
+                                            }}
+                                            style={{ background: "var(--color-primary-light)", border: "none", color: "var(--color-primary)", cursor: "pointer", fontSize: "14px", fontWeight: 600, padding: "8px 12px", borderRadius: "6px", display: "flex", alignItems: "center", gap: 4 }}
+                                            title="Register Face biometric"
+                                        >
+                                            <User size={14} /> Face
+                                        </button>
                                         <button 
                                             onClick={() => handleEditClick(u)}
                                             style={{ background: "none", border: "none", color: "var(--color-primary)", cursor: "pointer", fontSize: "14px", fontWeight: 600, padding: "8px", borderRadius: "6px" }}
@@ -449,6 +465,15 @@ export default function UsersPage() {
                     </div>
                 </div>, 
                 document.body
+            )}
+
+            {faceUserId && mounted && (
+                <FaceEnrollmentModal
+                    isOpen={!!faceUserId}
+                    onClose={() => setFaceUserId(null)}
+                    userId={faceUserId}
+                    userName={faceUserName}
+                />
             )}
         </div>
     );
