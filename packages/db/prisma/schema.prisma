@@ -107,7 +107,7 @@ model Location {
   latitude          Float
   longitude         Float
   altitudeM         Float?             @map("altitude_m")
-  radiusM           Float              @default(200) @map("radius_m")
+  radiusM           Float              @default(100) @map("radius_m")
   geofencePolygon   Json?              @map("geofence_polygon")
   wifiBssids        String[]           @map("wifi_bssids")
   entityId          String             @map("entity_id")
