@@ -159,6 +159,20 @@ async function handleApply(
             },
         });
 
+        // Create in-app notification for the approver
+        await prisma.notification.create({
+            data: {
+                userId: finalApproverId,
+                type: "LEAVE_APPROVAL",
+                title: "New Leave Request",
+                body: `${user?.fullName || "An employee"} has requested ${leaveType.name}.`,
+                data: {
+                    leaveId: leaveRequest.id,
+                    employeeName: user?.fullName,
+                }
+            }
+        });
+
         // Fire-and-forget email dispatch
         prisma.user.findUnique({
             where: { id: finalApproverId },
