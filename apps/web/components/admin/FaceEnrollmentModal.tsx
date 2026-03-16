@@ -164,7 +164,7 @@ export function FaceEnrollmentModal({ isOpen, onClose, userId, userName, onEnrol
 
     return (
         <div style={{
-            position: "fixed", inset: 0, zIndex: 99999,
+            position: "fixed", inset: 0, zIndex: 999999,
             background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)",
             display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
         }}>

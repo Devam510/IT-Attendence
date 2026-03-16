@@ -323,16 +323,6 @@ export default function UsersPage() {
                                         >
                                             Edit
                                         </button>
-                                        <button 
-                                            onClick={() => {
-                                                setLeaveUserId(u.id);
-                                                setLeaveUserName(u.fullName);
-                                            }}
-                                            style={{ background: "none", border: "none", color: "#16a34a", cursor: "pointer", fontSize: "14px", fontWeight: 600, padding: "8px", borderRadius: "6px", display: "flex", alignItems: "center", gap: 4 }}
-                                            title="Manage Leave Balances"
-                                        >
-                                            <Calendar size={14} /> Leaves
-                                        </button>
                                         {!(currentUser?.role === "HRA" && u.role === "SADM") && (
                                             <button
                                                 onClick={() => setUserToDelete(u)}
@@ -460,28 +450,50 @@ export default function UsersPage() {
                             </div>
 
                             {editingUser && (
-                                <div style={{ marginTop: 8, padding: "16px", background: "var(--bg-secondary)", borderRadius: 8, border: "1px solid var(--border-light)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                    <div style={{ flex: 1, paddingRight: 16 }}>
-                                        <h4 style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-primary)", margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
-                                            Face Biometric
-                                            {editingUser.faceProfile && <CheckCircle size={14} color="#16a34a" />}
-                                        </h4>
-                                        <p style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", marginTop: 4, margin: 0, lineHeight: 1.4 }}>
-                                            {editingUser.faceProfile ? "Face data is successfully registered for this employee." : "No face data found for this employee."}
-                                        </p>
+                                <>
+                                    <div style={{ marginTop: 8, padding: "16px", background: "var(--bg-secondary)", borderRadius: 8, border: "1px solid var(--border-light)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                        <div style={{ flex: 1, paddingRight: 16 }}>
+                                            <h4 style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-primary)", margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+                                                Face Biometric
+                                                {editingUser.faceProfile && <CheckCircle size={14} color="#16a34a" />}
+                                            </h4>
+                                            <p style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", marginTop: 4, margin: 0, lineHeight: 1.4 }}>
+                                                {editingUser.faceProfile ? "Face data is successfully registered for this employee." : "No face data found for this employee."}
+                                            </p>
+                                        </div>
+                                        <button 
+                                            type="button"
+                                            onClick={() => {
+                                                setFaceUserId(editingUser.id);
+                                                setFaceUserName(editingUser.fullName);
+                                            }}
+                                            style={{ whiteSpace: "nowrap", background: editingUser.faceProfile ? "white" : "var(--color-primary)", border: editingUser.faceProfile ? "1px solid #d1d5db" : "none", color: editingUser.faceProfile ? "#374151" : "white", cursor: "pointer", fontSize: "13px", fontWeight: 600, padding: "8px 16px", borderRadius: "6px", display: "flex", alignItems: "center", gap: 6 }}
+                                        >
+                                            <Camera size={14} /> {editingUser.faceProfile ? "Update Face" : "Register Face"}
+                                        </button>
                                     </div>
-                                    <button 
-                                        type="button"
-                                        onClick={() => {
-                                            // Make sure modal states don't conflict, wait for one to render
-                                            setFaceUserId(editingUser.id);
-                                            setFaceUserName(editingUser.fullName);
-                                        }}
-                                        style={{ whiteSpace: "nowrap", background: editingUser.faceProfile ? "white" : "var(--color-primary)", border: editingUser.faceProfile ? "1px solid #d1d5db" : "none", color: editingUser.faceProfile ? "#374151" : "white", cursor: "pointer", fontSize: "13px", fontWeight: 600, padding: "8px 16px", borderRadius: "6px", display: "flex", alignItems: "center", gap: 6 }}
-                                    >
-                                        <Camera size={14} /> {editingUser.faceProfile ? "Update Face" : "Register Face"}
-                                    </button>
-                                </div>
+
+                                    <div style={{ padding: "16px", background: "var(--bg-secondary)", borderRadius: 8, border: "1px solid var(--border-light)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                        <div style={{ flex: 1, paddingRight: 16 }}>
+                                            <h4 style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-primary)", margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+                                                Leave Balances
+                                            </h4>
+                                            <p style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", marginTop: 4, margin: 0, lineHeight: 1.4 }}>
+                                                Assign explicit starting Annual, Sick, and Casual leave quotas.
+                                            </p>
+                                        </div>
+                                        <button 
+                                            type="button"
+                                            onClick={() => {
+                                                setLeaveUserId(editingUser.id);
+                                                setLeaveUserName(editingUser.fullName);
+                                            }}
+                                            style={{ whiteSpace: "nowrap", background: "white", border: "1px solid #d1d5db", color: "#374151", cursor: "pointer", fontSize: "13px", fontWeight: 600, padding: "8px 16px", borderRadius: "6px", display: "flex", alignItems: "center", gap: 6 }}
+                                        >
+                                            <Calendar size={14} /> Manage Leaves
+                                        </button>
+                                    </div>
+                                </>
                             )}
 
                             <div style={{ display: "flex", gap: 12, marginTop: 16 }}>

@@ -87,7 +87,7 @@ export default function LeaveBalanceModal({ isOpen, onClose, userId, userName }:
 
     return (
         <div style={{
-            position: "fixed", inset: 0, zIndex: 99999,
+            position: "fixed", inset: 0, zIndex: 999999,
             background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
             display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
         }}>
