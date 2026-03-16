@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api-client";
 import { useAuth } from "@/context/AuthContext";
-import { User, Shield, CheckCircle, Camera } from "lucide-react";
+import { User, Shield, CheckCircle, Camera, Calendar } from "lucide-react";
 import { FaceEnrollmentModal } from "@/components/admin/FaceEnrollmentModal";
+import LeaveBalanceModal from "@/components/admin/LeaveBalanceModal";
 
 interface Department {
     id: string;
@@ -69,6 +70,10 @@ export default function UsersPage() {
     const togglePassword = (id: string) => {
         setVisiblePasswords(prev => ({ ...prev, [id]: !prev[id] }));
     };
+
+    // Leave Balances state
+    const [leaveUserId, setLeaveUserId] = useState<string | null>(null);
+    const [leaveUserName, setLeaveUserName] = useState<string>("");
 
     const fetchUsersAndStaticData = async () => {
         setLoading(true);
@@ -524,6 +529,16 @@ export default function UsersPage() {
                         setFaceUserId(null);
                         fetchUsersAndStaticData();
                     }}
+                />,
+                document.body
+            )}
+
+            {leaveUserId && mounted && createPortal(
+                <LeaveBalanceModal
+                    isOpen={!!leaveUserId}
+                    onClose={() => { setLeaveUserId(null); }}
+                    userId={leaveUserId}
+                    userName={leaveUserName}
                 />,
                 document.body
             )}
