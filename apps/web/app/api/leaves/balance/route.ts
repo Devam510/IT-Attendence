@@ -68,7 +68,7 @@ async function handleBalance(
             name: lt.name,
             code: lt.code,
             year,
-            entitlement: lt.defaultBalance,
+            entitlement: bal ? opening + accrued : lt.defaultBalance,
             accrualType: lt.accrualType,
             carryForwardMax: lt.carryForwardMax,
             opening,
