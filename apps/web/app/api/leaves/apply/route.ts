@@ -90,7 +90,7 @@ async function handleApply(
     // 6. Team overlap detection (warn only, don't block)
     const user = await prisma.user.findUnique({
         where: { id: auth.sub },
-        select: { managerId: true, departmentId: true, fullName: true },
+        select: { managerId: true, departmentId: true, fullName: true, entityId: true },
     });
 
     let teamOverlapCount = 0;
@@ -126,8 +126,22 @@ async function handleApply(
         },
     });
 
-    // 10. Create approval workflow + Send Email
-    if (user?.managerId) {
+    // 10. Determine Approver & Create Workflow 
+    let finalApproverId: string | null = user?.managerId || null;
+    let isSickLeave = leaveType.name.toLowerCase().includes("sick");
+
+    if (isSickLeave) {
+        // Find an HR or SADM to route Sick Leave to directly
+        const hrUser = await prisma.user.findFirst({
+            where: { role: { in: ["HRA", "SADM"] }, entityId: user?.entityId },
+            select: { id: true }
+        });
+        if (hrUser) {
+            finalApproverId = hrUser.id;
+        }
+    }
+
+    if (finalApproverId) {
         await prisma.approvalWorkflow.create({
             data: {
                 entityType: "leave",
@@ -137,7 +151,7 @@ async function handleApply(
                 status: "PENDING",
                 slaDeadline: calculateSlaDeadline("leave"),
                 steps: JSON.parse(JSON.stringify([{
-                    approverId: user.managerId,
+                    approverId: finalApproverId,
                     status: "PENDING",
                     actedAt: null,
                     comment: null,
@@ -147,13 +161,13 @@ async function handleApply(
 
         // Fire-and-forget email dispatch
         prisma.user.findUnique({
-            where: { id: user.managerId },
+            where: { id: finalApproverId },
             select: { email: true }
-        }).then(manager => {
-            if (manager?.email) {
+        }).then(approver => {
+            if (approver?.email) {
                 EmailService.sendLeaveRequestEmail({
-                    managerEmail: manager.email,
-                    employeeName: user.fullName,
+                    managerEmail: approver.email,
+                    employeeName: user?.fullName || "Employee",
                     leaveType: leaveType.name,
                     startDate: leaveRequest.startDate.toISOString(),
                     endDate: leaveRequest.endDate.toISOString(),

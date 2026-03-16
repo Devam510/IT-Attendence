@@ -2,7 +2,7 @@ import { Resend } from 'resend';
 
 // Initialize Resend with the provided API Key.
 // Fallback is provided locally if .env isn't loaded yet.
-const apiKey = process.env.RESEND_API_KEY || 're_7d7Vw8yE_31vmTRwAyfQN5fw64FKhbxpY';
+const apiKey = process.env.RESEND_API_KEY || 're_8gdfx1Ni_6gvQr5ecwpxQzZzETsutquxF';
 const resend = new Resend(apiKey);
 
 // The domain must be verified in Resend. If you haven't added a custom domain yet,
