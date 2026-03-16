@@ -220,7 +220,7 @@ export default function UsersPage() {
             </div>
 
             {/* Users Table */}
-            <div style={{ background: "white", borderRadius: "12px", border: "1px solid var(--border-light)", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
+            <div style={{ background: "var(--bg-card)", borderRadius: "12px", border: "1px solid var(--border-light)", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
                     <thead>
                         <tr style={{ background: "var(--bg-secondary)", borderBottom: "1px solid var(--border-light)", color: "var(--text-secondary)", fontSize: "var(--text-xs)", textTransform: "uppercase" }}>
@@ -470,7 +470,7 @@ export default function UsersPage() {
                             )}
 
                             <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
-                                <button type="button" onClick={() => setShowModal(false)} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "1px solid #d1d5db", background: "white", color: "#374151", fontWeight: 600, cursor: "pointer" }}>
+                                <button type="button" onClick={() => setShowModal(false)} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "1px solid var(--border-light)", background: "var(--bg-card)", color: "var(--text-primary)", fontWeight: 600, cursor: "pointer" }}>
                                     Cancel
                                 </button>
                                 <button type="submit" disabled={isSubmitting} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "none", background: "var(--color-primary)", color: "white", fontWeight: 600, cursor: isSubmitting ? "not-allowed" : "pointer", opacity: isSubmitting ? 0.7 : 1 }}>
@@ -502,7 +502,7 @@ export default function UsersPage() {
                         {error && <div style={{ padding: 12, background: "#fee2e2", color: "#991b1b", borderRadius: 8, marginBottom: 20, fontSize: "var(--text-sm)" }}>{error}</div>}
 
                         <div style={{ display: "flex", gap: 12 }}>
-                            <button type="button" onClick={() => { setUserToDelete(null); setError(null); }} disabled={isDeleting} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "1px solid #d1d5db", background: "white", color: "#374151", fontWeight: 600, cursor: "pointer" }}>
+                            <button type="button" onClick={() => { setUserToDelete(null); setError(null); }} disabled={isDeleting} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "1px solid var(--border-light)", background: "var(--bg-card)", color: "var(--text-primary)", fontWeight: 600, cursor: "pointer" }}>
                                 Cancel
                             </button>
                             <button type="button" onClick={handleDelete} disabled={isDeleting} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "none", background: "#ef4444", color: "white", fontWeight: 600, cursor: isDeleting ? "not-allowed" : "pointer", opacity: isDeleting ? 0.7 : 1 }}>

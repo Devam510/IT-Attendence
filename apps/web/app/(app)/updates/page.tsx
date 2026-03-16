@@ -149,10 +149,9 @@ export default function UpdatesPage() {
                 </div>
             </div>
 
-            {/* Post update section (only on "Today" and NOT for Super Admins) */}
             {isToday && user?.role !== "SADM" && (
                 <div className="update-composer animate-slideUp" style={{
-                    background: "white",
+                    background: "var(--bg-card)",
                     borderRadius: "12px",
                     padding: "16px",
                     boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
@@ -200,7 +199,7 @@ export default function UpdatesPage() {
                     <div style={{
                         textAlign: "center",
                         padding: "48px 24px",
-                        background: "white",
+                        background: "var(--bg-card)",
                         borderRadius: "12px",
                         border: "1px dashed var(--border-light)",
                         color: "var(--text-tertiary)"
@@ -211,7 +210,7 @@ export default function UpdatesPage() {
                 ) : (
                     updates.map(update => (
                         <div key={update.id} style={{
-                            background: "white",
+                            background: "var(--bg-card)",
                             borderRadius: "12px",
                             padding: "20px",
                             boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
