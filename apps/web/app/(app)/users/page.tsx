@@ -323,6 +323,16 @@ export default function UsersPage() {
                                         >
                                             Edit
                                         </button>
+                                        <button 
+                                            onClick={() => {
+                                                setLeaveUserId(u.id);
+                                                setLeaveUserName(u.fullName);
+                                            }}
+                                            style={{ background: "none", border: "none", color: "#16a34a", cursor: "pointer", fontSize: "14px", fontWeight: 600, padding: "8px", borderRadius: "6px", display: "flex", alignItems: "center", gap: 4 }}
+                                            title="Manage Leave Balances"
+                                        >
+                                            <Calendar size={14} /> Leaves
+                                        </button>
                                         {!(currentUser?.role === "HRA" && u.role === "SADM") && (
                                             <button
                                                 onClick={() => setUserToDelete(u)}
