@@ -181,8 +181,8 @@ export function FaceEnrollmentModal({ isOpen, onClose, userId, userName, onEnrol
                 </p>
 
                 {/* Camera + SVG Ring overlay */}
-                <div style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 24 }}>
-                    {/* SVG progress ring */}
+                <div style={{ position: "relative", width: 260, height: 260, marginBottom: 24, flexShrink: 0 }}>
+                    {/* SVG progress ring — fills the entire 260x260 container */}
                     <svg width={260} height={260} style={{ position: "absolute", top: 0, left: 0, zIndex: 2, transform: "rotate(-90deg)" }}>
                         {/* track */}
                         <circle cx={130} cy={130} r={radius} fill="none" stroke="#1e293b" strokeWidth={8} />
@@ -199,13 +199,15 @@ export function FaceEnrollmentModal({ isOpen, onClose, userId, userName, onEnrol
                         />
                     </svg>
 
-                    {/* Circular mask for webcam */}
+                    {/* Circular webcam — centered inside the 260x260 container */}
                     <div style={{
-                        width: 220, height: 220,
+                        position: "absolute",
+                        top: "50%", left: "50%",
+                        transform: "translate(-50%, -50%)",
+                        width: 224, height: 224,
                         borderRadius: "50%",
                         overflow: "hidden",
                         background: "#0f172a",
-                        position: "relative",
                         zIndex: 1,
                     }}>
                         {phase !== "success" && phase !== "error" && (
@@ -214,7 +216,7 @@ export function FaceEnrollmentModal({ isOpen, onClose, userId, userName, onEnrol
                                 audio={false}
                                 mirrored={true}
                                 onUserMedia={() => setIsCameraReady(true)}
-                                onUserMediaError={(e) => {
+                                onUserMediaError={() => {
                                     setPhase("error");
                                     setErrorMsg("Camera access denied. Please allow camera permissions.");
                                 }}
@@ -233,13 +235,14 @@ export function FaceEnrollmentModal({ isOpen, onClose, userId, userName, onEnrol
                         )}
                     </div>
 
-                    {/* Percentage badge */}
+                    {/* Percentage badge — centered at the bottom of the ring */}
                     {phase === "scanning" && (
                         <div style={{
-                            position: "absolute", bottom: 6, right: 6,
+                            position: "absolute", bottom: -8, left: "50%", transform: "translateX(-50%)",
                             background: "#0f172a", border: `2px solid ${ringColor}`,
-                            borderRadius: 20, padding: "4px 10px",
+                            borderRadius: 20, padding: "4px 12px",
                             fontSize: 13, fontWeight: 700, color: ringColor, zIndex: 3,
+                            whiteSpace: "nowrap",
                         }}>
                             {progress}%
                         </div>
