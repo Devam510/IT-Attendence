@@ -9,12 +9,12 @@ type FilterType = "all" | "leave";
 type FilterStatus = "pending" | "approved" | "rejected";
 
 interface ApprovalItem {
-    id: string;
+    id: string;   // NOTE: This represents workflowId for regularizations!
     employeeId: string;
     employeeName: string;
     employeeRole: string;
     department: string;
-    type: "leave";
+    type: "leave" | "regularization";
     leaveType?: string;
     startDate: string;
     endDate: string;
@@ -27,11 +27,12 @@ interface ApprovalItem {
 const TYPE_LABELS: Record<string, string> = {
     annual: "Annual Leave", sick: "Sick Leave",
     casual: "Casual Leave", comp: "Comp Off",
+    regularization: "Time Regularization",
 };
 
 const TYPE_ICONS: Record<string, string> = {
     annual: "🏖️", sick: "🤒", casual: "☀️", comp: "🔄",
-    leave: "🗓️",
+    leave: "🗓️", regularization: "⏰",
 };
 
 export default function ApprovalsPage() {
@@ -58,26 +59,39 @@ export default function ApprovalsPage() {
 
     useEffect(() => { load(); }, [load]);
 
-    async function handleAction(id: string, action: "approved" | "rejected") {
-        setActionLoading(id);
-        // Use direct leave respond API — reliable, doesn't depend on workflow chain
-        const res = await apiPost("/api/leaves/respond", {
-            leaveId: id,
-            action,
-            comment: comment[id] || "",
-        });
+    async function handleAction(item: ApprovalItem, action: "approved" | "rejected") {
+        setActionLoading(item.id);
+        
+        if (item.type === "regularization") {
+            await apiPost("/api/attendance/regularize/respond", {
+                workflowId: item.id,
+                action,
+            });
+        } else {
+            await apiPost("/api/leaves/respond", {
+                leaveId: item.id,
+                action,
+                comment: comment[item.id] || "",
+            });
+        }
+        
         setActionLoading(null);
-        // Always reload from server to reflect true DB state
         await load();
     }
 
     async function handleBulkAction(action: "approved" | "rejected") {
         setActionLoading("bulk");
-        // Process each one via the reliable direct API
         await Promise.all(
-            Array.from(selected).map(id =>
-                apiPost("/api/leaves/respond", { leaveId: id, action, comment: "" })
-            )
+            Array.from(selected).map(id => {
+                const item = items.find(i => i.id === id);
+                if (!item) return Promise.resolve();
+                
+                if (item.type === "regularization") {
+                    return apiPost("/api/attendance/regularize/respond", { workflowId: item.id, action });
+                } else {
+                    return apiPost("/api/leaves/respond", { leaveId: item.id, action, comment: "" });
+                }
+            })
         );
         setSelected(new Set());
         setActionLoading(null);
@@ -168,7 +182,7 @@ export default function ApprovalsPage() {
                     </button>
                 ))}
                 <span style={{ width: 1, height: 24, background: "var(--border-color, #e5e7eb)", alignSelf: "center" }} />
-                {(["all", "leave"] as FilterType[]).map(t => (
+                {(["all", "leave", "regularization"] as FilterType[]).map(t => (
                     <button
                         key={t}
                         className={`filter-chip ${filterType === t ? "active" : ""}`}
@@ -275,14 +289,14 @@ export default function ApprovalsPage() {
                                 <div className="approval-card-actions">
                                     <button
                                         className="btn btn-ghost btn-sm"
-                                        onClick={() => handleAction(item.id, "rejected")}
+                                        onClick={() => handleAction(item, "rejected")}
                                         disabled={actionLoading === item.id}
                                     >
                                         {actionLoading === item.id ? <span className="spinner" /> : "❌"} Reject
                                     </button>
                                     <button
                                         className="btn btn-primary btn-sm"
-                                        onClick={() => handleAction(item.id, "approved")}
+                                        onClick={() => handleAction(item, "approved")}
                                         disabled={actionLoading === item.id}
                                     >
                                         {actionLoading === item.id ? <span className="spinner" /> : "✅"} Approve

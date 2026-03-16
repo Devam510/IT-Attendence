@@ -75,6 +75,7 @@ model User {
   reports           User[]             @relation("ManagerReports")
   faceProfile       FaceProfile?
   faceLogs          FaceVerificationLog[]
+  regularizationRequests RegularizationRequest[]
 
   @@index([entityId])
   @@index([departmentId])
@@ -161,6 +162,7 @@ model AttendanceRecord {
   shift             Shift?           @relation(fields: [shiftId], references: [id])
   user              User             @relation(fields: [userId], references: [id])
   faceLogs          FaceVerificationLog[]
+  regularizationRequests RegularizationRequest[]
 
   @@unique([userId, date])
   @@index([userId, date])
@@ -431,3 +433,26 @@ enum VerificationStatus {
   FAILED_MATCH
   FAILED_LIVENESS
 }
+
+model RegularizationRequest {
+  id                String         @id @default(uuid())
+  attendanceId      String         @map("attendance_id")
+  userId            String         @map("user_id")
+  reason            String
+  status            ApprovalStatus @default(PENDING)
+  
+  // The proposed times
+  requestedCheckIn  DateTime?      @map("requested_check_in")
+  requestedCheckOut DateTime?      @map("requested_check_out")
+  
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+
+  attendance        AttendanceRecord @relation(fields: [attendanceId], references: [id])
+  user              User             @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@map("regularization_requests")
+}
+

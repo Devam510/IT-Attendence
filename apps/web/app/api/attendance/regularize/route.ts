@@ -16,93 +16,105 @@ async function handleRegularize(
 ): Promise<NextResponse> {
     const { auth } = context;
 
-    let body: Record<string, unknown>;
+    let body: any;
     try { body = await req.json(); } catch {
         return error("INVALID_JSON", "Request body must be valid JSON", 400);
     }
 
-    const parsed = RegularizeSchema.safeParse(body);
-    if (!parsed.success) {
-        return error("VALIDATION_ERROR", "Invalid regularization data", 422, parsed.error.errors);
+    const { attendanceId, reason, requestedCheckIn, requestedCheckOut } = body;
+
+    if (!attendanceId || !reason) {
+        return error("VALIDATION", "Attendance ID and reason are required", 400);
     }
 
-    const input = parsed.data;
-    const targetDate = new Date(input.date);
-    targetDate.setHours(0, 0, 0, 0);
-
-    // Prevent future date regularization
-    const todayMidnight = new Date();
-    todayMidnight.setHours(0, 0, 0, 0);
-    if (targetDate >= todayMidnight) {
-        return error("INVALID_DATE", "Cannot regularize a future date", 400);
-    }
-
-    // Get user's manager for approval
-    const user = await prisma.user.findUnique({
-        where: { id: auth.sub },
-        select: { managerId: true, fullName: true },
+    // 1. Get the Attendance Record and User Manager
+    const record = await prisma.attendanceRecord.findUnique({
+        where: { id: attendanceId, userId: auth.sub },
+        include: { user: { select: { managerId: true, entityId: true, fullName: true } } }
     });
 
-    if (!user?.managerId) {
-        return error("NO_MANAGER", "No manager assigned for approval routing", 400);
+    if (!record) return error("NOT_FOUND", "Attendance record not found", 404);
+    if (record.status !== "FLAGGED") {
+        return error("INVALID_STATE", "Only FLAGGED days can be regularized", 400);
     }
 
-    // Check for existing pending regularization for same date using entityId
-    const entityId = `reg:${auth.sub}:${input.date}`;
-    const existingRequest = await prisma.approvalWorkflow.findFirst({
-        where: {
-            entityId,
-            entityType: "regularization",
-            status: "PENDING",
-        },
+    let approverId = record.user.managerId;
+    if (!approverId) {
+        const hr = await prisma.user.findFirst({
+            where: { role: { in: ["HRA", "SADM"] }, entityId: record.user.entityId }
+        });
+        approverId = hr?.id || null;
+    }
+    if (!approverId) return error("NO_APPROVER", "No manager or HR found to approve this request", 400);
+
+    // 2. Check for existing pending request
+    const existingReq = await prisma.regularizationRequest.findFirst({
+        where: { attendanceId: record.id, status: "PENDING" }
     });
-
-    if (existingRequest) {
-        return error("DUPLICATE_REQUEST", "A regularization request for this date is already pending", 409);
+    if (existingReq) {
+        return error("DUPLICATE", "A regularization request is already pending for this day", 409);
     }
 
-    // Create approval workflow
-    const workflow = await prisma.approvalWorkflow.create({
-        data: {
-            entityType: "regularization",
-            entityId,
-            requesterId: auth.sub,
-            currentStep: 0,
-            status: "PENDING",
-            steps: JSON.parse(JSON.stringify([{
-                approverId: user.managerId,
+    const checkInDate = requestedCheckIn ? new Date(requestedCheckIn) : null;
+    const checkOutDate = requestedCheckOut ? new Date(requestedCheckOut) : null;
+
+    // 3. Atomically create Request + Approval Workflow + Notification
+    const result = await prisma.$transaction(async (tx) => {
+        const regReq = await tx.regularizationRequest.create({
+            data: {
+                attendanceId: record.id,
+                userId: auth.sub,
+                reason,
+                requestedCheckIn: checkInDate,
+                requestedCheckOut: checkOutDate,
+                status: "PENDING"
+            }
+        });
+
+        const workflow = await tx.approvalWorkflow.create({
+            data: {
+                entityType: "regularization",
+                entityId: regReq.id,
+                requesterId: auth.sub,
+                currentStep: 0,
                 status: "PENDING",
-                comment: null,
-                actedAt: null,
-                // Embed regularization details in the first step
-                metadata: {
-                    date: input.date,
-                    reason: input.reason,
-                    checkInAt: input.checkInAt || null,
-                    checkOutAt: input.checkOutAt || null,
-                    requestedBy: user.fullName,
-                },
-            }])),
-        },
+                steps: JSON.parse(JSON.stringify([{
+                    approverId: approverId,
+                    status: "PENDING",
+                    comment: null,
+                    actedAt: null,
+                }])),
+            }
+        });
+
+        await tx.notification.create({
+            data: {
+                userId: approverId,
+                type: "REGULARIZATION_APPROVAL",
+                title: "Attendance Regularization",
+                body: `${record.user.fullName} requested time correction for ${record.date.toISOString().split("T")[0]}.`,
+                data: { regularizationId: regReq.id, attendanceId: record.id }
+            }
+        });
+
+        return { regReq, workflow };
     });
 
-    // Audit
     await logAuditEvent({
         actorId: auth.sub,
         actorRole: auth.role,
         action: "attendance.regularize_requested",
-        resourceType: "approval",
-        resourceId: workflow.id,
-        metadata: { date: input.date, reason: input.reason },
-    });
+        resourceType: "regularization",
+        resourceId: result.regReq.id,
+        metadata: { date: record.date, reason }
+    }).catch(()=>{});
 
-    logger.info({ userId: auth.sub, workflowId: workflow.id, date: input.date }, "Regularization requested");
+    logger.info({ userId: auth.sub, regReqId: result.regReq.id }, "Regularization requested");
 
     return success({
-        workflowId: workflow.id,
-        status: "PENDING",
-        approver: user.managerId,
-        date: input.date,
+        workflowId: result.workflow.id,
+        requestId: result.regReq.id,
+        status: "PENDING"
     }, 201);
 }
 

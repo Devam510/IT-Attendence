@@ -70,6 +70,7 @@ async function handleHistory(
                 }
             } catch { /* ignore */ }
             calendar.push({
+                id: rec.id,
                 date: dateStr,
                 status: rec.status,
                 checkInAt: rec.checkInAt?.toISOString() || null,

@@ -86,12 +86,71 @@ async function handlePending(
         appliedAt: lr.createdAt.toISOString(),
     }));
 
-    // Apply type filter
-    const filtered = type === "all" ? approvals : approvals.filter(a => a.type === type);
+    // Apply type filter to leaves
+    const filteredLeaves = type === "all" || type === "leave" ? approvals : [];
+
+    // Fetch Regularization Workflows
+    let regularizations: any[] = [];
+    if (type === "all" || type === "regularization") {
+        const regWorkflows = await prisma.approvalWorkflow.findMany({
+            where: {
+                entityType: "regularization",
+                ...(prismaStatus ? { status: prismaStatus as any } : {}),
+                steps: {
+                    path: ["0", "approverId"],
+                    equals: auth.role === "MGR" ? auth.sub : undefined
+                } // Simplified filter for demo
+            },
+            include: {
+                requester: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        employeeId: true,
+                        role: true,
+                        department: { select: { name: true } },
+                    }
+                }
+            },
+            orderBy: { createdAt: "desc" },
+            take: 50,
+        });
+
+        // We fetch the related RegularizationRequest data in a loop since ApprovalWorkflow is poly-morphic
+        const regIds = regWorkflows.map(w => w.entityId);
+        const regDetails = await prisma.regularizationRequest.findMany({
+            where: { id: { in: regIds } }
+        });
+        const detailsMap = Object.fromEntries(regDetails.map(r => [r.id, r]));
+
+        regularizations = regWorkflows.map(w => {
+            const detail = detailsMap[w.entityId];
+            return {
+                id: w.id, // the frontend uses this for the respond API
+                workflowId: w.id,
+                employeeId: w.requester.employeeId || w.requester.id,
+                employeeName: w.requester.fullName,
+                employeeRole: w.requester.role,
+                department: w.requester.department?.name || "—",
+                type: "regularization" as const,
+                leaveType: "regularization",
+                startDate: detail?.requestedCheckIn?.toISOString().split("T")[0] || w.createdAt.toISOString().split("T")[0],
+                endDate: detail?.requestedCheckOut?.toISOString().split("T")[0] || w.createdAt.toISOString().split("T")[0],
+                days: 1,
+                reason: detail?.reason || "Check-in time correction",
+                status: w.status.toLowerCase() as "pending" | "approved" | "rejected",
+                appliedAt: w.createdAt.toISOString(),
+            };
+        });
+    }
+
+    const unifiedApprovals = [...filteredLeaves, ...regularizations].sort(
+        (a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime()
+    );
 
     return success({
-        approvals: filtered,
-        total: filtered.length,
+        approvals: unifiedApprovals,
+        total: unifiedApprovals.length,
     });
 }
 

@@ -16,6 +16,7 @@ interface TodayData {
 }
 
 interface CalendarDay {
+    id?: string;
     date: string;
     status: string;
     checkInAt: string | null;
@@ -70,6 +71,13 @@ export default function AttendancePage() {
     const [earlyReason, setEarlyReason] = useState("");
     const [earlyReasonError, setEarlyReasonError] = useState(false);
     const [showComplianceModal, setShowComplianceModal] = useState(false);
+    
+    // Regularization Modal State
+    const [showRegModal, setShowRegModal] = useState(false);
+    const [regCheckIn, setRegCheckIn] = useState("");
+    const [regCheckOut, setRegCheckOut] = useState("");
+    const [regReason, setRegReason] = useState("");
+
     const { user } = useAuth();
     // Token key is scoped per user so switching accounts never mixes tokens
     const tokenKey = `nexus-checkin-token-${user?.id || "guest"}`;
@@ -277,6 +285,32 @@ export default function AttendancePage() {
         handleCheckOut(true, earlyReason.trim());
     }
 
+    async function submitRegularization() {
+        if (!selectedCalDay?.id || !regReason.trim()) {
+            setToast({ message: "Reason is required to regularize", type: "error" });
+            return;
+        }
+        setActionLoading(true);
+        const checkInDate = regCheckIn ? new Date(`${selectedDate}T${regCheckIn}:00`).toISOString() : undefined;
+        const checkOutDate = regCheckOut ? new Date(`${selectedDate}T${regCheckOut}:00`).toISOString() : undefined;
+
+        const res = await apiPost("/api/attendance/regularize", {
+            attendanceId: selectedCalDay.id,
+            reason: regReason.trim(),
+            requestedCheckIn: checkInDate,
+            requestedCheckOut: checkOutDate
+        });
+
+        if (res.data) {
+            setToast({ message: "Regularization request sent to manager!", type: "success" });
+            setShowRegModal(false);
+            setRegReason(""); setRegCheckIn(""); setRegCheckOut("");
+        } else {
+            setToast({ message: res.error || "Failed to submit request", type: "error" });
+        }
+        setActionLoading(false);
+    }
+
     // ── Export to CSV ─────────────────────────────────────────────
     function exportToCSV() {
         const rows = [
@@ -456,6 +490,64 @@ export default function AttendancePage() {
                             <button onClick={confirmEarlyCheckout} disabled={actionLoading}
                                 style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "none", background: "#dc2626", color: "white", fontWeight: 700, cursor: actionLoading ? "not-allowed" : "pointer", opacity: actionLoading ? 0.7 : 1 }}>
                                 {actionLoading ? "Checking out…" : "Confirm Half Day Check-Out"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Regularization Modal */}
+            {showRegModal && selectedCalDay && (
+                <div style={{
+                    position: "fixed", inset: 0, zIndex: 9999,
+                    background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
+                    display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+                }}>
+                    <div style={{
+                        background: "var(--bg-primary)", borderRadius: 16, padding: "28px 32px",
+                        maxWidth: 440, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+                        border: "1.5px solid var(--color-primary)",
+                    }}>
+                        <h3 style={{ fontSize: "var(--text-lg)", fontWeight: 700, margin: "0 0 16px" }}>Request Regularization</h3>
+                        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: 16 }}>
+                            Submit your actual check-in and check-out times for <strong>{selectedLabel}</strong>. Your manager will review this request.
+                        </p>
+                        
+                        <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+                            <div style={{ flex: 1 }}>
+                                <label style={{ display: "block", fontSize: 12, marginBottom: 4, color: "var(--text-secondary)" }}>Check In Time</label>
+                                <input type="time" value={regCheckIn} onChange={e => setRegCheckIn(e.target.value)}
+                                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border-primary)",
+                                    background: "var(--bg-secondary)", color: "var(--text-primary)" }} />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <label style={{ display: "block", fontSize: 12, marginBottom: 4, color: "var(--text-secondary)" }}>Check Out Time</label>
+                                <input type="time" value={regCheckOut} onChange={e => setRegCheckOut(e.target.value)}
+                                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border-primary)",
+                                    background: "var(--bg-secondary)", color: "var(--text-primary)" }} />
+                            </div>
+                        </div>
+
+                        <label style={{ display: "block", fontSize: 12, marginBottom: 4, color: "var(--text-secondary)" }}>Reason (required)</label>
+                        <textarea
+                            value={regReason}
+                            onChange={e => setRegReason(e.target.value)}
+                            placeholder="e.g. Forgot to check out, left at 7:30 PM"
+                            rows={3}
+                            style={{
+                                width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid var(--border-primary)",
+                                backgroundColor: "var(--bg-secondary)", color: "var(--text-primary)", fontSize: "var(--text-sm)", resize: "none", boxSizing: "border-box"
+                            }}
+                        />
+
+                        <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+                            <button onClick={() => setShowRegModal(false)}
+                                style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "1.5px solid var(--border-primary)", background: "var(--bg-secondary)", color: "var(--text-primary)", fontWeight: 600, cursor: "pointer" }}>
+                                Cancel
+                            </button>
+                            <button onClick={submitRegularization} disabled={actionLoading || !regReason.trim()}
+                                style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "none", background: "var(--color-primary)", color: "white", fontWeight: 700, cursor: (!regReason.trim() || actionLoading) ? "not-allowed" : "pointer", opacity: (!regReason.trim() || actionLoading) ? 0.7 : 1 }}>
+                                {actionLoading ? "Submitting…" : "Submit Request"}
                             </button>
                         </div>
                     </div>
@@ -773,6 +865,29 @@ export default function AttendancePage() {
                             <div style={{ textAlign: "center", padding: "var(--space-6)", color: "var(--text-secondary)" }}>
                                 <div style={{ fontSize: "2rem", marginBottom: 8 }}>📋</div>
                                 No attendance record for this day
+                            </div>
+                        )}
+
+                        {/* Request Regularization Button for Flagged Days */}
+                        {selectedCalDay && (selectedCalDay.status === "FLAGGED" || selectedCalDay.status === "ABSENT") && (
+                            <div style={{ marginTop: "var(--space-6)" }}>
+                                <button className="btn btn-primary btn-full" style={{ background: "#475569" }} onClick={() => {
+                                    // pre-fill existing times if available
+                                    if (selectedCalDay.checkInAt) {
+                                        const d = new Date(selectedCalDay.checkInAt);
+                                        setRegCheckIn(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
+                                    }
+                                    if (selectedCalDay.checkOutAt) {
+                                        const d = new Date(selectedCalDay.checkOutAt);
+                                        setRegCheckOut(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
+                                    }
+                                    setShowRegModal(true);
+                                }}>
+                                    Request Regularization
+                                </button>
+                                <p style={{ fontSize: 12, color: "var(--text-tertiary)", textAlign: "center", marginTop: 8 }}>
+                                    Submit your actual time to your manager to fix this record.
+                                </p>
                             </div>
                         )}
                     </>
