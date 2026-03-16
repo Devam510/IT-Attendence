@@ -387,28 +387,39 @@ export default function UsersPage() {
                             <div style={{ display: "flex", gap: 16 }}>
                                 <div style={{ flex: 1 }}>
                                     <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Role</label>
-                                    <select required className="input" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }}>
+                                    <select required className="input" value={formData.role} onChange={e => {
+                                        const newRole = e.target.value;
+                                        setFormData(f => ({
+                                            ...f,
+                                            role: newRole,
+                                            // Clear dept + manager when switching to SADM — they don't need them
+                                            ...(newRole === "SADM" ? { departmentId: "", managerId: "" } : {}),
+                                        }));
+                                    }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }}>
                                         <option value="EMP">Employee</option>
                                         <option value="MGR">Manager</option>
                                         <option value="HRA">HR Admin</option>
                                         <option value="SADM">Super Admin</option>
                                     </select>
                                 </div>
+                                {formData.role !== "SADM" && (
                                 <div style={{ flex: 1 }}>
                                     <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Department</label>
-                                    <select required className="input" value={formData.departmentId} onChange={e => setFormData({...formData, departmentId: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }}>
+                                    <select className="input" value={formData.departmentId} onChange={e => setFormData({...formData, departmentId: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }}>
                                         <option value="">Unassigned</option>
                                         {departments.map(d => (
                                             <option key={d.id} value={d.id}>{d.name}</option>
                                         ))}
                                     </select>
                                 </div>
+                                )}
                             </div>
 
                             <div style={{ display: "flex", gap: 16 }}>
+                                {formData.role !== "SADM" && (
                                 <div style={{ flex: 1 }}>
                                     <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Reports To (Manager / Superior)</label>
-                                    <select required className="input" value={formData.managerId} onChange={e => setFormData({...formData, managerId: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827", cursor: "pointer" }}>
+                                    <select className="input" value={formData.managerId} onChange={e => setFormData({...formData, managerId: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827", cursor: "pointer" }}>
                                         <option value="">Select Superior</option>
                                         {managers
                                             .filter(m => formData.role === "HRA" ? m.role === "SADM" : true)
@@ -418,6 +429,7 @@ export default function UsersPage() {
                                         }
                                     </select>
                                 </div>
+                                )}
                                 <div style={{ flex: 1 }}>
                                     <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Date of Joining</label>
                                     <input required type="date" className="input" value={formData.dateOfJoining} onChange={e => setFormData({...formData, dateOfJoining: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
