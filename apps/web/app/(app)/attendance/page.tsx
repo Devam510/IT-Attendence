@@ -783,7 +783,7 @@ export default function AttendancePage() {
             <div className="att-summary">
                 <span>Present: <strong>{summary?.totalPresent ?? "—"}</strong></span>
                 <span>Hours: <strong>{summary?.totalHours ? `${summary.totalHours.toFixed(1)}h` : "—"}</strong></span>
-
+                <span>Overtime: <strong style={{color: "#d97706"}}>{summary?.totalOvertime ? `+${summary.totalOvertime.toFixed(1)}h` : "—"}</strong></span>
             </div>
         </div>
     );
