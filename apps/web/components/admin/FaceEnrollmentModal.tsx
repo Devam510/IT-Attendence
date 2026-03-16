@@ -181,7 +181,7 @@ export function FaceEnrollmentModal({ isOpen, onClose, userId, userName, onEnrol
                 </p>
 
                 {/* Camera + SVG Ring overlay */}
-                <div style={{ position: "relative", width: 260, height: 260, marginBottom: 24, flexShrink: 0 }}>
+                <div style={{ position: "relative", width: 260, height: 260, marginBottom: 32, marginLeft: "auto", marginRight: "auto", flexShrink: 0 }}>
                     {/* SVG progress ring — fills the entire 260x260 container */}
                     <svg width={260} height={260} style={{ position: "absolute", top: 0, left: 0, zIndex: 2, transform: "rotate(-90deg)" }}>
                         {/* track */}

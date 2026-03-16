@@ -502,7 +502,7 @@ export default function UsersPage() {
                 document.body
             )}
 
-            {faceUserId && mounted && (
+            {faceUserId && mounted && createPortal(
                 <FaceEnrollmentModal
                     isOpen={!!faceUserId}
                     onClose={() => { setFaceUserId(null); fetchUsersAndStaticData(); }}
@@ -512,7 +512,8 @@ export default function UsersPage() {
                         setFaceUserId(null);
                         fetchUsersAndStaticData();
                     }}
-                />
+                />,
+                document.body
             )}
         </div>
     );
