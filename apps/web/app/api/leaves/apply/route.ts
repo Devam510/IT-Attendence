@@ -190,6 +190,7 @@ async function handleApply(
         });
 
         // Fire-and-forget email dispatch
+        /*
         prisma.user.findUnique({
             where: { id: finalApproverId },
             select: { email: true }
@@ -205,6 +206,7 @@ async function handleApply(
                 }).catch(err => logger.error({ err, leaveId: leaveRequest.id }, "Failed to send leave request email"));
             }
         }).catch(() => {});
+        */
     }
 
     // 11. Audit log

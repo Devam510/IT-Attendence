@@ -114,6 +114,7 @@ async function handleRespond(
     }
 
     // Fire-and-forget email dispatch
+    /*
     if (leave.user.email) {
         EmailService.sendLeaveStatusUpdateEmail({
             employeeEmail: leave.user.email,
@@ -125,6 +126,7 @@ async function handleRespond(
             remarks: comment, 
         }).catch(err => logger.error({ err, leaveId }, "Failed to send leave status email"));
     }
+    */
 
     logger.info({ actorId: auth.sub, leaveId, action: newStatus }, "Leave request responded");
 
