@@ -49,13 +49,16 @@ export default function LeaveBalanceModal({ isOpen, onClose, userId, userName }:
 
     if (!isOpen) return null;
 
-    const handleOpeningChange = (leaveTypeId: string, newOpeningStr: string) => {
-        const val = parseFloat(newOpeningStr) || 0;
+    const handleAvailableChange = (leaveTypeId: string, newAvailableStr: string) => {
+        const val = parseFloat(newAvailableStr) || 0;
         setBalances(prev => prev.map(b => {
             if (b.leaveTypeId === leaveTypeId) {
-                // Instantly preview the new closing balance
-                const newClosing = Math.max(0, val + b.accrued - b.used - b.pending);
-                return { ...b, opening: val, closing: newClosing };
+                // HR is typing the exact Available amount they want the user to have.
+                // We reverse-engineer the required "opening" balance for the DB.
+                // Target: val = opening + accrued - used - pending
+                // Result: opening = val - accrued + used + pending
+                const newOpening = val - b.accrued + b.used + b.pending;
+                return { ...b, opening: newOpening, closing: val };
             }
             return b;
         }));
@@ -129,32 +132,22 @@ export default function LeaveBalanceModal({ isOpen, onClose, userId, userName }:
                                         </div>
                                     </div>
                                     
-                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                        <div style={{ textAlign: "right" }}>
-                                            <div style={{ fontSize: "10px", color: "var(--text-secondary)", fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>Starting Balance</div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                                        <div style={{ textAlign: "center", minWidth: 80 }}>
+                                            <div style={{ fontSize: "10px", color: "var(--text-secondary)", fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>Available</div>
                                             <input 
                                                 type="number" 
                                                 step="0.5" 
                                                 min="0"
                                                 className="input"
-                                                value={b.opening}
-                                                onChange={e => handleOpeningChange(b.leaveTypeId, e.target.value)}
+                                                value={b.closing}
+                                                onChange={e => handleAvailableChange(b.leaveTypeId, e.target.value)}
                                                 style={{ 
-                                                    width: 80, padding: "8px", borderRadius: 6, border: "1px solid var(--border-light)", 
-                                                    background: "var(--bg-primary)", color: "var(--text-primary)", textAlign: "center", fontWeight: 600
+                                                    width: 80, padding: "8px", borderRadius: 6, border: "2px solid", 
+                                                    borderColor: b.closing > 0 ? "#16a34a" : "var(--border-light)",
+                                                    background: "var(--bg-primary)", color: b.closing > 0 ? "#16a34a" : "var(--text-primary)", textAlign: "center", fontWeight: "bold", fontSize: 16
                                                 }} 
                                             />
-                                        </div>
-                                        <div style={{ fontSize: 24, color: "var(--text-tertiary)", padding: "0 4px", marginTop: 14 }}>=</div>
-                                        <div style={{ textAlign: "center", minWidth: 60 }}>
-                                            <div style={{ fontSize: "10px", color: "var(--text-secondary)", fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>Available</div>
-                                            <div style={{ 
-                                                fontSize: "18px", fontWeight: "bold", 
-                                                color: b.closing > 0 ? "#16a34a" : "var(--text-tertiary)",
-                                                marginTop: 8
-                                            }}>
-                                                {b.closing}
-                                            </div>
                                         </div>
                                     </div>
                                 </div>
