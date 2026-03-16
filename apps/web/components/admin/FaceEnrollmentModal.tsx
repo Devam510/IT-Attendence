@@ -107,7 +107,7 @@ export function FaceEnrollmentModal({ isOpen, onClose, userId, userName, onEnrol
                     "Hold still — almost done…",
                     "Perfect! Finalizing…",
                 ];
-                setStatusMsg(hints[Math.min(count - 1, hints.length - 1)]);
+                setStatusMsg(hints[Math.min(count - 1, hints.length - 1)] ?? "Capturing…");
 
                 if (count >= TOTAL_FRAMES) {
                     cleanup();
@@ -303,10 +303,12 @@ export function FaceEnrollmentModal({ isOpen, onClose, userId, userName, onEnrol
 
 // ── Utility: Average multiple face descriptors ─────────────────────────
 function averageDescriptors(descriptors: Float32Array[]): Float32Array {
-    const len = descriptors[0].length;
+    const first = descriptors[0];
+    if (!first) return new Float32Array(128);
+    const len = first.length;
     const avg = new Float32Array(len);
     for (let i = 0; i < len; i++) {
-        avg[i] = descriptors.reduce((sum, d) => sum + d[i], 0) / descriptors.length;
+        avg[i] = descriptors.reduce((sum, d) => sum + (d[i] ?? 0), 0) / descriptors.length;
     }
     return avg;
 }

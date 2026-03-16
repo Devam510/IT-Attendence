@@ -18,7 +18,8 @@ function euclideanDistance(a: number[], b: number[]): number {
     if (a.length !== b.length) return Infinity;
     let sum = 0;
     for (let i = 0; i < a.length; i++) {
-        sum += (a[i] - b[i]) ** 2;
+        const diff = (a[i] ?? 0) - (b[i] ?? 0);
+        sum += diff * diff;
     }
     return Math.sqrt(sum);
 }

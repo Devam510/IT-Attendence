@@ -849,7 +849,7 @@ export default function DashboardPage() {
             <FaceVerificationModal 
                isOpen={showFaceVerification} 
                onClose={() => setShowFaceVerification(false)} 
-               onVerificationSuccess={handleCheckIn} 
+               onSuccess={handleCheckIn} 
             />
             {ComplianceModal}
             {EarlyCheckoutModal}
