@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@vibetech/db";
 import { withAuth } from "@/lib/auth";
 import { success, error, logger } from "@/lib/errors";
+import { EmailService } from "@/lib/email-service";
 import type { JwtPayload } from "@vibetech/shared";
 
 async function handleRespond(
@@ -37,10 +38,13 @@ async function handleRespond(
         return error("VALIDATION_ERROR", "action must be 'approved' or 'rejected'", 422);
     }
 
-    // Find the leave request
+    // Find the leave request (including user details and leave type for the email)
     const leave = await prisma.leaveRequest.findUnique({
         where: { id: leaveId },
-        include: { user: { select: { managerId: true, entityId: true } } },
+        include: { 
+            user: { select: { fullName: true, email: true, managerId: true, entityId: true } },
+            leaveType: { select: { name: true } }
+        },
     });
 
     if (!leave) {
@@ -107,6 +111,19 @@ async function handleRespond(
             where: { id: workflow.id },
             data: { status: newStatus },
         }).catch(() => { }); // non-critical
+    }
+
+    // Fire-and-forget email dispatch
+    if (leave.user.email) {
+        EmailService.sendLeaveStatusUpdateEmail({
+            employeeEmail: leave.user.email,
+            employeeName: leave.user.fullName,
+            leaveType: leave.leaveType.name,
+            status: newStatus as "APPROVED" | "REJECTED",
+            startDate: leave.startDate.toISOString(),
+            endDate: leave.endDate.toISOString(),
+            remarks: comment, 
+        }).catch(err => logger.error({ err, leaveId }, "Failed to send leave status email"));
     }
 
     logger.info({ actorId: auth.sub, leaveId, action: newStatus }, "Leave request responded");

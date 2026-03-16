@@ -10,6 +10,7 @@ import { checkSandwichRule } from "@/lib/sandwich-rule";
 import { calculateSlaDeadline } from "@/lib/approval-chain";
 import { logAuditEvent } from "@/lib/audit";
 import { success, error, logger } from "@/lib/errors";
+import { EmailService } from "@/lib/email-service";
 import type { JwtPayload } from "@vibetech/shared";
 
 async function handleApply(
@@ -125,7 +126,7 @@ async function handleApply(
         },
     });
 
-    // 10. Create approval workflow
+    // 10. Create approval workflow + Send Email
     if (user?.managerId) {
         await prisma.approvalWorkflow.create({
             data: {
@@ -143,6 +144,23 @@ async function handleApply(
                 }])),
             },
         });
+
+        // Fire-and-forget email dispatch
+        prisma.user.findUnique({
+            where: { id: user.managerId },
+            select: { email: true }
+        }).then(manager => {
+            if (manager?.email) {
+                EmailService.sendLeaveRequestEmail({
+                    managerEmail: manager.email,
+                    employeeName: user.fullName,
+                    leaveType: leaveType.name,
+                    startDate: leaveRequest.startDate.toISOString(),
+                    endDate: leaveRequest.endDate.toISOString(),
+                    reason: leaveRequest.reason || "No reason provided",
+                }).catch(err => logger.error({ err, leaveId: leaveRequest.id }, "Failed to send leave request email"));
+            }
+        }).catch(() => {});
     }
 
     // 11. Audit log
