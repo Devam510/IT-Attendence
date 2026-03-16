@@ -1,223 +1,225 @@
 "use client";
 
-import React, { useRef, useState, useCallback, useEffect } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Webcam from "react-webcam";
-import { Camera, CheckCircle, AlertCircle, RefreshCw, ScanFace } from "lucide-react";
 import { apiPost } from "@/lib/api-client";
 
-interface FaceVerificationModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onVerificationSuccess: (token: string) => void;
+interface Props {
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess: (verificationToken: string) => void;
 }
 
-export function FaceVerificationModal({
-  isOpen,
-  onClose,
-  onVerificationSuccess,
-}: FaceVerificationModalProps) {
-  const webcamRef = useRef<Webcam>(null);
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const [isCameraReady, setIsCameraReady] = useState(false);
+type Phase = "loading_models" | "scanning" | "verifying" | "success" | "error";
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+function loadFaceApi() {
+    return import("@vladmandic/face-api");
+}
 
-  const captureFrame = useCallback(() => {
-    const imageSrc = webcamRef.current?.getScreenshot();
-    if (imageSrc) {
-      setCapturedImage(imageSrc);
-      setError(null);
-      // Auto-submit on capture for a smoother experience
-      submitVerification(imageSrc);
-    } else {
-      setError("Failed to access camera. Please check permissions.");
-    }
-  }, [webcamRef]);
+export function FaceVerificationModal({ isOpen, onClose, onSuccess }: Props) {
+    const webcamRef = useRef<Webcam>(null);
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const hasVerifiedRef = useRef(false);
 
-  const retakeImage = () => {
-    setCapturedImage(null);
-    setError(null);
-  };
+    const [phase, setPhase] = useState<Phase>("loading_models");
+    const [statusMsg, setStatusMsg] = useState("Loading AI…");
+    const [errorMsg, setErrorMsg] = useState("");
+    const [isCameraReady, setIsCameraReady] = useState(false);
 
-  const submitVerification = async (image: string) => {
-    setIsVerifying(true);
-    setError(null);
+    const cleanup = useCallback(() => {
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+        }
+    }, []);
 
-    try {
-      const response = await apiPost<any>("/api/face/verify", {
-        image,
-      });
+    const handleClose = useCallback(() => {
+        cleanup();
+        hasVerifiedRef.current = false;
+        setPhase("loading_models");
+        setStatusMsg("Loading AI…");
+        setErrorMsg("");
+        setIsCameraReady(false);
+        onClose();
+    }, [cleanup, onClose]);
 
-      if (response.error || !response.data?.verificationToken) {
-        throw new Error(response.error || "Face verification failed. Please try again.");
-      }
+    const startVerification = useCallback(async () => {
+        setPhase("loading_models");
+        setStatusMsg("Loading AI models…");
 
-      setIsSuccess(true);
-      
-      // Delay closing so they see the success marker
-      setTimeout(() => {
-        onVerificationSuccess(response.data.verificationToken);
-      }, 1500);
+        try {
+            const faceapi = await loadFaceApi();
+            const MODEL_URL = "/models";
+            await Promise.all([
+                faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+                faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+            ]);
 
-    } catch (err: any) {
-      setError(err.message || "Face not recognized. Please try again.");
-      setCapturedImage(null); // Auto-retake on failure
-    } finally {
-      setIsVerifying(false);
-    }
-  };
+            setPhase("scanning");
+            setStatusMsg("Look at the camera…");
 
-  const handleClose = () => {
-    if (isVerifying) return;
-    setCapturedImage(null);
-    setError(null);
-    setIsSuccess(false);
-    setIsCameraReady(false);
-    onClose();
-  };
+            // Continuous scan — verify on first good frame
+            intervalRef.current = setInterval(async () => {
+                if (hasVerifiedRef.current) return;
+                const video = webcamRef.current?.video;
+                if (!video || video.readyState !== 4) return;
 
-  if (!isOpen || !mounted) return null;
+                const detection = await faceapi.detectSingleFace(
+                    video,
+                    new faceapi.SsdMobilenetv1Options({ minConfidence: 0.85 })
+                ).withFaceLandmarks().withFaceDescriptor();
 
-  return createPortal(
-    <div style={{
-        position: "fixed", inset: 0, zIndex: 999999, // Super high z-index to cover sidebar
-        background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", // Strong blur
-        display: "flex", alignItems: "center", justifyContent: "center", padding: 20
-    }}>
-      <div className="animate-slideUp" style={{
-          background: "var(--bg-primary)", borderRadius: 20, padding: "32px",
-          maxWidth: 480, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.4)"
-      }}>
-        <div style={{ marginBottom: 20, textAlign: "center" }}>
-          <div style={{ display: "inline-flex", padding: 16, background: "var(--color-primary-light)", color: "var(--color-primary)", borderRadius: "50%", marginBottom: 16 }}>
-            <ScanFace size={32} />
-          </div>
-          <h2 style={{ fontSize: "var(--text-xl)", fontWeight: "var(--font-bold)", margin: 0, color: "var(--text-primary)" }}>
-            Face Verification
-          </h2>
-          <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", marginTop: 8 }}>
-            Please position your face in the frame to securely check in.
-          </p>
-        </div>
+                if (!detection) {
+                    setStatusMsg("Looking for your face…");
+                    return;
+                }
 
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "16px 0", position: "relative" }}>
-          {isSuccess ? (
-            <div className="animate-fadeIn" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyItems: "center", padding: "32px 0", color: "#16a34a" }}>
-              <CheckCircle size={64} style={{ marginBottom: 16 }} />
-              <p style={{ fontSize: "18px", fontWeight: 600 }}>Identity Verified!</p>
-              <p style={{ fontSize: "14px", color: "var(--text-secondary)", marginTop: 8 }}>Proceeding to check-in...</p>
-            </div>
-          ) : (
-            <div style={{ width: "100%" }}>
-              <div style={{ 
-                position: "relative", width: "100%", height: "360px",
-                backgroundColor: "black", borderRadius: 16, overflow: "hidden", 
-                display: "flex", alignItems: "center", justifyContent: "center",
-                border: "4px solid var(--surface-secondary)"
-              }}>
-                {capturedImage ? (
-                  <img src={capturedImage} alt="Captured" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : (
-                  <>
-                    {!isCameraReady && (
-                      <div style={{ position: "absolute", zIndex: 10, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)" }}>
-                        <RefreshCw size={24} className="animate-spin" style={{ marginBottom: 8 }} />
-                        <span style={{ fontSize: "14px" }}>Starting camera...</span>
-                      </div>
-                    )}
-                    <Webcam
-                      audio={false}
-                      ref={webcamRef}
-                      screenshotFormat="image/jpeg"
-                      videoConstraints={{
-                        facingMode: "user"
-                      }}
-                      mirrored={true}
-                      onUserMedia={() => setIsCameraReady(true)}
-                      onUserMediaError={(err: any) => {
-                        setIsCameraReady(false);
-                        console.error("Camera Error:", err);
-                        let detailedError = "";
-                        if (typeof err === 'string') {
-                          detailedError = err;
-                        } else if (err instanceof Error || (err && err.name && err.message)) {
-                          detailedError = `${err.name}: ${err.message}`;
-                        } else {
-                          detailedError = "Unknown camera error. Please ensure permissions are granted and no other app is using the camera.";
-                        }
-                        setError(`Camera Error: ${detailedError}`);
-                      }}
-                      style={{ 
-                        width: "100%", 
-                        height: "100%", 
-                        objectFit: "cover", 
-                        opacity: isCameraReady ? 1 : 0,
-                        transition: "opacity 0.3s ease" 
-                      }}
-                    />
-                  </>
-                )}
-                
-                {/* Visual Scanning Animation Overlay */}
-                {(!capturedImage && isCameraReady) && (
-                  <div style={{ position: "absolute", inset: 0, pointerEvents: "none", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ 
-                      width: "60%", height: "60%", 
-                      border: "2px solid rgba(255,255,255,0.2)", 
-                      borderRadius: "50%",
-                      boxShadow: "0 0 0 9999px rgba(0,0,0,0.5)" // Darken surroundings
-                    }}></div>
-                    {isVerifying && (
-                      <div className="animate-pulse" style={{ position: "absolute", width: "100%", height: "4px", background: "var(--color-primary)", top: "50%", boxShadow: "0 0 20px var(--color-primary-light)" }} />
-                    )}
-                  </div>
-                )}
-              </div>
+                if (detection.detection.score < 0.85) return;
 
-              {error && (
-                <div className="animate-slideUp" style={{ marginTop: 16, padding: 12, background: "#fee2e2", color: "#991b1b", borderRadius: 8, fontSize: "var(--text-sm)", display: "flex", alignItems: "center", gap: 8 }}>
-                  <AlertCircle size={16} />
-                  <span>{error}</span>
+                // Face found — send to backend
+                hasVerifiedRef.current = true;
+                cleanup();
+                setPhase("verifying");
+                setStatusMsg("Verifying identity…");
+
+                const descriptor = Array.from(detection.descriptor);
+                const res = await apiPost<{ verificationToken: string }>("/api/face/verify", { descriptor });
+
+                if (res.data?.verificationToken) {
+                    setPhase("success");
+                    setStatusMsg("Identity confirmed ✅");
+                    setTimeout(() => onSuccess(res.data!.verificationToken), 800);
+                } else {
+                    setPhase("error");
+                    setErrorMsg(res.error || "Face did not match. Please try again or contact HR.");
+                }
+            }, 250);
+
+        } catch (e: any) {
+            setPhase("error");
+            setErrorMsg(e.message || "Failed to start face verification.");
+        }
+    }, [cleanup, onSuccess]);
+
+    useEffect(() => {
+        if (isCameraReady && phase === "loading_models") {
+            startVerification();
+        }
+    }, [isCameraReady, phase, startVerification]);
+
+    useEffect(() => {
+        if (!isOpen) cleanup();
+    }, [isOpen, cleanup]);
+
+    if (!isOpen) return null;
+
+    const scannerColor =
+        phase === "success" ? "#22c55e" :
+        phase === "error" ? "#ef4444" :
+        "#3b82f6";
+
+    return (
+        <div style={{
+            position: "fixed", inset: 0, zIndex: 99999,
+            background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+        }}>
+            <div style={{
+                background: "#0f172a", borderRadius: 24, padding: "36px 32px",
+                maxWidth: 400, width: "100%", boxShadow: "0 30px 80px rgba(0,0,0,0.6)",
+                textAlign: "center", color: "white",
+            }}>
+                <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Face Check-In</h2>
+                <p style={{ color: "#94a3b8", fontSize: 13, marginBottom: 28 }}>
+                    Look at the camera to verify your identity
+                </p>
+
+                {/* Camera with animated ring */}
+                <div style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 24 }}>
+                    {/* Animated scanning ring */}
+                    <div style={{
+                        position: "absolute",
+                        width: 240, height: 240,
+                        borderRadius: "50%",
+                        border: `4px solid ${scannerColor}`,
+                        zIndex: 2,
+                        boxShadow: phase === "scanning" ? `0 0 24px ${scannerColor}55` : "none",
+                        animation: phase === "scanning" ? "pulse-ring 1.5s ease-in-out infinite" : "none",
+                        transition: "border-color 0.3s ease, box-shadow 0.3s ease",
+                    }} />
+
+                    <div style={{
+                        width: 220, height: 220,
+                        borderRadius: "50%",
+                        overflow: "hidden",
+                        background: "#0f172a",
+                        position: "relative",
+                        zIndex: 1,
+                    }}>
+                        {(phase === "loading_models" || phase === "scanning" || phase === "verifying") && (
+                            <Webcam
+                                ref={webcamRef}
+                                audio={false}
+                                mirrored={true}
+                                onUserMedia={() => setIsCameraReady(true)}
+                                onUserMediaError={() => {
+                                    setPhase("error");
+                                    setErrorMsg("Camera access denied. Please allow camera permissions.");
+                                }}
+                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                            />
+                        )}
+                        {phase === "success" && (
+                            <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #064e3b, #166534)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64 }}>
+                                ✅
+                            </div>
+                        )}
+                        {phase === "error" && (
+                            <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #7f1d1d, #991b1b)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64 }}>
+                                ❌
+                            </div>
+                        )}
+                    </div>
                 </div>
-              )}
-            </div>
-          )}
-        </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginTop: 24 }}>
-          {!isSuccess && (
-            <>
-              {capturedImage ? (
-                <>
-                  <button onClick={retakeImage} disabled={isVerifying} style={{ flex: 1, padding: "14px 0", borderRadius: 12, border: "1px solid #d1d5db", background: "white", color: "#374151", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                    <RefreshCw size={18} /> Retry
-                  </button>
-                  <button disabled style={{ flex: 1, padding: "14px 0", borderRadius: 12, border: "none", background: "var(--color-primary)", color: "white", fontWeight: 600, opacity: 0.7, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                    Verifying...
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button onClick={handleClose} disabled={isVerifying} style={{ flex: 1, padding: "14px 0", borderRadius: 12, border: "1px solid #d1d5db", background: "white", color: "#374151", fontWeight: 600, cursor: "pointer" }}>
-                    Cancel Check-in
-                  </button>
-                  <button onClick={captureFrame} disabled={isVerifying || !isCameraReady} style={{ flex: 1, padding: "14px 0", borderRadius: 12, border: "none", background: "var(--color-primary)", color: "white", fontWeight: 600, cursor: isCameraReady && !isVerifying ? "pointer" : "not-allowed", opacity: isCameraReady && !isVerifying ? 1 : 0.5, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 4px 14px rgba(99,102,241,0.4)" }}>
-                    <Camera size={18} /> Verify Identity
-                  </button>
-                </>
-              )}
-            </>
-          )}
+                {/* Status */}
+                <p style={{ fontSize: 14, color: phase === "error" ? "#f87171" : phase === "success" ? "#4ade80" : "#94a3b8", marginBottom: 24, minHeight: 20 }}>
+                    {phase === "error" ? errorMsg : statusMsg}
+                </p>
+
+                {/* Buttons */}
+                <div style={{ display: "flex", gap: 12 }}>
+                    <button
+                        onClick={handleClose}
+                        style={{ flex: 1, padding: "12px 0", borderRadius: 10, border: "1px solid #334155", background: "transparent", color: "#94a3b8", fontWeight: 600, cursor: "pointer", fontSize: 14 }}
+                    >
+                        Cancel
+                    </button>
+                    {phase === "error" && (
+                        <button
+                            onClick={() => {
+                                hasVerifiedRef.current = false;
+                                setPhase("loading_models");
+                                setStatusMsg("Loading AI…");
+                                setErrorMsg("");
+                                setIsCameraReady(false);
+                            }}
+                            style={{ flex: 1, padding: "12px 0", borderRadius: 10, border: "none", background: "#3b82f6", color: "white", fontWeight: 600, cursor: "pointer", fontSize: 14 }}
+                        >
+                            Retry
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            <style>{`
+                @keyframes spin { to { transform: rotate(360deg); } }
+                @keyframes pulse-ring {
+                    0%, 100% { transform: scale(1); opacity: 1; }
+                    50% { transform: scale(1.05); opacity: 0.75; }
+                }
+            `}</style>
         </div>
-      </div>
-    </div>,
-    document.body
-  );
+    );
 }

@@ -1,13 +1,27 @@
 // Vibe Tech Labs — POST /api/face/verify
-// Verifies an employee's face during check-in
+// Verifies an employee's face using Euclidean distance between a live descriptor
+// and the stored multi-frame average descriptor.
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@vibetech/db";
 import { withAuth } from "@/lib/auth";
 import { success, error, logger } from "@/lib/errors";
-import { verifyFace } from "@/lib/face-api";
 import { logAuditEvent } from "@/lib/audit";
 import type { JwtPayload } from "@vibetech/shared";
+
+// Euclidean distance between two 128D vectors
+// face-api.js recommends a threshold of 0.45-0.6 for face recognition
+// Lower = stricter. 0.45 is tight but secure. 0.5 is standard.
+const DISTANCE_THRESHOLD = 0.50;
+
+function euclideanDistance(a: number[], b: number[]): number {
+    if (a.length !== b.length) return Infinity;
+    let sum = 0;
+    for (let i = 0; i < a.length; i++) {
+        sum += (a[i] - b[i]) ** 2;
+    }
+    return Math.sqrt(sum);
+}
 
 async function handleFaceVerification(
     req: NextRequest,
@@ -15,19 +29,19 @@ async function handleFaceVerification(
 ): Promise<NextResponse> {
     const { auth } = context;
 
-    let body: { image: string };
+    let body: { descriptor: number[] };
     try {
         body = await req.json();
     } catch {
         return error("INVALID_JSON", "Request body must be valid JSON", 400);
     }
 
-    const { image } = body;
-    if (!image) {
-        return error("MISSING_FIELDS", "Live image is required", 400);
+    const { descriptor } = body;
+    if (!Array.isArray(descriptor) || descriptor.length !== 128) {
+        return error("MISSING_FIELDS", "A valid 128D 'descriptor' array is required", 400);
     }
 
-    // Attempt to pull their profile from DB
+    // Pull their stored profile from DB
     const profile = await prisma.faceProfile.findUnique({
         where: { userId: auth.sub }
     });
@@ -36,51 +50,52 @@ async function handleFaceVerification(
         return error("NO_FACE_REGISTERED", "You do not have a registered face. Please see HR.", 403);
     }
 
-    // Call ML API
-    // Ensure casting embeddingVector to number array since Prisma handles JSON natively
-    const storedVector = Array.isArray(profile.embeddingVector) 
-        ? profile.embeddingVector as number[] 
+    const storedDescriptor = Array.isArray(profile.embeddingVector)
+        ? profile.embeddingVector as number[]
         : [];
 
-    if (storedVector.length === 0) {
-        return error("INVALID_DATA", "Stored face embedding is corrupt.", 500);
+    if (storedDescriptor.length !== 128) {
+        return error("INVALID_DATA", "Stored face profile is corrupted or from an old system. Please re-enroll.", 500);
     }
 
-    const result = await verifyFace(image, storedVector);
-    const passed = result.success && result.match;
-    
-    // Log verification attempt (Success or Failure)
+    // ── Core Step: Euclidean Distance Comparison ──────────────────────
+    const distance = euclideanDistance(descriptor, storedDescriptor);
+    const passed = distance <= DISTANCE_THRESHOLD;
+    const confidence = Math.max(0, Math.min(1, 1 - distance / 1.5)); // Normalize to 0-1
+
+    logger.info({ userId: auth.sub, distance, passed }, "Face verification attempt");
+
+    // Log verification attempt
     await prisma.faceVerificationLog.create({
         data: {
             userId: auth.sub,
-            confidenceScore: result.confidence || 0,
-            spoofProbability: result.spoofProbability || 0,
+            confidenceScore: confidence,
+            spoofProbability: 0, // True liveness detection requires a dedicated model
             status: passed ? "SUCCESS" : "FAILED_MATCH",
             ipAddress: req.headers.get("x-forwarded-for") || "unknown"
         }
     });
 
     if (!passed) {
-        logger.warn({ userId: auth.sub, score: result.confidence }, "Employee face verification failed");
-        
+        logger.warn({ userId: auth.sub, distance }, "Face verification FAILED — distance too large");
         await logAuditEvent({
             actorId: auth.sub,
             actorRole: auth.role,
             action: "face.verify",
             resourceType: "attendance",
             ipAddress: req.headers.get("x-forwarded-for") || "unknown",
-            metadata: { success: false, reason: "mismatch" }
+            metadata: { success: false, reason: "distance_mismatch", distance }
         }).catch(() => {});
 
         return error("VERIFICATION_FAILED", "Face verification failed. Please try again or see HR.", 401);
     }
 
-    logger.info({ userId: auth.sub }, "Employee face verified successfully");
+    logger.info({ userId: auth.sub, distance }, "Face verified successfully");
 
     return success({
         message: "Verified",
-        confidence: result.confidence,
-        // Optional: Return a short-lived token that the check-in API will consume to guarantee it isn't bypassed.
+        confidence,
+        distance,
         verificationToken: `v_token_${Date.now()}_${auth.sub}`
     }, 200);
 }

@@ -1,211 +1,312 @@
 "use client";
 
-import React, { useRef, useState, useCallback, useEffect } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Webcam from "react-webcam";
-import { Camera, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
 import { apiPost } from "@/lib/api-client";
 
-interface FaceEnrollmentModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  userId: string;
-  userName: string;
-  onEnrollmentSuccess?: () => void;
+interface Props {
+    isOpen: boolean;
+    onClose: () => void;
+    userId: string;
+    userName: string;
+    onEnrollmentSuccess?: () => void;
 }
 
-export function FaceEnrollmentModal({
-  isOpen,
-  onClose,
-  userId,
-  userName,
-  onEnrollmentSuccess,
-}: FaceEnrollmentModalProps) {
-  const webcamRef = useRef<Webcam>(null);
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const [isCapturing, setIsCapturing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const [isCameraReady, setIsCameraReady] = useState(false);
+type Phase = "idle" | "loading_models" | "scanning" | "processing" | "success" | "error";
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+function loadFaceApi() {
+    return import("@vladmandic/face-api");
+}
 
-  const captureFrame = useCallback(() => {
-    const imageSrc = webcamRef.current?.getScreenshot();
-    if (imageSrc) {
-      setCapturedImage(imageSrc);
-      setError(null);
-    } else {
-      setError("Failed to capture image. Please ensure camera permissions are granted.");
-    }
-  }, [webcamRef]);
+export function FaceEnrollmentModal({ isOpen, onClose, userId, userName, onEnrollmentSuccess }: Props) {
+    const webcamRef = useRef<Webcam>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const descriptorsRef = useRef<Float32Array[]>([]);
 
-  const retakeImage = () => {
-    setCapturedImage(null);
-    setError(null);
-  };
+    const [phase, setPhase] = useState<Phase>("idle");
+    const [progress, setProgress] = useState(0);
+    const [statusMsg, setStatusMsg] = useState("Initializing…");
+    const [errorMsg, setErrorMsg] = useState("");
+    const [isCameraReady, setIsCameraReady] = useState(false);
 
-  const submitEnrollment = async () => {
-    if (!capturedImage) return;
+    const TOTAL_FRAMES = 10;
 
-    setIsCapturing(true);
-    setError(null);
+    // ── Cleanup ──────────────────────────────────────────────
+    const cleanup = useCallback(() => {
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+        }
+    }, []);
 
-    try {
-      const response = await apiPost("/api/face/enroll", {
-        userId,
-        image: capturedImage,
-      });
+    const handleClose = useCallback(() => {
+        cleanup();
+        setPhase("idle");
+        setProgress(0);
+        setStatusMsg("Initializing…");
+        setErrorMsg("");
+        setIsCameraReady(false);
+        descriptorsRef.current = [];
+        onClose();
+    }, [cleanup, onClose]);
 
-      if (response.error) throw new Error(response.error);
+    // ── Load Models ──────────────────────────────────────────
+    const startScanning = useCallback(async () => {
+        setPhase("loading_models");
+        setStatusMsg("Loading AI models…");
 
-      setIsSuccess(true);
-      if (onEnrollmentSuccess) {
-        setTimeout(onEnrollmentSuccess, 1500);
-      }
-    } catch (err: any) {
-      setError(err.message || "Failed to enroll face. Please try again.");
-    } finally {
-      setIsCapturing(false);
-    }
-  };
+        try {
+            const faceapi = await loadFaceApi();
+            const MODEL_URL = "/models";
+            await Promise.all([
+                faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+                faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+            ]);
 
-  // Reset state on modal close
-  const handleClose = () => {
-    setCapturedImage(null);
-    setError(null);
-    setIsSuccess(false);
-    setIsCapturing(false);
-    setIsCameraReady(false);
-    onClose();
-  };
+            setPhase("scanning");
+            setStatusMsg("Position your face inside the circle…");
+            descriptorsRef.current = [];
 
-  if (!isOpen || !mounted) return null;
+            // ── Scan Loop (runs every 300ms) ─────────────────
+            intervalRef.current = setInterval(async () => {
+                const video = webcamRef.current?.video;
+                if (!video || video.readyState !== 4) return;
 
-  return createPortal(
-    <div style={{
-        position: "fixed", inset: 0, zIndex: 999999, // Super high z-index to block sidebar/navbar
-        background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)", // Stronger blur
-        display: "flex", alignItems: "center", justifyContent: "center", padding: 20
-    }}>
-      <div className="animate-slideUp" style={{
-          background: "var(--bg-primary)", borderRadius: 16, padding: "32px",
-          maxWidth: 600, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.4)"
-      }}>
-        <div style={{ marginBottom: 20 }}>
-          <h2 style={{ fontSize: "var(--text-xl)", fontWeight: "var(--font-bold)", margin: 0, color: "var(--text-primary)" }}>
-            Register Face: {userName}
-          </h2>
-          <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", marginTop: 8 }}>
-            Position the employee's face clearly within the frame. Ensure good lighting.
-          </p>
-        </div>
+                const detection = await faceapi.detectSingleFace(
+                    video,
+                    new faceapi.SsdMobilenetv1Options({ minConfidence: 0.80 })
+                ).withFaceLandmarks().withFaceDescriptor();
 
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "16px 0", position: "relative" }}>
-          {isSuccess ? (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 0", color: "#16a34a" }}>
-              <CheckCircle size={64} style={{ marginBottom: 16 }} />
-              <p style={{ fontSize: "18px", fontWeight: 500 }}>Face Registered Successfully!</p>
-            </div>
-          ) : (
-            <div style={{ width: "100%" }}>
-              <div style={{ position: "relative", width: "100%", height: "360px", backgroundColor: "black", borderRadius: 12, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {capturedImage ? (
-                  <img src={capturedImage} alt="Captured" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : (
-                  <>
-                    {!isCameraReady && (
-                      <div style={{ position: "absolute", zIndex: 10, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)" }}>
-                        <RefreshCw size={24} className="animate-spin" style={{ marginBottom: 8 }} />
-                        <span style={{ fontSize: "14px" }}>Starting camera...</span>
-                      </div>
+                if (!detection) {
+                    setStatusMsg("No face detected — keep your face in the frame…");
+                    return;
+                }
+
+                const score = detection.detection.score;
+                if (score < 0.85) {
+                    setStatusMsg(`Low confidence (${Math.round(score * 100)}%) — hold still…`);
+                    return;
+                }
+
+                descriptorsRef.current.push(detection.descriptor);
+                const count = descriptorsRef.current.length;
+                const pct = Math.round((count / TOTAL_FRAMES) * 100);
+                setProgress(pct);
+
+                const hints = [
+                    "Look straight at the camera…",
+                    "Look slightly left…",
+                    "Look slightly right…",
+                    "Tilt head slightly up…",
+                    "Tilt head slightly down…",
+                    "Smile naturally…",
+                    "Keep neutral expression…",
+                    "Move a little closer…",
+                    "Hold still — almost done…",
+                    "Perfect! Finalizing…",
+                ];
+                setStatusMsg(hints[Math.min(count - 1, hints.length - 1)]);
+
+                if (count >= TOTAL_FRAMES) {
+                    cleanup();
+                    setPhase("processing");
+                    setStatusMsg("Building your face profile…");
+
+                    // Average all descriptors
+                    const averaged = averageDescriptors(descriptorsRef.current);
+
+                    const res = await apiPost<{ profileId: string }>("/api/face/enroll", {
+                        userId,
+                        descriptor: Array.from(averaged),
+                    });
+
+                    if (res.data) {
+                        setPhase("success");
+                        setStatusMsg("Face registered successfully!");
+                        onEnrollmentSuccess?.();
+                    } else {
+                        setPhase("error");
+                        setErrorMsg(res.error || "Failed to save face profile.");
+                    }
+                }
+            }, 300);
+
+        } catch (e: any) {
+            setPhase("error");
+            setErrorMsg(e.message || "Could not load AI models.");
+        }
+    }, [userId, cleanup, onEnrollmentSuccess]);
+
+    // Start scanning once camera is ready
+    useEffect(() => {
+        if (isCameraReady && phase === "idle") {
+            startScanning();
+        }
+    }, [isCameraReady, phase, startScanning]);
+
+    useEffect(() => {
+        if (!isOpen) cleanup();
+    }, [isOpen, cleanup]);
+
+    if (!isOpen) return null;
+
+    // ── Progress ring math ────────────────────────────────────
+    const radius = 110;
+    const circumference = 2 * Math.PI * radius;
+    const strokeDashoffset = circumference - (progress / 100) * circumference;
+
+    const ringColor =
+        progress < 40 ? "#ef4444" :
+        progress < 75 ? "#f59e0b" :
+        "#22c55e";
+
+    return (
+        <div style={{
+            position: "fixed", inset: 0, zIndex: 99999,
+            background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+        }}>
+            <div style={{
+                background: "#0f172a", borderRadius: 24, padding: "36px 32px",
+                maxWidth: 440, width: "100%", boxShadow: "0 30px 80px rgba(0,0,0,0.6)",
+                textAlign: "center", color: "white",
+            }}>
+                <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>
+                    {phase === "success" ? "✅ Face Registered!" : "Register Face"}
+                </h2>
+                <p style={{ color: "#94a3b8", fontSize: 13, marginBottom: 28 }}>
+                    {userName}
+                </p>
+
+                {/* Camera + SVG Ring overlay */}
+                <div style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 24 }}>
+                    {/* SVG progress ring */}
+                    <svg width={260} height={260} style={{ position: "absolute", top: 0, left: 0, zIndex: 2, transform: "rotate(-90deg)" }}>
+                        {/* track */}
+                        <circle cx={130} cy={130} r={radius} fill="none" stroke="#1e293b" strokeWidth={8} />
+                        {/* progress */}
+                        <circle
+                            cx={130} cy={130} r={radius}
+                            fill="none"
+                            stroke={ringColor}
+                            strokeWidth={8}
+                            strokeLinecap="round"
+                            strokeDasharray={circumference}
+                            strokeDashoffset={strokeDashoffset}
+                            style={{ transition: "stroke-dashoffset 0.3s ease, stroke 0.3s ease" }}
+                        />
+                    </svg>
+
+                    {/* Circular mask for webcam */}
+                    <div style={{
+                        width: 220, height: 220,
+                        borderRadius: "50%",
+                        overflow: "hidden",
+                        background: "#0f172a",
+                        position: "relative",
+                        zIndex: 1,
+                    }}>
+                        {phase !== "success" && phase !== "error" && (
+                            <Webcam
+                                ref={webcamRef}
+                                audio={false}
+                                mirrored={true}
+                                onUserMedia={() => setIsCameraReady(true)}
+                                onUserMediaError={(e) => {
+                                    setPhase("error");
+                                    setErrorMsg("Camera access denied. Please allow camera permissions.");
+                                }}
+                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                            />
+                        )}
+                        {phase === "success" && (
+                            <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #064e3b, #166534)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64 }}>
+                                ✅
+                            </div>
+                        )}
+                        {phase === "error" && (
+                            <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #7f1d1d, #991b1b)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64 }}>
+                                ❌
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Percentage badge */}
+                    {phase === "scanning" && (
+                        <div style={{
+                            position: "absolute", bottom: 6, right: 6,
+                            background: "#0f172a", border: `2px solid ${ringColor}`,
+                            borderRadius: 20, padding: "4px 10px",
+                            fontSize: 13, fontWeight: 700, color: ringColor, zIndex: 3,
+                        }}>
+                            {progress}%
+                        </div>
                     )}
-                    <Webcam
-                      audio={false}
-                      ref={webcamRef}
-                      screenshotFormat="image/jpeg"
-                      videoConstraints={{
-                        facingMode: "user"
-                      }}
-                      mirrored={true}
-                      onUserMedia={() => setIsCameraReady(true)}
-                      onUserMediaError={(err: any) => {
-                        setIsCameraReady(false);
-                        console.error("Camera Error:", err);
-                        let detailedError = "";
-                        if (typeof err === 'string') {
-                          detailedError = err;
-                        } else if (err instanceof Error || (err && err.name && err.message)) {
-                          detailedError = `${err.name}: ${err.message}`;
-                        } else {
-                          detailedError = "Unknown camera error. Please ensure permissions are granted and no other app is using the camera.";
-                        }
-                        setError(`Camera Error: ${detailedError}`);
-                      }}
-                      style={{ 
-                        width: "100%", 
-                        height: "100%", 
-                        objectFit: "cover", 
-                        opacity: isCameraReady ? 1 : 0,
-                        transition: "opacity 0.3s ease" 
-                      }}
-                    />
-                  </>
-                )}
-                
-                {/* Targeting Overlay */}
-                {(!capturedImage && isCameraReady) && (
-                  <div style={{ position: "absolute", inset: 0, border: "2px solid rgba(139, 92, 246, 0.5)", margin: 16, borderRadius: 12, pointerEvents: "none", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ width: 160, height: 200, border: "2px dashed rgba(255,255,255,0.7)", borderRadius: "100%" }}></div>
-                  </div>
-                )}
-              </div>
-
-              {error && (
-                <div style={{ marginTop: 16, padding: 12, background: "#fee2e2", color: "#991b1b", borderRadius: 8, fontSize: "var(--text-sm)", display: "flex", alignItems: "center", gap: 8 }}>
-                  <AlertCircle size={16} />
-                  <span>{error}</span>
                 </div>
-              )}
-            </div>
-          )}
-        </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginTop: 24 }}>
-          {!isSuccess && (
-            <>
-              {capturedImage ? (
-                <>
-                  <button onClick={retakeImage} disabled={isCapturing} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "1px solid #d1d5db", background: "white", color: "#374151", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                    <RefreshCw size={16} /> Retake
-                  </button>
-                  <button onClick={submitEnrollment} disabled={isCapturing} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "none", background: "var(--color-primary)", color: "white", fontWeight: 600, cursor: isCapturing ? "not-allowed" : "pointer", opacity: isCapturing ? 0.7 : 1 }}>
-                    {isCapturing ? "Enrolling..." : "Submit Photo"}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button onClick={handleClose} disabled={isCapturing} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "1px solid #d1d5db", background: "white", color: "#374151", fontWeight: 600, cursor: "pointer" }}>
-                    Cancel
-                  </button>
-                  <button onClick={captureFrame} disabled={!isCameraReady} style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "none", background: "var(--color-primary)", color: "white", fontWeight: 600, cursor: isCameraReady ? "pointer" : "not-allowed", opacity: isCameraReady ? 1 : 0.5, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                    <Camera size={16} /> Capture Face
-                  </button>
-                </>
-              )}
-            </>
-          )}
-          {isSuccess && (
-            <button onClick={handleClose} style={{ width: "100%", padding: "12px 0", borderRadius: 8, border: "none", background: "var(--color-primary)", color: "white", fontWeight: 600, cursor: "pointer" }}>
-              Done
-            </button>
-          )}
+                {/* Status text */}
+                {phase === "loading_models" && (
+                    <div style={{ color: "#94a3b8", fontSize: 14, marginBottom: 24 }}>
+                        <div className="spinner" style={{ width: 20, height: 20, border: "2px solid #334155", borderTopColor: "#3b82f6", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 10px" }} />
+                        Loading AI models…
+                    </div>
+                )}
+
+                {phase === "scanning" && (
+                    <>
+                        <p style={{ color: "#e2e8f0", fontSize: 14, marginBottom: 8, minHeight: 20 }}>{statusMsg}</p>
+                        <div style={{ background: "#1e293b", borderRadius: 8, height: 6, overflow: "hidden", marginBottom: 24 }}>
+                            <div style={{ width: `${progress}%`, height: "100%", background: `linear-gradient(90deg, #3b82f6, ${ringColor})`, transition: "width 0.3s ease, background 0.3s ease" }} />
+                        </div>
+                    </>
+                )}
+
+                {phase === "processing" && (
+                    <p style={{ color: "#94a3b8", fontSize: 14, marginBottom: 24 }}>Saving your secure face profile…</p>
+                )}
+
+                {phase === "success" && (
+                    <p style={{ color: "#4ade80", fontSize: 15, fontWeight: 600, marginBottom: 24 }}>Face profile created successfully!</p>
+                )}
+
+                {phase === "error" && (
+                    <p style={{ color: "#f87171", fontSize: 14, marginBottom: 24 }}>{errorMsg}</p>
+                )}
+
+                {/* Buttons */}
+                <div style={{ display: "flex", gap: 12 }}>
+                    <button
+                        onClick={handleClose}
+                        style={{ flex: 1, padding: "12px 0", borderRadius: 10, border: "1px solid #334155", background: "transparent", color: "#94a3b8", fontWeight: 600, cursor: "pointer", fontSize: 14 }}
+                    >
+                        {phase === "success" ? "Close" : "Cancel"}
+                    </button>
+                    {phase === "error" && (
+                        <button
+                            onClick={() => { setPhase("idle"); setProgress(0); descriptorsRef.current = []; setIsCameraReady(false); }}
+                            style={{ flex: 1, padding: "12px 0", borderRadius: 10, border: "none", background: "#3b82f6", color: "white", fontWeight: 600, cursor: "pointer", fontSize: 14 }}
+                        >
+                            Try Again
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            <style>{`
+                @keyframes spin { to { transform: rotate(360deg); } }
+            `}</style>
         </div>
-      </div>
-    </div>,
-    document.body
-  );
+    );
+}
+
+// ── Utility: Average multiple face descriptors ─────────────────────────
+function averageDescriptors(descriptors: Float32Array[]): Float32Array {
+    const len = descriptors[0].length;
+    const avg = new Float32Array(len);
+    for (let i = 0; i < len; i++) {
+        avg[i] = descriptors.reduce((sum, d) => sum + d[i], 0) / descriptors.length;
+    }
+    return avg;
 }

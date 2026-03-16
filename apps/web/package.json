@@ -16,6 +16,7 @@
     "@types/speakeasy": "^2.0.10",
     "@vibetech/db": "*",
     "@vibetech/shared": "*",
+    "@vladmandic/face-api": "^1.7.15",
     "bullmq": "^5.40.0",
     "jose": "^6.0.0",
     "lucide-react": "^0.577.0",
