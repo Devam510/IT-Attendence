@@ -72,7 +72,7 @@ async function handleApply(
         });
     }
 
-    // 5. Check for overlapping requests
+    // 5. Check for overlapping or duplicate requests
     const overlapping = await prisma.leaveRequest.findFirst({
         where: {
             userId: auth.sub,
@@ -84,7 +84,23 @@ async function handleApply(
     });
 
     if (overlapping) {
-        return error("OVERLAP", "You already have a leave request overlapping with these dates", 409);
+        if (overlapping.status === "APPROVED" && overlapping.leaveTypeId === input.leaveTypeId) {
+            return error("DUPLICATE_LEAVE", "You already have an approved leave of this type for these dates.", 409);
+        }
+        return error("OVERLAP", "You already have a leave request overlapping with these dates.", 409);
+    }
+
+    // 5b. Prevent applying for leave on days where attendance is already marked present
+    const existingAttendance = await prisma.attendanceRecord.findFirst({
+        where: {
+            userId: auth.sub,
+            date: { gte: startDate, lte: endDate },
+            status: { in: ["VERIFIED", "FLAGGED", "REGULARIZED", "PENDING"] }
+        }
+    });
+
+    if (existingAttendance) {
+        return error("ATTENDANCE_EXISTS", `You cannot apply for leave on ${existingAttendance.date.toLocaleDateString()} because your attendance is already recorded for that day.`, 409);
     }
 
     // 6. Team overlap detection (warn only, don't block)
