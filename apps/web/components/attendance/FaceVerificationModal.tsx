@@ -10,7 +10,7 @@ interface Props {
     onSuccess: (verificationToken: string) => void;
 }
 
-type Phase = "loading_models" | "scanning" | "verifying" | "success" | "error";
+type Phase = "loading_models" | "scanning" | "verifying" | "success" | "error" | "security_alert";
 
 function loadFaceApi() {
     return import("@vladmandic/face-api");
@@ -25,6 +25,7 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess }: Props) {
     const [statusMsg, setStatusMsg] = useState("Loading AI…");
     const [errorMsg, setErrorMsg] = useState("");
     const [isCameraReady, setIsCameraReady] = useState(false);
+    const [alertCountdown, setAlertCountdown] = useState(10);
 
     const cleanup = useCallback(() => {
         if (intervalRef.current) {
@@ -40,6 +41,7 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess }: Props) {
         setStatusMsg("Loading AI…");
         setErrorMsg("");
         setIsCameraReady(false);
+        setAlertCountdown(10);
         onClose();
     }, [cleanup, onClose]);
 
@@ -59,7 +61,6 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess }: Props) {
             setPhase("scanning");
             setStatusMsg("Look at the camera…");
 
-            // Continuous scan — verify on first good frame
             intervalRef.current = setInterval(async () => {
                 if (hasVerifiedRef.current) return;
                 const video = webcamRef.current?.video;
@@ -77,7 +78,6 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess }: Props) {
 
                 if (detection.detection.score < 0.85) return;
 
-                // Face found — send to backend
                 hasVerifiedRef.current = true;
                 cleanup();
                 setPhase("verifying");
@@ -91,8 +91,9 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess }: Props) {
                     setStatusMsg("Identity confirmed ✅");
                     setTimeout(() => onSuccess(res.data!.verificationToken), 800);
                 } else {
-                    setPhase("error");
-                    setErrorMsg(res.error || "Face did not match. Please try again or contact HR.");
+                    // Face did not match — show Security Alert
+                    setPhase("security_alert");
+                    setAlertCountdown(10);
                 }
             }, 250);
 
@@ -101,6 +102,14 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess }: Props) {
             setErrorMsg(e.message || "Failed to start face verification.");
         }
     }, [cleanup, onSuccess]);
+
+    // Countdown auto-close for the security alert
+    useEffect(() => {
+        if (phase !== "security_alert") return;
+        if (alertCountdown <= 0) { handleClose(); return; }
+        const t = setTimeout(() => setAlertCountdown(n => n - 1), 1000);
+        return () => clearTimeout(t);
+    }, [phase, alertCountdown, handleClose]);
 
     useEffect(() => {
         if (isCameraReady && phase === "loading_models") {
@@ -114,6 +123,136 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess }: Props) {
 
     if (!isOpen) return null;
 
+    // ── Security Alert Phase ─────────────────────────────────────────────
+    if (phase === "security_alert") {
+        return (
+            <div style={{
+                position: "fixed", inset: 0, zIndex: 999999,
+                background: "rgba(0,0,0,0.92)", backdropFilter: "blur(12px)",
+                display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+                animation: "fadeIn 0.2s ease",
+            }}>
+                <div style={{
+                    background: "linear-gradient(135deg, #1a0000, #2d0000)",
+                    border: "2px solid #ef4444",
+                    borderRadius: 24,
+                    padding: "40px 36px",
+                    maxWidth: 460,
+                    width: "100%",
+                    textAlign: "center",
+                    color: "white",
+                    boxShadow: "0 0 60px rgba(239,68,68,0.4), 0 30px 80px rgba(0,0,0,0.8)",
+                    animation: "slideUp 0.3s ease",
+                }}>
+                    {/* Warning icon with pulse */}
+                    <div style={{
+                        width: 80, height: 80, borderRadius: "50%",
+                        background: "rgba(239,68,68,0.15)",
+                        border: "2px solid #ef4444",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        margin: "0 auto 20px",
+                        fontSize: 36,
+                        animation: "alert-pulse 1s ease-in-out infinite",
+                    }}>
+                        🚨
+                    </div>
+
+                    <h2 style={{ fontSize: 22, fontWeight: 800, color: "#ef4444", marginBottom: 8, letterSpacing: 0.5 }}>
+                        Unauthorized Access Attempt
+                    </h2>
+                    <p style={{ color: "#fca5a5", fontSize: 14, marginBottom: 6, lineHeight: 1.6 }}>
+                        The face scanned does <strong>not match</strong> the registered face profile for this account.
+                    </p>
+                    <p style={{ color: "#94a3b8", fontSize: 12, marginBottom: 28, lineHeight: 1.6 }}>
+                        This attempt has been logged and reported to your HR administrator.
+                    </p>
+
+                    {/* Log details box */}
+                    <div style={{
+                        background: "rgba(239,68,68,0.08)",
+                        border: "1px solid rgba(239,68,68,0.2)",
+                        borderRadius: 12, padding: "12px 16px",
+                        marginBottom: 28, textAlign: "left",
+                    }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                            <span style={{ color: "#94a3b8", fontSize: 12 }}>Time</span>
+                            <span style={{ color: "#fca5a5", fontSize: 12, fontWeight: 600 }}>
+                                {new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                            </span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                            <span style={{ color: "#94a3b8", fontSize: 12 }}>Status</span>
+                            <span style={{ color: "#ef4444", fontSize: 12, fontWeight: 700 }}>❌ FACE MISMATCH</span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span style={{ color: "#94a3b8", fontSize: 12 }}>Action</span>
+                            <span style={{ color: "#fca5a5", fontSize: 12 }}>Check-in Blocked</span>
+                        </div>
+                    </div>
+
+                    {/* Auto-close countdown bar */}
+                    <div style={{ marginBottom: 20 }}>
+                        <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 8 }}>
+                            Auto-closing in <strong style={{ color: "#ef4444" }}>{alertCountdown}s</strong>
+                        </div>
+                        <div style={{ background: "#1e293b", borderRadius: 8, height: 4, overflow: "hidden" }}>
+                            <div style={{
+                                height: "100%",
+                                background: "#ef4444",
+                                width: `${(alertCountdown / 10) * 100}%`,
+                                transition: "width 1s linear",
+                                borderRadius: 8,
+                            }} />
+                        </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 12 }}>
+                        <button
+                            onClick={handleClose}
+                            style={{
+                                flex: 1, padding: "12px 0", borderRadius: 10,
+                                border: "1px solid rgba(239,68,68,0.4)",
+                                background: "transparent", color: "#fca5a5",
+                                fontWeight: 600, cursor: "pointer", fontSize: 14,
+                            }}
+                        >
+                            Dismiss
+                        </button>
+                        <button
+                            onClick={() => {
+                                hasVerifiedRef.current = false;
+                                setPhase("loading_models");
+                                setStatusMsg("Loading AI…");
+                                setErrorMsg("");
+                                setIsCameraReady(false);
+                                setAlertCountdown(10);
+                            }}
+                            style={{
+                                flex: 1, padding: "12px 0", borderRadius: 10,
+                                border: "1px solid rgba(239,68,68,0.4)",
+                                background: "rgba(239,68,68,0.15)",
+                                color: "#fca5a5",
+                                fontWeight: 600, cursor: "pointer", fontSize: 14,
+                            }}
+                        >
+                            Try Again
+                        </button>
+                    </div>
+                </div>
+
+                <style>{`
+                    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+                    @keyframes alert-pulse {
+                        0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+                        50% { box-shadow: 0 0 0 12px rgba(239,68,68,0); }
+                    }
+                `}</style>
+            </div>
+        );
+    }
+
+    // ── Normal scanning/verifying UI ─────────────────────────────────────
     const scannerColor =
         phase === "success" ? "#22c55e" :
         phase === "error" ? "#ef4444" :
@@ -136,11 +275,10 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess }: Props) {
                 </p>
 
                 {/* Camera with animated ring */}
-                <div style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 24 }}>
+                <div style={{ position: "relative", width: 260, height: 260, margin: "0 auto 24px" }}>
                     {/* Animated scanning ring */}
                     <div style={{
-                        position: "absolute",
-                        width: 240, height: 240,
+                        position: "absolute", inset: 0,
                         borderRadius: "50%",
                         border: `4px solid ${scannerColor}`,
                         zIndex: 2,
@@ -149,12 +287,15 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess }: Props) {
                         transition: "border-color 0.3s ease, box-shadow 0.3s ease",
                     }} />
 
+                    {/* Circular webcam — centered */}
                     <div style={{
-                        width: 220, height: 220,
+                        position: "absolute",
+                        top: "50%", left: "50%",
+                        transform: "translate(-50%, -50%)",
+                        width: 240, height: 240,
                         borderRadius: "50%",
                         overflow: "hidden",
                         background: "#0f172a",
-                        position: "relative",
                         zIndex: 1,
                     }}>
                         {(phase === "loading_models" || phase === "scanning" || phase === "verifying") && (
@@ -171,16 +312,28 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess }: Props) {
                             />
                         )}
                         {phase === "success" && (
-                            <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #064e3b, #166534)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64 }}>
+                            <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #064e3b, #166534)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 72 }}>
                                 ✅
                             </div>
                         )}
                         {phase === "error" && (
-                            <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #7f1d1d, #991b1b)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64 }}>
+                            <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #7f1d1d, #991b1b)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 72 }}>
                                 ❌
                             </div>
                         )}
                     </div>
+
+                    {/* Loading spinner overlay */}
+                    {phase === "loading_models" && (
+                        <div style={{
+                            position: "absolute", inset: 0, borderRadius: "50%",
+                            background: "rgba(15,23,42,0.7)", zIndex: 3,
+                            display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8
+                        }}>
+                            <div style={{ width: 28, height: 28, border: "3px solid #334155", borderTopColor: "#3b82f6", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                            <span style={{ color: "#94a3b8", fontSize: 11 }}>Loading AI…</span>
+                        </div>
+                    )}
                 </div>
 
                 {/* Status */}
@@ -190,10 +343,7 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess }: Props) {
 
                 {/* Buttons */}
                 <div style={{ display: "flex", gap: 12 }}>
-                    <button
-                        onClick={handleClose}
-                        style={{ flex: 1, padding: "12px 0", borderRadius: 10, border: "1px solid #334155", background: "transparent", color: "#94a3b8", fontWeight: 600, cursor: "pointer", fontSize: 14 }}
-                    >
+                    <button onClick={handleClose} style={{ flex: 1, padding: "12px 0", borderRadius: 10, border: "1px solid #334155", background: "transparent", color: "#94a3b8", fontWeight: 600, cursor: "pointer", fontSize: 14 }}>
                         Cancel
                     </button>
                     {phase === "error" && (
@@ -217,7 +367,7 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess }: Props) {
                 @keyframes spin { to { transform: rotate(360deg); } }
                 @keyframes pulse-ring {
                     0%, 100% { transform: scale(1); opacity: 1; }
-                    50% { transform: scale(1.05); opacity: 0.75; }
+                    50% { transform: scale(1.04); opacity: 0.75; }
                 }
             `}</style>
         </div>
