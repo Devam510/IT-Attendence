@@ -5,11 +5,12 @@ import Link from "next/link";
 import { apiGet } from "@/lib/api-client";
 import "@/styles/leaves.css";
 
-interface LeaveBalance {
-    annual: { remaining: number; total: number };
-    sick: { remaining: number; total: number };
-    casual: { remaining: number; total: number };
-    comp: { remaining: number; total: number };
+interface BalanceItem {
+    leaveTypeId: string;
+    name: string;
+    code: string;
+    entitlement: number;
+    available: number;
 }
 
 interface LeaveRecord {
@@ -22,15 +23,18 @@ interface LeaveRecord {
     reason?: string;
 }
 
-const TYPE_ICONS: Record<string, string> = {
-    annual: "🏖️",
-    sick: "🤒",
-    casual: "☀️",
-    comp: "🔄",
+const getIconForType = (name: string) => {
+    const n = name.toLowerCase();
+    if (n.includes("annual") || n.includes("earned")) return "🏖️";
+    if (n.includes("sick")) return "🤒";
+    if (n.includes("casual")) return "☀️";
+    if (n.includes("comp")) return "🔄";
+    if (n.includes("maternity") || n.includes("paternity")) return "👶";
+    return "📋";
 };
 
 export default function LeavesPage() {
-    const [balance, setBalance] = useState<LeaveBalance | null>(null);
+    const [balance, setBalance] = useState<BalanceItem[]>([]);
     const [history, setHistory] = useState<LeaveRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<"balance" | "history">("balance");
@@ -43,34 +47,10 @@ export default function LeavesPage() {
                 apiGet<any>("/api/leaves/history"),
             ]);
 
-            // Map API balances array to frontend LeaveBalance object
+            // Map API balances array directly to frontend state
             if (balRes.data) {
-                const balArr = balRes.data.balances || balRes.data.balance || [];
-                const codeMap: Record<string, string> = { EL: "annual", SL: "sick", CL: "casual", CO: "comp" };
-                const nameMap: Record<string, string> = { "Annual Leave": "annual", "Earned Leave": "annual", "Sick Leave": "sick", "Casual Leave": "casual", "Comp Off": "comp" };
-
-                const mapped: Record<string, { remaining: number; total: number }> = {
-                    annual: { remaining: 0, total: 0 },
-                    sick: { remaining: 0, total: 0 },
-                    casual: { remaining: 0, total: 0 },
-                    comp: { remaining: 0, total: 0 },
-                };
-
-                if (Array.isArray(balArr)) {
-                    for (const b of balArr) {
-                        const key = codeMap[b.code] || nameMap[b.name] || b.code?.toLowerCase();
-                        if (key && mapped[key]) {
-                            mapped[key] = {
-                                remaining: b.available ?? (b.opening + b.accrued - b.used - b.pending),
-                                total: b.entitlement ?? b.opening ?? 0,
-                            };
-                        }
-                    }
-                } else if (typeof balArr === "object") {
-                    // Already in the right shape
-                    Object.assign(mapped, balArr);
-                }
-                setBalance(mapped as unknown as LeaveBalance);
+                const balArr = balRes.data.balances || [];
+                setBalance(balArr);
             }
 
             // Map history response
@@ -92,13 +72,6 @@ export default function LeavesPage() {
         }
         load();
     }, []);
-
-    const balanceCards = balance ? [
-        { key: "annual", label: "Annual Leave", icon: TYPE_ICONS.annual, type: "annual" as const, data: balance.annual },
-        { key: "sick", label: "Sick Leave", icon: TYPE_ICONS.sick, type: "sick" as const, data: balance.sick },
-        { key: "casual", label: "Casual Leave", icon: TYPE_ICONS.casual, type: "casual" as const, data: balance.casual },
-        { key: "comp", label: "Comp Off", icon: TYPE_ICONS.comp, type: "comp" as const, data: balance.comp },
-    ] : [];
 
     if (loading) {
         return (
@@ -141,33 +114,49 @@ export default function LeavesPage() {
             {/* Balance Cards */}
             {activeTab === "balance" && (
                 <div className="leave-balance-grid animate-slideUp">
-                    {balanceCards.map(({ key, label, icon, type, data }) => {
-                        const pct = data.total > 0 ? Math.round((data.remaining / data.total) * 100) : 0;
-                        return (
-                            <div key={key} className="leave-balance-card">
-                                <div className="leave-balance-card-top">
-                                    <div className={`leave-balance-icon ${type}`}>{icon}</div>
-                                    <span className={`badge ${pct > 50 ? "badge-success" : pct > 25 ? "badge-warning" : "badge-danger"}`}>
-                                        {pct}%
-                                    </span>
+                    {balance.length === 0 ? (
+                        <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "40px", color: "var(--text-tertiary)" }}>
+                            No leave types configured for your account.
+                        </div>
+                    ) : (
+                        balance.map((b) => {
+                            // Provide safe fallbacks so Math doesn't fail on undefined/null
+                            const total = b.entitlement || 0;
+                            const remaining = b.available || 0;
+                            
+                            const pct = total > 0 ? Math.round((remaining / total) * 100) : 0;
+                            const icon = getIconForType(b.name);
+                            // Derive CSS class name dynamically or use a generic one
+                            const cssType = b.name.toLowerCase().includes("sick") ? "sick" : 
+                                            b.name.toLowerCase().includes("casual") ? "casual" : 
+                                            b.name.toLowerCase().includes("comp") ? "comp" : "annual";
+
+                            return (
+                                <div key={b.leaveTypeId} className="leave-balance-card">
+                                    <div className="leave-balance-card-top">
+                                        <div className={`leave-balance-icon ${cssType}`}>{icon}</div>
+                                        <span className={`badge ${pct > 50 ? "badge-success" : pct > 25 ? "badge-warning" : "badge-danger"}`}>
+                                            {pct}%
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <div className="leave-balance-remaining">{remaining}</div>
+                                        <div className="leave-balance-type">{b.name}</div>
+                                    </div>
+                                    <div className="leave-balance-bar-container">
+                                        <div
+                                            className={`leave-balance-bar ${cssType}`}
+                                            style={{ width: `${pct}%` }}
+                                        />
+                                    </div>
+                                    <div className="leave-balance-footer">
+                                        <span>{remaining} remaining</span>
+                                        <span>of {total}</span>
+                                    </div>
                                 </div>
-                                <div>
-                                    <div className="leave-balance-remaining">{data.remaining}</div>
-                                    <div className="leave-balance-type">{label}</div>
-                                </div>
-                                <div className="leave-balance-bar-container">
-                                    <div
-                                        className={`leave-balance-bar ${type}`}
-                                        style={{ width: `${pct}%` }}
-                                    />
-                                </div>
-                                <div className="leave-balance-footer">
-                                    <span>{data.remaining} remaining</span>
-                                    <span>of {data.total}</span>
-                                </div>
-                            </div>
-                        );
-                    })}
+                            );
+                        })
+                    )}
                 </div>
             )}
 
@@ -186,7 +175,7 @@ export default function LeavesPage() {
                                 <div className={`leave-history-color-bar ${item.status}`} />
                                 <div className="leave-history-info">
                                     <div className="leave-history-title">
-                                        {TYPE_ICONS[item.type] || "📋"} {item.type.charAt(0).toUpperCase() + item.type.slice(1)} Leave
+                                        {getIconForType(item.type)} {item.type.charAt(0).toUpperCase() + item.type.slice(1)} (History)
                                         <span style={{ marginLeft: 8, fontWeight: "normal", color: "var(--text-secondary)" }}>
                                             · {item.days} day{item.days > 1 ? "s" : ""}
                                         </span>

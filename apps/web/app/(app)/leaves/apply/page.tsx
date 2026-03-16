@@ -5,12 +5,22 @@ import { useRouter } from "next/navigation";
 import { apiGet, apiPost } from "@/lib/api-client";
 import "@/styles/leaves.css";
 
-const LEAVE_TYPES = [
-    { value: "annual", label: "Annual Leave", icon: "🏖️" },
-    { value: "sick", label: "Sick Leave", icon: "🤒" },
-    { value: "casual", label: "Casual Leave", icon: "☀️" },
-    { value: "comp", label: "Comp Off", icon: "🔄" },
-];
+const getIconForType = (name: string) => {
+    const n = name.toLowerCase();
+    if (n.includes("annual") || n.includes("earned")) return "🏖️";
+    if (n.includes("sick")) return "🤒";
+    if (n.includes("casual")) return "☀️";
+    if (n.includes("comp")) return "🔄";
+    if (n.includes("maternity") || n.includes("paternity")) return "👶";
+    return "📋";
+};
+
+interface DynamicLeaveType {
+    value: string; // The specific leaveTypeId from DB
+    label: string; // The exact name mapped in the DB
+    icon: string;
+    available: number;
+}
 
 interface TeamOverlap {
     name: string;
@@ -26,7 +36,7 @@ export default function ApplyLeavePage() {
     const router = useRouter();
 
     const [formData, setFormData] = useState({
-        leaveType: "annual",
+        leaveTypeId: "", // Starts empty, selects first dynamically loaded option
         startDate: "",
         endDate: "",
         reason: "",
@@ -34,11 +44,37 @@ export default function ApplyLeavePage() {
         halfDayPeriod: "am" as "am" | "pm",
     });
 
+    const [availableTypes, setAvailableTypes] = useState<DynamicLeaveType[]>([]);
+    const [loadingTypes, setLoadingTypes] = useState(true);
+
     const [dayCount, setDayCount] = useState<DayCount | null>(null);
     const [overlap, setOverlap] = useState<TeamOverlap[]>([]);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState(false);
+
+    // Fetch dynamic leave types on mount based on backend configuration
+    useEffect(() => {
+        async function fetchTypes() {
+            setLoadingTypes(true);
+            const res = await apiGet<any>("/api/leaves/balance");
+            if (res.data && res.data.balances) {
+                const types = res.data.balances.map((b: any) => ({
+                    value: b.leaveTypeId,
+                    label: b.name,
+                    icon: getIconForType(b.name),
+                    available: b.available || 0,
+                }));
+                // Remove fully depleted types if desired? No, let them request although it'll error later or pending.
+                setAvailableTypes(types);
+                if (types.length > 0) {
+                    setFormData(f => ({ ...f, leaveTypeId: types[0].value }));
+                }
+            }
+            setLoadingTypes(false);
+        }
+        fetchTypes();
+    }, []);
 
     // Calculate days when dates change
     useEffect(() => {
@@ -73,34 +109,16 @@ export default function ApplyLeavePage() {
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         setError("");
-        setSubmitting(true);
-
-        // First, look up the leaveTypeId from the balance API
-        const balRes = await apiGet<any>("/api/leaves/balance");
-        const codeMap: Record<string, string[]> = {
-            annual: ["EL", "AL"],
-            sick: ["SL"],
-            casual: ["CL"],
-            comp: ["CO"],
-        };
-        const validCodes = codeMap[formData.leaveType] || [formData.leaveType.toUpperCase()];
-        let leaveTypeId = "";
-
-        if (balRes.data?.balances) {
-            const match = balRes.data.balances.find((b: any) =>
-                validCodes.includes(b.code) || b.name?.toLowerCase().includes(formData.leaveType)
-            );
-            if (match) leaveTypeId = match.leaveTypeId;
-        }
-
-        if (!leaveTypeId) {
-            setError("Could not find leave type. Please try again.");
-            setSubmitting(false);
+        
+        if (!formData.leaveTypeId) {
+            setError("Please select a valid leave type.");
             return;
         }
 
+        setSubmitting(true);
+
         const res = await apiPost("/api/leaves/apply", {
-            leaveTypeId,
+            leaveTypeId: formData.leaveTypeId,
             startDate: formData.startDate,
             endDate: formData.endDate,
             reason: formData.reason,
@@ -156,35 +174,46 @@ export default function ApplyLeavePage() {
                     <div className="input-group" style={{ marginBottom: "var(--space-5)" }}>
                         <label className="input-label">Leave Type</label>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "var(--space-3)" }}>
-                            {LEAVE_TYPES.map(type => (
-                                <label
-                                    key={type.value}
-                                    style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "var(--space-3)",
-                                        padding: "var(--space-4)",
-                                        borderRadius: "var(--radius-md)",
-                                        border: `2px solid ${formData.leaveType === type.value ? "var(--color-primary)" : "var(--border-primary)"}`,
-                                        background: formData.leaveType === type.value ? "var(--color-primary-light)" : "var(--bg-secondary)",
-                                        cursor: "pointer",
-                                        transition: "all var(--transition-fast)",
-                                    }}
-                                >
-                                    <input
-                                        type="radio"
-                                        name="leaveType"
-                                        value={type.value}
-                                        checked={formData.leaveType === type.value}
-                                        onChange={() => setFormData(f => ({ ...f, leaveType: type.value }))}
-                                        style={{ display: "none" }}
-                                    />
-                                    <span style={{ fontSize: "1.4rem" }}>{type.icon}</span>
-                                    <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-medium)" }}>
-                                        {type.label}
-                                    </span>
-                                </label>
-                            ))}
+                            {loadingTypes ? (
+                                <div style={{ color: "var(--text-tertiary)", padding: "var(--space-2)" }}>Loading available leave types...</div>
+                            ) : availableTypes.length === 0 ? (
+                                <div style={{ color: "var(--color-danger)", padding: "var(--space-2)", gridColumn: "1 / -1", background: "var(--color-danger-light)", borderRadius: 6 }}>No leave types configured for your account. Please contact HR.</div>
+                            ) : (
+                                availableTypes.map(type => (
+                                    <label
+                                        key={type.value}
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "var(--space-3)",
+                                            padding: "var(--space-4)",
+                                            borderRadius: "var(--radius-md)",
+                                            border: `2px solid ${formData.leaveTypeId === type.value ? "var(--color-primary)" : "var(--border-primary)"}`,
+                                            background: formData.leaveTypeId === type.value ? "var(--color-primary-light)" : "var(--bg-secondary)",
+                                            cursor: "pointer",
+                                            transition: "all var(--transition-fast)",
+                                        }}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="leaveType"
+                                            value={type.value}
+                                            checked={formData.leaveTypeId === type.value}
+                                            onChange={() => setFormData(f => ({ ...f, leaveTypeId: type.value }))}
+                                            style={{ display: "none" }}
+                                        />
+                                        <span style={{ fontSize: "1.4rem" }}>{type.icon}</span>
+                                        <div style={{ display: "flex", flexDirection: "column" }}>
+                                            <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-medium)" }}>
+                                                {type.label}
+                                            </span>
+                                            <span style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", marginTop: 2 }}>
+                                                {type.available} days remaining
+                                            </span>
+                                        </div>
+                                    </label>
+                                ))
+                            )}
                         </div>
                     </div>
 
@@ -296,7 +325,7 @@ export default function ApplyLeavePage() {
                         <button
                             type="submit"
                             className="btn btn-primary"
-                            disabled={submitting || !formData.startDate || !formData.endDate || !formData.reason}
+                            disabled={submitting || !formData.startDate || !formData.endDate || !formData.reason || !formData.leaveTypeId}
                         >
                             {submitting ? <><span className="spinner" /> Submitting...</> : "Submit Request"}
                         </button>
