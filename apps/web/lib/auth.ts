@@ -69,11 +69,13 @@ export function withAuth(handler: RouteHandler): (req: NextRequest, ctx?: unknow
             );
         }
 
-        const params = ctx && typeof ctx === "object" && "params" in ctx
-            ? (ctx as { params: Record<string, string> }).params
-            : undefined;
+        let parsedParams: Record<string, string> | undefined = undefined;
+        if (ctx && typeof ctx === "object" && "params" in ctx) {
+            const rawParams = (ctx as any).params;
+            parsedParams = rawParams instanceof Promise ? await rawParams : rawParams;
+        }
 
-        return handler(req, { auth, params });
+        return handler(req, { auth, params: parsedParams });
     };
 }
 
