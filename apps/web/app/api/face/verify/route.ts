@@ -88,7 +88,7 @@ async function handleFaceVerification(
             metadata: { success: false, reason: "distance_mismatch", distance }
         }).catch(() => {});
 
-        return error("VERIFICATION_FAILED", "Face verification failed. Please try again or see HR.", 401);
+        return error("VERIFICATION_FAILED", "Face verification failed. Please try again or see HR.", 422);
     }
 
     logger.info({ userId: auth.sub, distance }, "Face verified successfully");

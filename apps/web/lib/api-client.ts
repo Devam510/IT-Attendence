@@ -80,7 +80,7 @@ export async function apiFetch(
         headers,
     });
 
-    const isAuthEndpoint = path.includes("/api/auth/login") || path.includes("/api/auth/token");
+    const isAuthEndpoint = path.includes("/api/auth/login") || path.includes("/api/auth/token") || path.includes("/api/face/");
     if (res.status === 401 && token && !isAuthEndpoint) {
         const refreshed = await refreshToken();
         if (refreshed) {
@@ -124,7 +124,7 @@ export async function api<T = unknown>(
         });
 
         // If 401, try refresh and retry once — but NOT for auth endpoints
-        const isAuthEndpoint = path.includes("/api/auth/login") || path.includes("/api/auth/token");
+        const isAuthEndpoint = path.includes("/api/auth/login") || path.includes("/api/auth/token") || path.includes("/api/face/");
         if (res.status === 401 && token && !isAuthEndpoint) {
             const refreshed = await refreshToken();
             if (refreshed) {
