@@ -28,21 +28,24 @@ def process_logo():
             min_c = min(r, g, b)
             
             # Yellow is High R, High G, Low B.
-            # Black/gray text is low R, G, B.
+            # Black/gray text is low R, G, B with minimal difference between channels.
             
-            # If it's grayish and somewhat dark
-            if max_c < 150:
-                # It's dark text or shadow. Let's make it white, but keep the alpha!
-                # To maintain anti-aliasing against a dark background, if the original was dark color with full alpha,
-                # we want it to be light color with full alpha. 
-                # Note: if it was black text with partial alpha, we want white text with partial alpha.
-                # So we can just set RGB to 255 and keep A.
-                new_data.append((255, 255, 255, a))
-            elif max_c - min_c < 30 and max_c < 200:
-                # Still pretty grays-ish
+            # Pure white
+            if r > 200 and g > 200 and b > 200:
+                new_data.append(item)
+                continue
+                
+            # It's only gray/black text if it lacks significant color saturation
+            is_gray = max_c - min_c < 45
+            
+            # And it's not too bright (though the text is quite dark anyway)
+            is_dark = max_c < 180
+            
+            if is_gray and is_dark:
+                # Turn black/gray into pure white while preserving alpha for anti-aliasing
                 new_data.append((255, 255, 255, a))
             else:
-                # Keep original color
+                # Keep original color (this preserves the yellow V and anti-aliased bright edge pixels)
                 new_data.append(item)
                 
         img.putdata(new_data)
