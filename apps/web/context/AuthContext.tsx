@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { api, setAccessToken, getAccessToken } from "@/lib/api-client";
+import { api, apiGet, setAccessToken, getAccessToken, refreshToken } from "@/lib/api-client";
 
 interface User {
     id: string;
@@ -61,60 +61,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
 
     // ── Boot: decode token locally for instant load ──────────────
-    // We parse the JWT payload client-side (no secret needed for payload read)
-    // so the UI shows immediately. A background call to /api/auth/session
-    // validates the token is not revoked; if it fails we clear the session.
     useEffect(() => {
-        const token = getAccessToken();
-        if (!token) {
-            setIsLoading(false);
-            return;
-        }
+        async function initAuth() {
+            let token = getAccessToken();
+            if (!token) {
+                setIsLoading(false);
+                return;
+            }
 
-        // Instant boot — decode JWT payload locally
-        const payload = decodeJwtPayload(token);
-        const localUser = jwtToUser(payload ?? {});
+            let payload = decodeJwtPayload(token);
+            let localUser = jwtToUser(payload ?? {});
+            const now = Math.floor(Date.now() / 1000);
 
-        // Check token expiry (exp is Unix seconds)
-        const now = Math.floor(Date.now() / 1000);
-        if (!localUser || (payload?.exp && payload.exp < now)) {
-            // Token is expired locally — clear and show login
-            setAccessToken(null);
-            setIsLoading(false);
-            return;
-        }
-
-        // Show the UI immediately using local data
-        setUser(localUser);
-        setIsLoading(false);
-
-        // Background session validation with 5s timeout (catches revoked tokens)
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
-
-        fetch("/api/auth/session", {
-            headers: { Authorization: `Bearer ${token}` },
-            signal: controller.signal,
-        })
-            .then(r => r.json())
-            .then(json => {
-                clearTimeout(timeout);
-                if (json.data?.user) {
-                    // Refresh user state with fresh server data
-                    setUser(json.data.user);
+            // If local token is expired, try to refresh immediately before doing anything
+            if (!localUser || (payload?.exp && payload.exp < now)) {
+                const refreshed = await refreshToken();
+                if (refreshed) {
+                    token = getAccessToken();
+                    payload = decodeJwtPayload(token!);
+                    localUser = jwtToUser(payload ?? {});
                 } else {
-                    // Token revoked server-side — force logout
+                    // Refresh failed, token is dead
                     setAccessToken(null);
                     localStorage.removeItem("nexus-refresh-token");
-                    setUser(null);
-                    window.location.href = "/login";
+                    setIsLoading(false);
+                    return;
                 }
-            })
-            .catch(() => {
-                clearTimeout(timeout);
-                // Network error or timeout — keep local user, don't logout
-                // (avoids booting users offline or on slow connections)
-            });
+            }
+
+            // Show UI immediately if we have a valid token
+            setUser(localUser);
+            setIsLoading(false);
+
+            // Background validation to ensure token isn't revoked
+            const res = await apiGet<{ user: User }>("/api/auth/session");
+            if (res.data?.user) {
+                setUser(res.data.user);
+            } else if (res.error === "Unauthorized" || res.code === "UNAUTHORIZED") {
+                // Token was revoked or invalid server-side
+                setAccessToken(null);
+                localStorage.removeItem("nexus-refresh-token");
+                setUser(null);
+                window.location.href = "/login";
+            }
+        }
+
+        initAuth();
+
+        // Proactively refresh the token every 12 minutes (since it expires in 15m)
+        // This ensures the user stays logged in as long as the tab is open
+        const interval = setInterval(async () => {
+            if (getAccessToken()) {
+                await refreshToken();
+            }
+        }, 12 * 60 * 1000);
+
+        return () => clearInterval(interval);
     }, []);
 
     const login = useCallback(async (identifier: string, password: string) => {

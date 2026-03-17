@@ -28,7 +28,7 @@ export function getAccessToken(): string | null {
     return accessToken;
 }
 
-async function refreshToken(): Promise<boolean> {
+export async function refreshToken(): Promise<boolean> {
     const refresh = localStorage.getItem("nexus-refresh-token");
     if (!refresh) return false;
 
