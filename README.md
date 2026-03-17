@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://it-attendence-web.vercel.app">🌐 Live Demo</a> •
+  <a href="https://it-attendence-web-devam510s-projects.vercel.app">🌐 Live Demo</a> •
   <a href="#features">✨ Features</a> •
   <a href="#tech-stack">🛠 Tech Stack</a> •
   <a href="#getting-started">🚀 Getting Started</a>
