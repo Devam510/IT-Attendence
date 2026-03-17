@@ -60,7 +60,7 @@ export default function Navbar() {
             <div className="navbar-left">
                 <Link href="/dashboard" className="navbar-logo">
                     <Image
-                        src="/vibe-tech-logo.png"
+                        src="/logo-black.webp"
                         alt="Vibe Tech Labs"
                         width={130}
                         height={36}

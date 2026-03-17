@@ -11,7 +11,7 @@ import "@/styles/security.css";
 export const metadata: Metadata = {
   title: "Vibe Tech Labs — Enterprise Workforce Platform",
   description: "AI-powered workforce intelligence by Vibe Tech Labs. A Digital Idea To Grow You Up! Attendance, leave management, and security compliance.",
-  icons: { icon: "/vibe-tech-logo.png" },
+  icons: { icon: "/logo-black.webp" },
 };
 
 export default function RootLayout({

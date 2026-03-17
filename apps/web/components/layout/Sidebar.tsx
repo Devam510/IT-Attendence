@@ -55,7 +55,7 @@ export default function Sidebar() {
             <div className="sidebar-header">
                 <Link href="/dashboard" className="sidebar-logo">
                     <Image
-                        src="/vibe-tech-logo.png"
+                        src="/logo-black.webp"
                         alt="Vibe Tech Labs"
                         width={140}
                         height={40}
