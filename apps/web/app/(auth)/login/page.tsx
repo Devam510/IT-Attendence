@@ -39,7 +39,7 @@ export default function LoginPage() {
             {/* Left — Brand Panel */}
             <div className="login-brand">
                 <Image
-                    src={theme === "dark" ? "/logo-white-2.png" : "/logo-black.webp"}
+                    src={theme === "dark" ? "/logo-dark-final.png" : "/logo-black.webp"}
                     alt="Vibe Tech Labs"
                     width={200}
                     height={60}
