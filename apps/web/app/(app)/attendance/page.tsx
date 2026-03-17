@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { apiGet, apiPost } from "@/lib/api-client";
 import { useAuth } from "@/context/AuthContext";
+import { FaceVerificationModal } from "@/components/attendance/FaceVerificationModal";
 
 interface TodayData {
     checkedIn: boolean;
@@ -13,6 +14,7 @@ interface TodayData {
     location?: string;
     verificationScore?: number;
     totalMinutes?: number;
+    breaks?: { start: string; end: string | null }[];
 }
 
 interface CalendarDay {
@@ -64,6 +66,8 @@ export default function AttendancePage() {
     const [selectedDate, setSelectedDate] = useState<string | null>(null); // "2026-03-04" or null = today
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
+    const [showFaceModal, setShowFaceModal] = useState(false);
+    const [pendingRemark, setPendingRemark] = useState("");
     const [elapsed, setElapsed] = useState(0);
     const [toast, setToast] = useState<{ message: string; type: "error" | "success" } | null>(null);
     const [lateRemark, setLateRemark] = useState("");
@@ -137,7 +141,14 @@ export default function AttendancePage() {
                 apiGet<TodayData>("/api/attendance/today"),
                 apiGet<HistoryResponse>(`/api/attendance/history?month=${monthStr}`),
             ]);
-            if (todayRes.data) setToday(todayRes.data);
+            if (todayRes.data) {
+                setToday(todayRes.data);
+                if (todayRes.data.breaks && Array.isArray(todayRes.data.breaks)) {
+                    setAttBreakLog(todayRes.data.breaks);
+                    const last = todayRes.data.breaks[todayRes.data.breaks.length - 1];
+                    setAttOnBreak(!!(last && !last.end));
+                }
+            }
             if (historyRes.data) {
                 setCalendar(historyRes.data.calendar || []);
                 setSummary(historyRes.data.summary || null);
@@ -181,9 +192,10 @@ export default function AttendancePage() {
     const countdownPct = Math.max(0, Math.min(100, (countdownSecs / WORKDAY_SECS) * 100));
     const countdownColor = countdownPct > 50 ? "#16a34a" : countdownPct > 20 ? "#d97706" : "#dc2626";
 
-    const handleCheckIn = useCallback(async (remark?: string) => {
+    const handleCheckIn = useCallback(async (faceToken: string) => {
         setActionLoading(true);
         setToast(null);
+        setShowFaceModal(false);
 
         // Get real browser location
         let latitude = 0, longitude = 0;
@@ -202,7 +214,8 @@ export default function AttendancePage() {
         const res = await apiPost<TodayData & { sessionToken?: string }>("/api/attendance/checkin", {
             latitude,
             longitude,
-            ...(remark?.trim() ? { remark: remark.trim() } : {}),
+            faceToken,
+            ...(pendingRemark.trim() ? { remark: pendingRemark.trim() } : {}),
         });
         if (res.data) {
             setToday(prev => ({
@@ -781,7 +794,10 @@ export default function AttendancePage() {
                                     </div>
                                     <button
                                         className="btn btn-primary btn-full"
-                                        onClick={() => handleCheckIn(lateRemark)}
+                                        onClick={() => {
+                                            setPendingRemark(lateRemark);
+                                            setShowFaceModal(true);
+                                        }}
                                         disabled={actionLoading}
                                     >
                                         {actionLoading ? <><span className="spinner" /> Checking in...</> : "Check In"}
@@ -900,6 +916,12 @@ export default function AttendancePage() {
                 <span>Hours: <strong>{summary?.totalHours ? `${summary.totalHours.toFixed(1)}h` : "—"}</strong></span>
                 <span>Overtime: <strong style={{color: "#d97706"}}>{summary?.totalOvertime ? `+${summary.totalOvertime.toFixed(1)}h` : "—"}</strong></span>
             </div>
+
+            <FaceVerificationModal
+                isOpen={showFaceModal}
+                onClose={() => setShowFaceModal(false)}
+                onSuccess={handleCheckIn}
+            />
         </div>
     );
 }

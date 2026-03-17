@@ -60,7 +60,7 @@ export function FaceEnrollmentModal({ isOpen, onClose, userId, userName, onEnrol
             const faceapi = await loadFaceApi();
             const MODEL_URL = "/models";
             await Promise.all([
-                faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+                faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
                 faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
                 faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
             ]);
@@ -76,7 +76,7 @@ export function FaceEnrollmentModal({ isOpen, onClose, userId, userName, onEnrol
 
                 const detection = await faceapi.detectSingleFace(
                     video,
-                    new faceapi.SsdMobilenetv1Options({ minConfidence: 0.80 })
+                    new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.80 })
                 ).withFaceLandmarks().withFaceDescriptor();
 
                 if (!detection) {

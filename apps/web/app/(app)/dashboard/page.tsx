@@ -505,6 +505,26 @@ export default function DashboardPage() {
             checkOutTime: checkOutAt ? fmt(checkOutAt.toISOString()) : undefined,
             pendingItems: d.pendingItems ?? [],
         });
+
+        // Sync break state from API
+        if (info.breaks && Array.isArray(info.breaks)) {
+            const bLog: BreakEntry[] = info.breaks;
+            setBreakLog(bLog);
+            breakLogRef.current = bLog;
+            const last = bLog[bLog.length - 1];
+            if (last && !last.end) {
+                const startDate = new Date(last.start);
+                setOnBreak(true);
+                setBreakStartedAt(startDate);
+                onBreakRef.current = true;
+                breakStartedAtRef.current = startDate;
+            } else {
+                setOnBreak(false);
+                setBreakStartedAt(null);
+                onBreakRef.current = false;
+                breakStartedAtRef.current = null;
+            }
+        }
     }, []);
 
     useEffect(() => {
@@ -543,13 +563,13 @@ export default function DashboardPage() {
         const saved = localStorage.getItem(`dash_sessionToken_${user.id}`);
         if (saved) setSessionToken(saved);
         const breakState = localStorage.getItem(`dash_break_${user.id}`);
-        if (breakState) {
+        if (breakState && breakLogRef.current.length === 0 && !empData.checkedIn) {
+            // Only fallback to localStorage if no checkedIn state yet (optimistic load)
             try {
                 const parsed = JSON.parse(breakState);
                 const log: BreakEntry[] = parsed.log ?? [];
                 setBreakLog(log);
                 breakLogRef.current = log;
-                // If last entry has no end, we're still on break
                 const last = log[log.length - 1];
                 if (last && !last.end) {
                     const startDate = new Date(last.start);
@@ -560,7 +580,7 @@ export default function DashboardPage() {
                 }
             } catch { /* ignore corrupt data */ }
         }
-    }, [user?.id]);
+    }, [user?.id, empData.checkedIn]);
 
     // ── 8-hour countdown ticker — uses refs to avoid stale closures ──
     useEffect(() => {

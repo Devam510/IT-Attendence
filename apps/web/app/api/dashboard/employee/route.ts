@@ -42,7 +42,7 @@ async function handleEmployeeDashboard(
         // Today's attendance — use checkInAt IST range (not date field)
         prisma.attendanceRecord.findFirst({
             where: { userId: auth.sub, checkInAt: { gte: todayStart, lt: tomorrowStart } },
-            select: { checkInAt: true, checkOutAt: true, status: true, totalHours: true, verificationScore: true },
+            select: { checkInAt: true, checkOutAt: true, status: true, totalHours: true, verificationScore: true, anomalyFlags: true },
         }),
         // Month attendance summary
         prisma.attendanceRecord.findMany({
@@ -122,6 +122,7 @@ async function handleEmployeeDashboard(
             checkOutAt: todayAttendance?.checkOutAt?.toISOString() || null,
             totalHours: todayAttendance?.totalHours || null,
             verificationScore: todayAttendance?.verificationScore || null,
+            breaks: (todayAttendance?.anomalyFlags as any)?.breaks || [],
         },
         monthSummary: {
             daysTracked: monthDays,

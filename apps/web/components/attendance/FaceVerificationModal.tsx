@@ -53,7 +53,7 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess }: Props) {
             const faceapi = await loadFaceApi();
             const MODEL_URL = "/models";
             await Promise.all([
-                faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+                faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
                 faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
                 faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
             ]);
@@ -68,7 +68,7 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess }: Props) {
 
                 const detection = await faceapi.detectSingleFace(
                     video,
-                    new faceapi.SsdMobilenetv1Options({ minConfidence: 0.85 })
+                    new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.85 })
                 ).withFaceLandmarks().withFaceDescriptor();
 
                 if (!detection) {

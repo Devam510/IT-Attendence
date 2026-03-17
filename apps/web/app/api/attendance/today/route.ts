@@ -27,9 +27,13 @@ async function handleToday(
             // Use checkInAt timestamp range in IST — avoids UTC-midnight date storage mismatch
             checkInAt: { gte: todayStart, lt: tomorrowStart },
         },
-        include: {
+        select: {
+            checkInAt: true,
+            checkOutAt: true,
             location: { select: { name: true } },
-        },
+            verificationScore: true,
+            anomalyFlags: true,
+        }
     });
 
     if (!record || !record.checkInAt) {
@@ -63,6 +67,7 @@ async function handleToday(
         location: record.location?.name || null,
         verificationScore: record.verificationScore,
         totalMinutes,
+        breaks: (record.anomalyFlags as any)?.breaks || [],
     });
 }
 
