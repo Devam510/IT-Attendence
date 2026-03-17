@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
 import {
     LayoutDashboard,
     Clock,
@@ -37,6 +38,7 @@ const MANAGER_NAV_ITEMS = [
 export default function Sidebar() {
     const pathname = usePathname();
     const { user } = useAuth();
+    const { theme } = useTheme();
 
     const isManager = user?.role === "MGR" || user?.role === "HRA" || user?.role === "HRBP" || user?.role === "SADM";
     // HR is no longer an Admin for viewing Audit Logs, Security, Health
@@ -55,7 +57,7 @@ export default function Sidebar() {
             <div className="sidebar-header">
                 <Link href="/dashboard" className="sidebar-logo">
                     <Image
-                        src="/logo-black.webp"
+                        src={theme === "dark" ? "/logo-white-2.webp" : "/logo-black.webp"}
                         alt="Vibe Tech Labs"
                         width={140}
                         height={40}

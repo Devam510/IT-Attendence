@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
 import "@/styles/components.css";
 
 export default function LoginPage() {
@@ -14,6 +15,7 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const { theme } = useTheme();
 
     async function handleSubmit(e: FormEvent) {
         e.preventDefault();
@@ -37,7 +39,7 @@ export default function LoginPage() {
             {/* Left — Brand Panel */}
             <div className="login-brand">
                 <Image
-                    src="/logo-black.webp"
+                    src={theme === "dark" ? "/logo-white-2.webp" : "/logo-black.webp"}
                     alt="Vibe Tech Labs"
                     width={200}
                     height={60}
