@@ -63,46 +63,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // ── Boot: decode token locally for instant load ──────────────
     useEffect(() => {
         async function initAuth() {
-            let token = getAccessToken();
-            if (!token) {
-                setIsLoading(false);
-                return;
-            }
-
-            let payload = decodeJwtPayload(token);
-            let localUser = jwtToUser(payload ?? {});
-            const now = Math.floor(Date.now() / 1000);
-
-            // If local token is expired, try to refresh immediately before doing anything
-            if (!localUser || (payload?.exp && payload.exp < now)) {
-                const refreshed = await refreshToken();
-                if (refreshed) {
-                    token = getAccessToken();
-                    payload = decodeJwtPayload(token!);
-                    localUser = jwtToUser(payload ?? {});
-                } else {
-                    // Refresh failed, token is dead
-                    setAccessToken(null);
-                    localStorage.removeItem("nexus-refresh-token");
+            try {
+                let token = getAccessToken();
+                if (!token) {
                     setIsLoading(false);
                     return;
                 }
-            }
 
-            // Show UI immediately if we have a valid token
-            setUser(localUser);
-            setIsLoading(false);
+                let payload = decodeJwtPayload(token);
+                let localUser = jwtToUser(payload ?? {});
+                const now = Math.floor(Date.now() / 1000);
 
-            // Background validation to ensure token isn't revoked
-            const res = await apiGet<{ user: User }>("/api/auth/session");
-            if (res.data?.user) {
-                setUser(res.data.user);
-            } else if (res.error === "Unauthorized" || res.code === "UNAUTHORIZED") {
-                // Token was revoked or invalid server-side
-                setAccessToken(null);
-                localStorage.removeItem("nexus-refresh-token");
-                setUser(null);
-                window.location.href = "/login";
+                // If local token is expired, try to refresh immediately before doing anything
+                if (!localUser || (payload?.exp && payload.exp < now)) {
+                    const refreshed = await refreshToken();
+                    if (refreshed) {
+                        token = getAccessToken();
+                        payload = decodeJwtPayload(token!);
+                        localUser = jwtToUser(payload ?? {});
+                    } else {
+                        // Refresh failed, token is dead
+                        setAccessToken(null);
+                        localStorage.removeItem("nexus-refresh-token");
+                        setIsLoading(false);
+                        return;
+                    }
+                }
+
+                // Show UI immediately if we have a valid token
+                setUser(localUser);
+                setIsLoading(false);
+
+                // Background validation to ensure token isn't revoked
+                const res = await apiGet<{ user: User }>("/api/auth/session");
+                if (res.data?.user) {
+                    setUser(res.data.user);
+                } else if (res.error === "Unauthorized" || res.code === "UNAUTHORIZED" || res.code === "USER_NOT_FOUND") {
+                    // Token was revoked or invalid server-side
+                    setAccessToken(null);
+                    localStorage.removeItem("nexus-refresh-token");
+                    setUser(null);
+                    // Only redirect if not already on login page
+                    if (window.location.pathname !== "/login") {
+                        window.location.href = "/login";
+                    }
+                }
+            } catch (err) {
+                console.error("Auth initialization failed:", err);
+                setIsLoading(false);
             }
         }
 

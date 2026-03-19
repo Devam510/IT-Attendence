@@ -17,6 +17,11 @@ export async function getRedis(): Promise<RedisClientType | null> {
     try {
         redisClient = createClient({
             url: process.env.REDIS_URL || "redis://localhost:6379",
+            // Add socket level timeouts
+            socket: {
+                connectTimeout: 5000,
+                keepAlive: 5000,
+            }
         });
 
         redisClient.on("error", (err) => {
@@ -24,12 +29,21 @@ export async function getRedis(): Promise<RedisClientType | null> {
             redisAvailable = false;
         });
 
-        await redisClient.connect();
+        // Enforce a strict connection timeout (2 seconds) to avoid hanging the entire request
+        await Promise.race([
+            redisClient.connect(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Redis connection timeout")), 2000))
+        ]);
+
         console.log("[Redis] Connected");
         return redisClient;
-    } catch {
-        console.warn("[Redis] Not available — running without Redis");
+    } catch (err) {
+        console.warn("[Redis] Not available — running without Redis:", err instanceof Error ? err.message : String(err));
         redisAvailable = false;
+        if (redisClient) {
+            redisClient.disconnect().catch(() => {});
+            redisClient = null;
+        }
         return null;
     }
 }

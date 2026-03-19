@@ -117,11 +117,17 @@ export async function api<T = unknown>(
         headers["Authorization"] = `Bearer ${token}`;
     }
 
+    // Add a 15-second timeout to all API calls to avoid infinite hangs
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
     try {
         let res = await fetch(`${BASE_URL}${path}`, {
             ...options,
             headers,
+            signal: controller.signal,
         });
+        clearTimeout(timeoutId);
 
         // If 401, try refresh and retry once — but NOT for auth endpoints
         const isAuthEndpoint = path.includes("/api/auth/login") || path.includes("/api/auth/token") || path.includes("/api/face/");
@@ -129,10 +135,11 @@ export async function api<T = unknown>(
             const refreshed = await refreshToken();
             if (refreshed) {
                 headers["Authorization"] = `Bearer ${getAccessToken()}`;
-                res = await fetch(`${BASE_URL}${path}`, {
+                const retryRes = await fetch(`${BASE_URL}${path}`, {
                     ...options,
                     headers,
                 });
+                res = retryRes;
             } else {
                 // Clear tokens and redirect to login
                 setAccessToken(null);
@@ -147,8 +154,6 @@ export async function api<T = unknown>(
         const json = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-            // 403 = Forbidden (role-based) — return error to caller, never redirect
-            // 401 = handled above with token refresh
             return {
                 error: json.error?.message || (typeof json.error === "string" ? json.error : null) || json.message || `Request failed (${res.status})`,
                 code: json.error?.code || (res.status === 403 ? "FORBIDDEN" : res.status === 401 ? "UNAUTHORIZED" : res.status === 409 ? "CONFLICT" : "UNKNOWN"),
@@ -156,7 +161,11 @@ export async function api<T = unknown>(
         }
 
         return { data: json.data ?? json };
-    } catch (err) {
+    } catch (err: any) {
+        clearTimeout(timeoutId);
+        if (err.name === "AbortError") {
+            return { error: "Request timed out. Please check your connection.", code: "TIMEOUT" };
+        }
         return { error: String(err), code: "NETWORK_ERROR" };
     }
 }
