@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { apiGet } from "@/lib/api-client";
+import { apiGet, apiPost } from "@/lib/api-client";
 import "@/styles/leaves.css";
 
 interface BalanceItem {
@@ -19,7 +19,7 @@ interface LeaveRecord {
     startDate: string;
     endDate: string;
     days: number;
-    status: "approved" | "pending" | "rejected";
+    status: "approved" | "pending" | "rejected" | "cancelled";
     reason?: string;
 }
 
@@ -38,6 +38,43 @@ export default function LeavesPage() {
     const [history, setHistory] = useState<LeaveRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<"balance" | "history">("balance");
+    const [isCancelling, setIsCancelling] = useState<string | null>(null);
+
+    const handleCancel = async (leaveId: string) => {
+        if (!confirm("Are you sure you want to cancel this leave?")) return;
+        setIsCancelling(leaveId);
+        
+        try {
+            const res = await apiPost("/api/leaves/cancel", { leaveId });
+            if (res.error) {
+                alert(res.error || "Failed to cancel leave.");
+                setIsCancelling(null);
+                return;
+            }
+            
+            // Re-fetch data to update balances and history correctly
+            const [balRes, histRes] = await Promise.all([
+                apiGet<any>("/api/leaves/balance"),
+                apiGet<any>("/api/leaves/history"),
+            ]);
+            
+            if (balRes.data?.balances) setBalance(balRes.data.balances);
+            if (histRes.data?.records) {
+                setHistory(histRes.data.records.map((r: any) => ({
+                    id: r.id,
+                    type: r.leaveType?.name?.toLowerCase() || r.type || "casual",
+                    startDate: r.startDate,
+                    endDate: r.endDate,
+                    days: r.days ?? 1,
+                    status: (r.status || "pending").toLowerCase() as LeaveRecord["status"],
+                    reason: r.reason,
+                })));
+            }
+        } catch (e) {
+            alert("Network error. Please try again.");
+        }
+        setIsCancelling(null);
+    };
 
     useEffect(() => {
         async function load() {
@@ -63,7 +100,7 @@ export default function LeavesPage() {
                         startDate: r.startDate,
                         endDate: r.endDate,
                         days: r.days ?? 1,
-                        status: (r.status || "pending").toLowerCase() as "approved" | "pending" | "rejected",
+                        status: (r.status || "pending").toLowerCase() as LeaveRecord["status"],
                         reason: r.reason,
                     })));
                 }
@@ -190,9 +227,21 @@ export default function LeavesPage() {
                                         </div>
                                     )}
                                 </div>
-                                <span className={`badge badge-${item.status === "approved" ? "success" : item.status === "pending" ? "warning" : "danger"}`}>
-                                    {item.status}
-                                </span>
+                                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px" }}>
+                                    <span className={`badge badge-${item.status === "approved" ? "success" : item.status === "pending" ? "warning" : item.status === "rejected" ? "danger" : "secondary"}`} style={{ opacity: item.status === "cancelled" ? 0.6 : 1 }}>
+                                        {item.status}
+                                    </span>
+                                    {(item.status === "pending" || item.status === "approved") && (
+                                        <button 
+                                            className="btn btn-secondary" 
+                                            style={{ padding: "4px 8px", fontSize: "12px" }}
+                                            onClick={() => handleCancel(item.id)}
+                                            disabled={isCancelling === item.id}
+                                        >
+                                            {isCancelling === item.id ? "Canceling..." : "Cancel"}
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         ))
                     )}

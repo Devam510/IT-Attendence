@@ -46,11 +46,16 @@ async function handleCheckIn(
     // Calculate "today" in IST (UTC+5:30), not in server's UTC timezone
     const istOffsetMs = 5.5 * 60 * 60 * 1000;
     const nowIst = new Date(now.getTime() + istOffsetMs);
+    
+    // For exact DATE comparisons matching the Leave system, we must compare against absolute UTC midnight
+    const todayIstStr = nowIst.toISOString().slice(0, 10); // "YYYY-MM-DD" in local time
+    const todayUtc = new Date(`${todayIstStr}T00:00:00Z`);
+
+    // For IST attendance timestamps (checkInAt), we use the precise 24h window (shifted back by 5.5h)
     const todayStart = new Date(Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - istOffsetMs);
     const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
-    // 1. Check if already checked in TODAY in IST — use checkInAt timestamp, not date field
-    //    date field was stored as UTC midnight which causes cross-midnight IST issues
+    // 1. Check if already checked in TODAY in IST — use checkInAt timestamp
     const existingRecord = await prisma.attendanceRecord.findFirst({
         where: {
             userId: auth.sub,
@@ -67,8 +72,8 @@ async function handleCheckIn(
         where: {
             userId: auth.sub,
             status: "APPROVED",
-            startDate: { lte: tomorrowStart },
-            endDate: { gte: todayStart },
+            startDate: { lte: todayUtc },
+            endDate: { gte: todayUtc },
         },
         select: { id: true, leaveType: { select: { name: true } } },
     });
