@@ -5,7 +5,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@vibetech/db";
 import { withAuth } from "@/lib/auth";
 import { success, error, logger } from "@/lib/errors";
-import { EmailService } from "@/lib/email-service";
 import type { JwtPayload } from "@vibetech/shared";
 
 async function handleCancel(
@@ -46,10 +45,6 @@ async function handleCancel(
         return error("ALREADY_PROCESSED", `This leave is already ${leave.status.toLowerCase()}`, 409);
     }
 
-    // Optional: Check if the leave is in the past
-    // If it's already started and approved, maybe they shouldn't cancel it?
-    // For now, let's allow it as requested, but log it.
-    
     const previousStatus = leave.status;
 
     // 1. Update leave request status to CANCELLED
@@ -70,69 +65,42 @@ async function handleCancel(
 
     if (balance) {
         if (previousStatus === "APPROVED") {
-            // It was approved, meaning it moved from pending to used.
-            // We must reverse the 'used' days.
+            // Move used days back — leave was already approved so reduce used count
             await prisma.leaveBalance.update({
                 where: { id: balance.id },
-                data: {
-                    used: Math.max(0, balance.used - leaveDays),
-                },
+                data: { used: Math.max(0, balance.used - leaveDays) },
             });
         } else if (previousStatus === "PENDING") {
-            // It was pending, meaning days were reserved in 'pending'.
-            // We must release the reserved pending days.
+            // Release the reserved pending days
             await prisma.leaveBalance.update({
                 where: { id: balance.id },
-                data: {
-                    pending: Math.max(0, balance.pending - leaveDays),
-                },
+                data: { pending: Math.max(0, balance.pending - leaveDays) },
             });
         }
     }
 
     // 3. Auto-resolve the workflow if it was still pending
     if (previousStatus === "PENDING") {
-        const workflow = await prisma.approvalWorkflow.findFirst({
-            where: { entityType: "leave", entityId: leaveId, status: "PENDING" }
+        await prisma.approvalWorkflow.updateMany({
+            where: { entityType: "leave", entityId: leaveId, status: "PENDING" },
+            data: { status: "CANCELLED" },
         });
-        if (workflow) {
-            await prisma.approvalWorkflow.update({
-                where: { id: workflow.id },
-                data: { status: "CANCELLED" }
-            });
-        }
     }
 
-    // 4. Notify Manager (if applicable)
-    try {
-        const manager = leave.user.managerId 
-            ? await prisma.user.findUnique({ where: { id: leave.user.managerId }, select: { email: true, id: true } })
-            : null;
-            
-        if (manager) {
-            // Create in-app notification for manager
+    // 4. Notify manager via in-app notification (silently — do not fail the cancel on error)
+    if (leave.user.managerId) {
+        try {
             await prisma.notification.create({
                 data: {
-                    userId: manager.id,
-                    type: "LEAVE_CANCELLED",
+                    userId: leave.user.managerId,
+                    type: "LEAVE_APPROVED", // Reuse existing notify type for generic leave update
                     title: "Leave Cancelled",
-                    body: `${leave.user.fullName} has cancelled their ${leave.leaveType.name} scheduled for ${leave.startDate.toLocaleDateString()}.`,
+                    body: `${leave.user.fullName} has cancelled their ${leave.leaveType.name} (${leave.startDate.toLocaleDateString()} – ${leave.endDate.toLocaleDateString()}).`,
                 }
             });
-
-            // Send email (silently proceeds if fails)
-            if (manager.email) {
-                EmailService.sendLeaveCancelledToManager(
-                    manager.email,
-                    leave.user.fullName,
-                    leave.startDate.toLocaleDateString(),
-                    leave.endDate.toLocaleDateString(),
-                    leave.leaveType.name
-                ).catch(e => logger.error("Failed to send leave cancellation email", e));
-            }
+        } catch (e) {
+            logger.warn({ err: e }, "Failed to send leave cancellation notification to manager");
         }
-    } catch (e) {
-        logger.error("Failed to process cancellation notifications", e);
     }
 
     return success({ canceled: true });
