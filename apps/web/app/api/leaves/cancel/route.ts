@@ -45,6 +45,17 @@ async function handleCancel(
         return error("ALREADY_PROCESSED", `This leave is already ${leave.status.toLowerCase()}`, 409);
     }
 
+    // 0. Ensure the leave has not already ended (cannot cancel past leaves)
+    const now = new Date();
+    const istOffsetMs = 5.5 * 60 * 60 * 1000;
+    const nowIst = new Date(now.getTime() + istOffsetMs);
+    const todayIstStr = nowIst.toISOString().slice(0, 10);
+    const todayUtc = new Date(`${todayIstStr}T00:00:00Z`);
+
+    if (leave.endDate < todayUtc) {
+        return error("LEAVE_PAST", "Cannot cancel a leave that has already ended", 400);
+    }
+
     const previousStatus = leave.status;
 
     // 1. Update leave request status to CANCELLED

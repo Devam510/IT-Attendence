@@ -231,7 +231,8 @@ export default function LeavesPage() {
                                     <span className={`badge badge-${item.status === "approved" ? "success" : item.status === "pending" ? "warning" : item.status === "rejected" ? "danger" : "secondary"}`} style={{ opacity: item.status === "cancelled" ? 0.6 : 1 }}>
                                         {item.status}
                                     </span>
-                                    {(item.status === "pending" || item.status === "approved") && (
+                                    {(item.status === "pending" || item.status === "approved") && 
+                                     new Date(item.endDate).getTime() + (24 * 60 * 60 * 1000) > new Date().getTime() && (
                                         <button 
                                             className="btn btn-secondary" 
                                             style={{ padding: "4px 8px", fontSize: "12px" }}
