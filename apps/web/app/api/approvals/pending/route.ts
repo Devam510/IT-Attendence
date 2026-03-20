@@ -92,15 +92,27 @@ async function handlePending(
     // Fetch Regularization Workflows
     let regularizations: any[] = [];
     if (type === "all" || type === "regularization") {
+        let regFilter: any = { entityType: "regularization" };
+        if (prismaStatus) regFilter.status = prismaStatus as any;
+
+        if (auth.role === "MGR") {
+            // Managers see requests from their direct reports
+            regFilter.steps = {
+                path: ["0", "approverId"],
+                equals: auth.sub
+            };
+        } else if (auth.role === "HRA" || auth.role === "HRBP") {
+            // HR see requests from their entity
+            regFilter.requester = { entityId: auth.entityId };
+        } else if (auth.role === "SADM") {
+            // SADM sees all - no extra filter
+        } else {
+            // Default: requester sees only their own
+            regFilter.requesterId = auth.sub;
+        }
+
         const regWorkflows = await prisma.approvalWorkflow.findMany({
-            where: {
-                entityType: "regularization",
-                ...(prismaStatus ? { status: prismaStatus as any } : {}),
-                steps: {
-                    path: ["0", "approverId"],
-                    equals: auth.role === "MGR" ? auth.sub : undefined
-                } // Simplified filter for demo
-            },
+            where: regFilter,
             include: {
                 requester: {
                     select: {

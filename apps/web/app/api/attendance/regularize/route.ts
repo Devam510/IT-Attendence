@@ -87,15 +87,33 @@ async function handleRegularize(
             }
         });
 
-        await tx.notification.create({
-            data: {
-                userId: approverId,
-                type: "REGULARIZATION_APPROVAL",
-                title: "Attendance Regularization",
-                body: `${record.user.fullName} requested time correction for ${record.date.toISOString().split("T")[0]}.`,
-                data: { regularizationId: regReq.id, attendanceId: record.id }
-            }
+        // 3.5 Find HR and Admin users for notifications
+        const hrAdmins = await tx.user.findMany({
+            where: {
+                role: { in: ["HRA", "SADM", "HRBP"] },
+                entityId: record.user.entityId,
+                status: "ACTIVE",
+                id: { not: auth.sub } // Don't notify the requester if they happen to be an admin
+            },
+            select: { id: true }
         });
+
+        const notifyUserIds = Array.from(new Set([
+            ...(approverId ? [approverId] : []),
+            ...hrAdmins.map(u => u.id)
+        ]));
+
+        if (notifyUserIds.length > 0) {
+            await tx.notification.createMany({
+                data: notifyUserIds.map(userId => ({
+                    userId,
+                    type: "REGULARIZATION_APPROVAL",
+                    title: "Attendance Regularization",
+                    body: `${record.user.fullName} requested time correction for ${record.date.toISOString().split("T")[0]}.`,
+                    data: { regularizationId: regReq.id, attendanceId: record.id }
+                }))
+            });
+        }
 
         return { regReq, workflow };
     });
