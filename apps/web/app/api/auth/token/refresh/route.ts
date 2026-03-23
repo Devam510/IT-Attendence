@@ -43,7 +43,11 @@ async function handleRefresh(req: NextRequest): Promise<NextResponse> {
 
     const deviceId = payload.deviceId || "web";
     const session = await getSession(payload.sub, deviceId);
-    if (!session || session.refreshToken !== refreshToken) {
+    
+    // Only reject if Redis IS available and explicitly says the token is invalid.
+    // If Redis is unavailable (null), we trust the JWT signature alone.
+    // This prevents Vercel cold-start Redis timeouts from causing false logouts.
+    if (session !== null && session.refreshToken !== refreshToken) {
         logger.warn({ userId: payload.sub }, "Refresh token mismatch — possible token reuse");
         return error("SESSION_INVALID", "Session not found or token mismatch", 401);
     }

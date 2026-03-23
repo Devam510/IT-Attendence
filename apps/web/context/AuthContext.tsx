@@ -94,20 +94,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setUser(localUser);
                 setIsLoading(false);
 
-                // Background validation to ensure token isn't revoked
+                // Background validation to ensure token isn't revoked server-side
+                // Only logout on explicit 401 — ignore 500/network errors to avoid false logouts
                 const res = await apiGet<{ user: User }>("/api/auth/session");
                 if (res.data?.user) {
                     setUser(res.data.user);
-                } else if (res.error === "Unauthorized" || res.code === "UNAUTHORIZED" || res.code === "USER_NOT_FOUND") {
-                    // Token was revoked or invalid server-side
+                } else if (res.code === "UNAUTHORIZED" && res.error) {
+                    // Confirmed server-side rejection — log out
                     setAccessToken(null);
                     localStorage.removeItem("nexus-refresh-token");
                     setUser(null);
-                    // Only redirect if not already on login page
                     if (window.location.pathname !== "/login") {
                         window.location.href = "/login";
                     }
                 }
+                // Any other error (network, 500, timeout) = silently keep user logged in
             } catch (err) {
                 console.error("Auth initialization failed:", err);
                 setIsLoading(false);
@@ -117,14 +118,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         initAuth();
 
         // Proactively refresh the token every 12 minutes (since it expires in 15m)
-        // This ensures the user stays logged in as long as the tab is open
         const interval = setInterval(async () => {
             if (getAccessToken()) {
                 await refreshToken();
             }
         }, 12 * 60 * 1000);
 
-        return () => clearInterval(interval);
+        // Also refresh when the user comes back to a tab that was sleeping
+        // (the interval may have been paused by the browser when in background)
+        const handleVisibilityChange = async () => {
+            if (document.visibilityState === "visible" && getAccessToken()) {
+                const payload = decodeJwtPayload(getAccessToken()!);
+                const now = Math.floor(Date.now() / 1000);
+                // If token expires within 2 minutes, refresh it now
+                if (payload?.exp && payload.exp - now < 120) {
+                    await refreshToken();
+                }
+            }
+        };
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+        };
     }, []);
 
     const login = useCallback(async (identifier: string, password: string) => {
