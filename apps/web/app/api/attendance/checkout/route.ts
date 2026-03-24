@@ -43,11 +43,11 @@ async function handleCheckOut(
     // sessionToken is OPTIONAL for web sessions — JWT already proves identity.
     // We only actively block when BOTH tokens exist AND they don't match
     // (true buddy-checkout: different person's token was sent).
-    const flags = record.anomalyFlags as Record<string, string> | null;
-    const storedToken = flags?.sessionToken;
+    const flags = record.anomalyFlags as Record<string, unknown> | null;
+    const storedToken = typeof flags?.sessionToken === "string" ? flags.sessionToken : undefined;
 
     if (storedToken && sessionToken && sessionToken !== storedToken) {
-        const checkInDevice = flags?.checkInDevice || "another device";
+        const checkInDevice = typeof flags?.checkInDevice === "string" ? flags.checkInDevice : "another device";
         logger.warn({
             userId: auth.sub,
             recordId: record.id,
@@ -72,7 +72,19 @@ async function handleCheckOut(
 
     const checkOutTime = new Date();
     const diffMs = checkOutTime.getTime() - record.checkInAt!.getTime();
-    const totalHours = +(diffMs / 3600000).toFixed(2);
+    const rawMinutes = diffMs / (1000 * 60);
+
+    // ── Deduct actual break time taken today ─────────────────────────
+    const breaks = (flags?.breaks as Array<{ start: string; end: string | null }> | undefined) ?? [];
+    const breakMinutes = breaks.reduce((sum, b) => {
+        if (!b.start) return sum;
+        const breakEnd = b.end ? new Date(b.end) : checkOutTime; // treat open break as ending at checkout
+        const breakMs = breakEnd.getTime() - new Date(b.start).getTime();
+        return sum + Math.max(0, breakMs / (1000 * 60));
+    }, 0);
+
+    const netMinutes = Math.max(0, rawMinutes - breakMinutes);
+    const totalHours = +(netMinutes / 60).toFixed(2);
     const overtimeHours = Math.max(0, +(totalHours - 8).toFixed(2));
     const isHalfDay = totalHours < 4;
 
@@ -82,6 +94,7 @@ async function handleCheckOut(
         checkOutDevice,
         checkOutUserAgent,
         checkOutIp,
+        totalBreakMinutes: Math.round(breakMinutes),
         ...(isHalfDay ? { isHalfDay: true } : {}),
         ...(isHalfDay && earlyReason ? { earlyReason } : {}),
     };

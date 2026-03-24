@@ -117,6 +117,28 @@ async function handleTeamAttendance(
         const earlyReason = typeof flags?.earlyReason === "string" && flags.earlyReason.trim() ? flags.earlyReason.trim() : null;
         const isHalfDay = flags?.isHalfDay === true;
         const location = typeof flags?.location === "string" ? flags.location : null;
+        // ── Compute net hours (deducting actual break time) ───────────────
+        // For checked-out employees, totalHours is already net (deducted at checkout).
+        // For currently checked-in employees, we must compute live net hours.
+        let netTotalHours = att?.totalHours || 0;
+        let netOvertimeHours = 0;
+
+        if (att && !att.checkOutAt && att.checkInAt) {
+            // Employee is still checked in — compute live net hours
+            const now = new Date();
+            const rawMs = now.getTime() - att.checkInAt.getTime();
+            const rawMinutes = rawMs / (1000 * 60);
+            const liveBreaks = (Array.isArray(flags?.breaks) ? flags!.breaks : []) as Array<{ start: string; end: string | null }>;
+            const breakMinutes = liveBreaks.reduce((sum: number, b: { start: string; end: string | null }) => {
+                if (!b.start) return sum;
+                const breakEnd = b.end ? new Date(b.end) : now;
+                return sum + Math.max(0, (breakEnd.getTime() - new Date(b.start).getTime()) / (1000 * 60));
+            }, 0);
+            netTotalHours = +((Math.max(0, rawMinutes - breakMinutes)) / 60).toFixed(2);
+        }
+
+        netOvertimeHours = onLeave ? 0 : Math.max(0, +(netTotalHours - 8).toFixed(2));
+
         return {
             id: emp.id,
             fullName: emp.fullName,
@@ -127,8 +149,8 @@ async function handleTeamAttendance(
             status,
             checkInAt: onLeave ? null : att?.checkInAt?.toISOString() || null,
             checkOutAt: onLeave ? null : att?.checkOutAt?.toISOString() || null,
-            totalHours: onLeave ? null : att?.totalHours || null,
-            overtimeHours: onLeave ? 0 : Math.max(0, (att?.totalHours || 0) - 8),
+            totalHours: onLeave ? null : netTotalHours,
+            overtimeHours: netOvertimeHours,
             leaveType: leave ? (leave as any).leaveType?.name : null,
             leaveStart: leave ? (leave as any).startDate?.toISOString() || null : null,
             leaveEnd: leave ? (leave as any).endDate?.toISOString() || null : null,
@@ -138,6 +160,7 @@ async function handleTeamAttendance(
             isHalfDay: onLeave ? false : isHalfDay,
             location: onLeave ? null : location,
         };
+
     });
 
     const presentCount = staff.filter(s => s.status === "PRESENT").length;

@@ -81,10 +81,21 @@ async function handleRespond(
                     let overtimeHours = 0;
 
                     if (finalCheckIn && finalCheckOut) {
-                        const diffMs = finalCheckOut.getTime() - finalCheckIn.getTime();
-                        totalHours = diffMs / (1000 * 60 * 60);
+                        const rawMs = finalCheckOut.getTime() - finalCheckIn.getTime();
+                        const rawMinutes = rawMs / (1000 * 60);
+
+                        // Deduct actual break time from anomalyFlags
+                        const existingFlags = (attendance.anomalyFlags as Record<string, unknown>) || {};
+                        const breaks = (existingFlags.breaks as Array<{ start: string; end: string | null }>) || [];
+                        const breakMinutes = breaks.reduce((sum, b) => {
+                            if (!b.start || !b.end) return sum;
+                            return sum + Math.max(0, (new Date(b.end).getTime() - new Date(b.start).getTime()) / (1000 * 60));
+                        }, 0);
+
+                        const netMinutes = Math.max(0, rawMinutes - breakMinutes);
+                        totalHours = +(netMinutes / 60).toFixed(2);
                         if (totalHours > 8) {
-                            overtimeHours = totalHours - 8;
+                            overtimeHours = +(totalHours - 8).toFixed(2);
                         }
                     }
 
