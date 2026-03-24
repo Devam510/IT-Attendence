@@ -68,10 +68,9 @@ async function registerPush(): Promise<void> {
         if (permission !== "granted") return;
 
         // Get VAPID public key from server
-        const keyRes = await fetch("/api/push/vapid-public-key");
-        if (!keyRes.ok) return;
-        const { key } = await keyRes.json();
-        if (!key) return;
+        const keyRes = await api<{key: string}>("/api/push/vapid-public-key");
+        if (keyRes.error || !keyRes.data?.key) return;
+        const key = keyRes.data.key;
 
         // Register the service worker
         const registration = await navigator.serviceWorker.register("/sw.js");
@@ -85,10 +84,8 @@ async function registerPush(): Promise<void> {
 
         // Save subscription to server
         const subJson = subscription.toJSON();
-        await fetch("/api/push/subscribe", {
+        await api("/api/push/subscribe", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
             body: JSON.stringify({
                 endpoint: subJson.endpoint,
                 keys: subJson.keys,
@@ -117,10 +114,8 @@ async function unregisterPush(): Promise<void> {
         if (!subscription) return;
         const endpoint = subscription.endpoint;
         await subscription.unsubscribe();
-        await fetch("/api/push/unsubscribe", {
+        await api("/api/push/unsubscribe", {
             method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
             body: JSON.stringify({ endpoint }),
         });
     } catch (err) {
