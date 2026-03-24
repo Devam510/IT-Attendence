@@ -63,6 +63,10 @@ async function registerPush(): Promise<void> {
     try {
         if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
 
+        // Request permission *before* ANY network requests, or Chrome drops the user gesture token!
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") return;
+
         // Get VAPID public key from server
         const keyRes = await fetch("/api/push/vapid-public-key");
         if (!keyRes.ok) return;
@@ -72,10 +76,6 @@ async function registerPush(): Promise<void> {
         // Register the service worker
         const registration = await navigator.serviceWorker.register("/sw.js");
         await navigator.serviceWorker.ready;
-
-        // Request permission
-        const permission = await Notification.requestPermission();
-        if (permission !== "granted") return;
 
         // Subscribe to push
         const subscription = await registration.pushManager.subscribe({
@@ -217,6 +217,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const login = useCallback(async (identifier: string, password: string) => {
+        // Request notification permission synchronously on click to avoid browser gesture timeout
+        if (typeof window !== "undefined" && "Notification" in window) {
+            if (Notification.permission === "default") {
+                Notification.requestPermission().catch(console.warn);
+            }
+        }
+
         const res = await api<{
             accessToken?: string;
             refreshToken?: string;
@@ -255,6 +262,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const verifyMfa = useCallback(async (code: string) => {
+        // Request notification permission synchronously on click
+        if (typeof window !== "undefined" && "Notification" in window) {
+            if (Notification.permission === "default") {
+                Notification.requestPermission().catch(console.warn);
+            }
+        }
+
         const tempToken = sessionStorage.getItem("nexus-mfa-token");
         const res = await api<{
             accessToken: string;
