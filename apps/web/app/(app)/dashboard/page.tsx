@@ -455,6 +455,10 @@ export default function DashboardPage() {
     // Face Verification Check-In Modal
     const [showFaceVerification, setShowFaceVerification] = useState(false);
 
+    // Face Verification Check-Out Modal
+    const [showCheckoutFaceModal, setShowCheckoutFaceModal] = useState(false);
+    const [pendingCheckoutReason, setPendingCheckoutReason] = useState("");
+
     // 8-hour countdown (in seconds)
     const WORK_SECS = 8 * 3600;
     const [countdown, setCountdown] = useState(WORK_SECS);
@@ -680,11 +684,11 @@ export default function DashboardPage() {
             // If it fails, we let them proceed to checkout anyway
         }
         setActionLoading(null);
-        // Proceed to normal checkout logic
+        // Proceed to early-check then face verification
         handleCheckOut();
     }
 
-    async function handleCheckOut(force = false, reason = "") {
+    async function handleCheckOut(force = false, reason = "", faceToken = "") {
         setActionError(null);
         // Skip early-checkout check if already in overtime — no need to ask for a reason
         if (!force && empData.checkInAt && overtimeSecs === 0) {
@@ -700,9 +704,14 @@ export default function DashboardPage() {
                 return;
             }
         }
+        // Gate: require face verification — open modal and let it call back with faceToken
+        if (!faceToken) {
+            setPendingCheckoutReason(reason);
+            setShowCheckoutFaceModal(true);
+            return;
+        }
         setActionLoading("checkout");
-        const token = sessionToken || (user?.id ? localStorage.getItem(`dash_sessionToken_${user.id}`) : null) || undefined;
-        const body: Record<string, unknown> = token ? { sessionToken: token } : {};
+        const body: Record<string, unknown> = { faceToken };
         if (reason) body.earlyReason = reason;
         const res = await apiPost<any>("/api/attendance/checkout", body);
         if (res.error) {
@@ -727,6 +736,7 @@ export default function DashboardPage() {
     function confirmEarlyCheckout() {
         if (!earlyReason.trim()) { setEarlyReasonError(true); return; }
         setShowEarlyModal(false);
+        // Pass reason, let face modal open next
         handleCheckOut(true, earlyReason.trim());
     }
 
@@ -866,11 +876,26 @@ export default function DashboardPage() {
     // Everyone else (EMP / MGR / HR) keeps the original layout
     return (
         <div>
+            {/* Check-In Modal */}
             <FaceVerificationModal 
                isOpen={showFaceVerification} 
+               mode="checkin"
                onClose={() => setShowFaceVerification(false)} 
                onSuccess={handleCheckIn} 
             />
+
+            {/* Check-Out Modal */}
+            <FaceVerificationModal
+                isOpen={showCheckoutFaceModal}
+                mode="checkout"
+                onClose={() => setShowCheckoutFaceModal(false)}
+                onSuccess={(faceToken) => {
+                    setShowCheckoutFaceModal(false);
+                    handleCheckOut(true, pendingCheckoutReason, faceToken);
+                }}
+            />
+
+            {/* ComplianceModal */}
             {ComplianceModal}
             {EarlyCheckoutModal}
             <div className="dash-greeting animate-fadeIn">
