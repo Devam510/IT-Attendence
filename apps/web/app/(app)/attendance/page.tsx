@@ -75,6 +75,8 @@ export default function AttendancePage() {
     const [earlyReason, setEarlyReason] = useState("");
     const [earlyReasonError, setEarlyReasonError] = useState(false);
     const [showComplianceModal, setShowComplianceModal] = useState(false);
+    const [showCheckoutFaceModal, setShowCheckoutFaceModal] = useState(false);
+    const [pendingCheckoutReason, setPendingCheckoutReason] = useState("");
     
     // Regularization Modal State
     const [showRegModal, setShowRegModal] = useState(false);
@@ -250,18 +252,16 @@ export default function AttendancePage() {
             // If it fails, we let them proceed to checkout anyway
         }
         setActionLoading(false);
-        // Proceed to normal checkout logic
+        // Proceed to early-check then face verification
         handleCheckOut();
     };
 
-    const handleCheckOut = useCallback(async (force = false, reason = "") => {
+    const handleCheckOut = useCallback(async (force = false, reason = "", faceToken = "") => {
         setActionLoading(true);
         setToast(null);
 
         // Gate: if worked < 4h and not forced, show early checkout modal
         if (!force && today.checkInTime) {
-            const checkInMs = elapsed > 0 ? (Date.now() - elapsed * 1000) : 0;
-            // Use elapsed directly — elapsed is already in seconds from check-in
             const workedHours = elapsed / 3600;
             if (workedHours < 4) {
                 setEarlyReason("");
@@ -272,8 +272,15 @@ export default function AttendancePage() {
             }
         }
 
-        const sessionToken = localStorage.getItem(tokenKey) || "";
-        const body: Record<string, unknown> = { sessionToken };
+        // Gate: require face verification — open modal and let it call back with faceToken
+        if (!faceToken) {
+            setPendingCheckoutReason(reason);
+            setShowCheckoutFaceModal(true);
+            setActionLoading(false);
+            return;
+        }
+
+        const body: Record<string, unknown> = { faceToken };
         if (reason) body.earlyReason = reason;
 
         const res = await apiPost<TodayData>("/api/attendance/checkout", body);
@@ -295,6 +302,7 @@ export default function AttendancePage() {
     function confirmEarlyCheckout() {
         if (!earlyReason.trim()) { setEarlyReasonError(true); return; }
         setShowEarlyModal(false);
+        // Pass reason, let face modal open next
         handleCheckOut(true, earlyReason.trim());
     }
 
@@ -432,7 +440,16 @@ export default function AttendancePage() {
 
     return (
         <div>
-            {/* Toast Notification */}
+            {/* Face Verification Modal — Check-Out */}
+            <FaceVerificationModal
+                isOpen={showCheckoutFaceModal}
+                mode="checkout"
+                onClose={() => setShowCheckoutFaceModal(false)}
+                onSuccess={(faceToken) => {
+                    setShowCheckoutFaceModal(false);
+                    handleCheckOut(true, pendingCheckoutReason, faceToken);
+                }}
+            />
 
             {/* Compliance Modal */}
             {showComplianceModal && (

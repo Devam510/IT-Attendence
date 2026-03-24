@@ -8,6 +8,7 @@ interface Props {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: (verificationToken: string) => void;
+    mode?: "checkin" | "checkout"; // controls UI labels
 }
 
 type Phase = "loading_models" | "scanning" | "verifying" | "success" | "error" | "security_alert";
@@ -16,7 +17,7 @@ function loadFaceApi() {
     return import("@vladmandic/face-api");
 }
 
-export function FaceVerificationModal({ isOpen, onClose, onSuccess }: Props) {
+export function FaceVerificationModal({ isOpen, onClose, onSuccess, mode = "checkin" }: Props) {
     const webcamRef = useRef<Webcam>(null);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const hasVerifiedRef = useRef(false);
@@ -186,7 +187,9 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess }: Props) {
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between" }}>
                             <span style={{ color: "#94a3b8", fontSize: 12 }}>Action</span>
-                            <span style={{ color: "#fca5a5", fontSize: 12 }}>Check-in Blocked</span>
+                            <span style={{ color: "#fca5a5", fontSize: 12 }}>
+                                {mode === "checkout" ? "Check-out Blocked" : "Check-in Blocked"}
+                            </span>
                         </div>
                     </div>
 
@@ -269,9 +272,13 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess }: Props) {
                 maxWidth: 400, width: "100%", boxShadow: "0 30px 80px rgba(0,0,0,0.6)",
                 textAlign: "center", color: "white",
             }}>
-                <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Face Check-In</h2>
+                <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>
+                    {mode === "checkout" ? "Face Check-Out" : "Face Check-In"}
+                </h2>
                 <p style={{ color: "#94a3b8", fontSize: 13, marginBottom: 28 }}>
-                    Look at the camera to verify your identity
+                    {mode === "checkout"
+                        ? "Scan your face to confirm it's really you checking out"
+                        : "Look at the camera to verify your identity"}
                 </p>
 
                 {/* Camera with animated ring */}

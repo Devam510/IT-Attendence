@@ -18,6 +18,11 @@ async function handleCheckOut(
 
     const sessionToken = body.sessionToken as string | undefined;
     const earlyReason = body.earlyReason as string | undefined;
+    const faceToken = body.faceToken as string | undefined;
+
+    if (!faceToken) {
+        return error("FACE_REQUIRED", "Face verification is required to check out", 403);
+    }
 
     const now = new Date();
     // Calculate "today" in IST (UTC+5:30), not in server's UTC timezone
@@ -39,36 +44,34 @@ async function handleCheckOut(
         return error("NO_CHECKIN", "No active check-in found for today", 404);
     }
 
-    // ── Device session verification ──────────────────────────────
-    // sessionToken is OPTIONAL for web sessions — JWT already proves identity.
-    // We only actively block when BOTH tokens exist AND they don't match
-    // (true buddy-checkout: different person's token was sent).
+    // ── Device type verification ──────────────────────────────
+    // We check device TYPE (Mobile vs Desktop) — NOT session token.
+    // This prevents someone from checking out from a completely different class of device,
+    // while allowing normal network switches (WiFi → Mobile data) on the same phone.
+    const checkOutUserAgent = req.headers.get("user-agent") || "Unknown device";
+    const checkOutDevice = /mobile|android|iphone|ipad/i.test(checkOutUserAgent) ? "Mobile" : "Desktop/Browser";
     const flags = record.anomalyFlags as Record<string, unknown> | null;
-    const storedToken = typeof flags?.sessionToken === "string" ? flags.sessionToken : undefined;
+    const checkInDevice = typeof flags?.checkInDevice === "string" ? flags.checkInDevice : null;
 
-    if (storedToken && sessionToken && sessionToken !== storedToken) {
-        const checkInDevice = typeof flags?.checkInDevice === "string" ? flags.checkInDevice : "another device";
+    if (checkInDevice && checkInDevice !== checkOutDevice) {
         logger.warn({
             userId: auth.sub,
             recordId: record.id,
-            expected: storedToken.slice(0, 8) + "...",
-            received: sessionToken.slice(0, 8) + "...",
-        }, "Checkout device mismatch — possible buddy checkout blocked");
-
+            checkInDevice,
+            checkOutDevice,
+        }, "Checkout device type mismatch — blocked");
         return error(
             "DEVICE_MISMATCH",
-            `You must check out from the same device used for check-in (${checkInDevice}). This incident has been logged.`,
+            `You checked in from a ${checkInDevice}. Please check out from the same type of device.`,
             403,
-            { checkInDevice }
+            { checkInDevice, checkOutDevice }
         );
     }
 
     // ── Capture checkout device info ─────────────────────────────
-    const checkOutUserAgent = req.headers.get("user-agent") || "Unknown device";
     const checkOutIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
         || req.headers.get("x-real-ip")
         || "Unknown IP";
-    const checkOutDevice = /mobile|android|iphone|ipad/i.test(checkOutUserAgent) ? "Mobile" : "Desktop/Browser";
 
     const checkOutTime = new Date();
     const diffMs = checkOutTime.getTime() - record.checkInAt!.getTime();
@@ -95,6 +98,7 @@ async function handleCheckOut(
         checkOutUserAgent,
         checkOutIp,
         totalBreakMinutes: Math.round(breakMinutes),
+        faceVerifiedAtCheckout: true,
         ...(isHalfDay ? { isHalfDay: true } : {}),
         ...(isHalfDay && earlyReason ? { earlyReason } : {}),
     };
@@ -125,7 +129,7 @@ async function handleCheckOut(
         totalHours,
         overtimeHours,
         isHalfDay,
-        deviceMatch: !storedToken || !sessionToken || sessionToken === storedToken,
+        deviceMatch: !checkInDevice || checkInDevice === checkOutDevice,
     });
 }
 
