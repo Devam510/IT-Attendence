@@ -29,7 +29,7 @@
         },
         {
             "path": "/api/cron/lunch-reminder",
-            "schedule": "30 7 * * 1-5"
+            "schedule": "0 9 * * 1-5"
         }
     ],
     "regions": [
