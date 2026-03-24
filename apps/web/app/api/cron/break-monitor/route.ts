@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@vibetech/db";
 import { logger } from "@/lib/errors";
+import { sendPushToUser } from "@/lib/web-push";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +85,7 @@ export async function GET(req: Request) {
                     },
                 });
 
-                // Notify the employee
+                // Notify the employee (in-app + OS push)
                 await prisma.notification.create({
                     data: {
                         userId: record.userId,
@@ -93,6 +94,15 @@ export async function GET(req: Request) {
                         body: `Your break was automatically ended after ${BREAK_AUTO_RESUME_MINUTES} minutes. Your attendance has been updated — please verify it if needed.`,
                         data: { type: "break_auto_resumed", attendanceId: record.id },
                     },
+                });
+
+                // OS-level push notification
+                await sendPushToUser(record.userId, {
+                    title: "⚠️ Break Auto-Ended",
+                    body: `Your break exceeded ${BREAK_AUTO_RESUME_MINUTES} minutes and was automatically closed. Please review your attendance.`,
+                    url: "/attendance",
+                    tag: "break-auto-resume",
+                    requireInteraction: true,
                 });
 
                 autoResumedCount++;
@@ -119,7 +129,7 @@ export async function GET(req: Request) {
                     },
                 });
 
-                // Notify the employee
+                // Notify the employee (in-app + OS push)
                 await prisma.notification.create({
                     data: {
                         userId: record.userId,
@@ -128,6 +138,15 @@ export async function GET(req: Request) {
                         body: "You've been on break for 30 minutes. Don't forget to resume work! Your break will be automatically ended after 60 minutes.",
                         data: { type: "break_reminder", attendanceId: record.id },
                     },
+                });
+
+                // OS-level push notification
+                await sendPushToUser(record.userId, {
+                    title: "⏰ Break Reminder",
+                    body: "You've been on break for 30 minutes. Don't forget to resume work!",
+                    url: "/attendance",
+                    tag: "break-reminder",
+                    requireInteraction: true,
                 });
 
                 remindersCount++;

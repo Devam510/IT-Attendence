@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@vibetech/db";
 import { logger } from "@/lib/errors";
+import { sendPushToUsers } from "@/lib/web-push";
 
 export const dynamic = "force-dynamic";
 
@@ -73,6 +74,14 @@ export async function GET(req: Request) {
         });
 
         logger.info({ count: eligibleUserIds.length }, "Lunch break reminders sent");
+
+        // OS-level push notifications (fires even if browser tab is closed)
+        await sendPushToUsers(eligibleUserIds, {
+            title: "🍽️ Lunch Break Reminder",
+            body: "It's 1:00 PM — time to take your lunch break! Stay refreshed and productive.",
+            url: "/attendance",
+            tag: "lunch-reminder",
+        });
 
         return NextResponse.json({
             success: true,

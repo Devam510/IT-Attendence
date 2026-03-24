@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { api, apiGet, setAccessToken, getAccessToken, refreshToken } from "@/lib/api-client";
 
 interface User {
@@ -54,6 +54,78 @@ function jwtToUser(payload: Record<string, any>): User | null {
         departmentId: payload.departmentId ?? "",
         mfaEnabled: payload.mfaEnabled ?? false,
     };
+}
+
+/* ── Push notification helpers ─────────────────────── */
+
+/** Register service worker and subscribe browser to Web Push. */
+async function registerPush(): Promise<void> {
+    try {
+        if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+
+        // Get VAPID public key from server
+        const keyRes = await fetch("/api/push/vapid-public-key");
+        if (!keyRes.ok) return;
+        const { key } = await keyRes.json();
+        if (!key) return;
+
+        // Register the service worker
+        const registration = await navigator.serviceWorker.register("/sw.js");
+        await navigator.serviceWorker.ready;
+
+        // Request permission
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") return;
+
+        // Subscribe to push
+        const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(key).buffer as ArrayBuffer,
+        });
+
+        // Save subscription to server
+        const subJson = subscription.toJSON();
+        await fetch("/api/push/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+                endpoint: subJson.endpoint,
+                keys: subJson.keys,
+            }),
+        });
+    } catch (err) {
+        console.warn("Push registration failed (non-critical):", err);
+    }
+}
+
+/** Convert base64url VAPID key to Uint8Array for the browser API. */
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+}
+
+/** Unsubscribe from push (call on logout). */
+async function unregisterPush(): Promise<void> {
+    try {
+        if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+        const registration = await navigator.serviceWorker.getRegistration("/sw.js");
+        if (!registration) return;
+        const subscription = await registration.pushManager.getSubscription();
+        if (!subscription) return;
+        const endpoint = subscription.endpoint;
+        await subscription.unsubscribe();
+        await fetch("/api/push/unsubscribe", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ endpoint }),
+        });
+    } catch (err) {
+        console.warn("Push unregister failed (non-critical):", err);
+    }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -174,6 +246,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (res.data.user) {
                 setUser(res.data.user);
             }
+            // Register for Web Push notifications after login
+            registerPush();
             return { success: true };
         }
 
@@ -199,6 +273,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             localStorage.setItem("nexus-refresh-token", res.data.refreshToken);
             setUser(res.data.user);
             sessionStorage.removeItem("nexus-mfa-token");
+            // Register for Web Push notifications after MFA
+            registerPush();
             return { success: true };
         }
 
@@ -209,6 +285,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAccessToken(null);
         localStorage.removeItem("nexus-refresh-token");
         sessionStorage.removeItem("nexus-mfa-token");
+        unregisterPush(); // Remove push subscription on logout
         setUser(null);
         window.location.href = "/login";
     }, []);
