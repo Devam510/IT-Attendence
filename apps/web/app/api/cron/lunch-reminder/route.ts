@@ -43,27 +43,15 @@ export async function GET(req: Request) {
             return NextResponse.json({ message: "No active check-ins found", count: 0 });
         }
 
-        // Filter to employees who haven't taken a long break yet today
+        // Filter to employees who are currently checked in and not actively on a break
         const eligibleUserIds: string[] = [];
         for (const record of openRecords) {
             const flags = (record.anomalyFlags as Record<string, unknown>) || {};
             const breaks = (flags.breaks as Array<{ start: string; end: string | null }>) || [];
             const hasOpenBreak = breaks.some((b) => b.end === null);
-            
-            // Calculate total break duration so far today in minutes
-            let totalBreakMins = 0;
-            for (const b of breaks) {
-                if (b.start && b.end) {
-                    const diff = new Date(b.end).getTime() - new Date(b.start).getTime();
-                    if (diff > 0) totalBreakMins += diff / (1000 * 60);
-                }
-            }
 
-            // Assume >20 minutes total break time means they probably took lunch
-            const hasTakenLunchBreak = totalBreakMins >= 20;
-
-            // Notify if they are actively working and haven't had a proper lunch break
-            if (!hasOpenBreak && !hasTakenLunchBreak) {
+            // Notify everyone actively working, regardless of past breaks
+            if (!hasOpenBreak) {
                 eligibleUserIds.push(record.userId);
             }
         }
