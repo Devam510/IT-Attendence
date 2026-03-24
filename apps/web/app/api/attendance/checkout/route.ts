@@ -44,29 +44,13 @@ async function handleCheckOut(
         return error("NO_CHECKIN", "No active check-in found for today", 404);
     }
 
-    // ── Device type verification ──────────────────────────────
-    // We check device TYPE (Mobile vs Desktop) — NOT session token.
-    // This prevents someone from checking out from a completely different class of device,
-    // while allowing normal network switches (WiFi → Mobile data) on the same phone.
+    // ── Device info — captured for audit log only, no longer blocks checkout ────
+    // Face verification is the identity proof. Device type is just logged.
     const checkOutUserAgent = req.headers.get("user-agent") || "Unknown device";
     const checkOutDevice = /mobile|android|iphone|ipad/i.test(checkOutUserAgent) ? "Mobile" : "Desktop/Browser";
     const flags = record.anomalyFlags as Record<string, unknown> | null;
     const checkInDevice = typeof flags?.checkInDevice === "string" ? flags.checkInDevice : null;
-
-    if (checkInDevice && checkInDevice !== checkOutDevice) {
-        logger.warn({
-            userId: auth.sub,
-            recordId: record.id,
-            checkInDevice,
-            checkOutDevice,
-        }, "Checkout device type mismatch — blocked");
-        return error(
-            "DEVICE_MISMATCH",
-            `You checked in from a ${checkInDevice}. Please check out from the same type of device.`,
-            403,
-            { checkInDevice, checkOutDevice }
-        );
-    }
+    void checkInDevice; // kept in anomalyFlags for audit, not used for blocking
 
     // ── Capture checkout device info ─────────────────────────────
     const checkOutIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
@@ -129,7 +113,7 @@ async function handleCheckOut(
         totalHours,
         overtimeHours,
         isHalfDay,
-        deviceMatch: !checkInDevice || checkInDevice === checkOutDevice,
+        deviceMatch: true, // device check removed — face verification is the identity proof
     });
 }
 
