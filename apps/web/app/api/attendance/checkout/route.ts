@@ -7,6 +7,17 @@ import { withAuth } from "@/lib/auth";
 import { success, error, logger } from "@/lib/errors";
 import type { JwtPayload } from "@vibetech/shared";
 
+// Haversine distance in meters
+function haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLng = (lng2 - lng1) * (Math.PI / 180);
+    const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 async function handleCheckOut(
     req: NextRequest,
     context: { auth: JwtPayload }
@@ -19,9 +30,15 @@ async function handleCheckOut(
     const sessionToken = body.sessionToken as string | undefined;
     const earlyReason = body.earlyReason as string | undefined;
     const faceToken = body.faceToken as string | undefined;
+    const lat = body.lat as number | undefined;
+    const lng = body.lng as number | undefined;
 
     if (!faceToken) {
         return error("FACE_REQUIRED", "Face verification is required to check out", 403);
+    }
+
+    if (lat === undefined || lng === undefined) {
+        return error("LOCATION_REQUIRED", "GPS coordinates are required to check out", 400);
     }
 
     const now = new Date();
@@ -42,6 +59,28 @@ async function handleCheckOut(
 
     if (!record) {
         return error("NO_CHECKIN", "No active check-in found for today", 404);
+    }
+
+    // ── Get user's assigned office location ─────────────────────────────
+    const user = await prisma.user.findUnique({
+        where: { id: auth.sub },
+        select: { location: true },
+    });
+
+    if (!user?.location) {
+        return error("NO_OFFICE", "No office location assigned to you", 400);
+    }
+
+    // ── Geofence check — must be within office radius ─────────────────
+    const distanceM = haversineM(lat, lng, user.location.latitude, user.location.longitude);
+    const maxRadius = user.location.radiusM || 500;
+
+    if (distanceM > maxRadius) {
+        return error("GEOFENCE_FAILED",
+            `You are ${Math.round(distanceM)}m from office. Must be within ${maxRadius}m to check out.`,
+            403,
+            { distanceM: Math.round(distanceM), maxRadius, officeName: user.location.name }
+        );
     }
 
     // ── Device info — captured for audit log only, no longer blocks checkout ────

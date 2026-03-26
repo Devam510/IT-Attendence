@@ -711,26 +711,41 @@ export default function DashboardPage() {
             return;
         }
         setActionLoading("checkout");
-        const body: Record<string, unknown> = { faceToken };
-        if (reason) body.earlyReason = reason;
-        const res = await apiPost<any>("/api/attendance/checkout", body);
-        if (res.error) {
-            setActionError(res.error || "Check-out failed");
-        } else {
-            if (user?.id) {
-                localStorage.removeItem(`dash_sessionToken_${user.id}`);
-                localStorage.removeItem(`dash_break_${user.id}`);
+        try {
+            const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+                navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
+            );
+            const body: Record<string, unknown> = { 
+                faceToken,
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude
+            };
+            if (reason) body.earlyReason = reason;
+            const res = await apiPost<any>("/api/attendance/checkout", body);
+            if (res.error) {
+                setActionError(res.error || "Check-out failed");
+            } else {
+                if (user?.id) {
+                    localStorage.removeItem(`dash_sessionToken_${user.id}`);
+                    localStorage.removeItem(`dash_break_${user.id}`);
+                }
+                setSessionToken(null);
+                setOnBreak(false);
+                onBreakRef.current = false;
+                setBreakLog([]);
+                breakLogRef.current = [];
+                setBreakStartedAt(null);
+                breakStartedAtRef.current = null;
+                await loadEmpData();
             }
-            setSessionToken(null);
-            setOnBreak(false);
-            onBreakRef.current = false;
-            setBreakLog([]);
-            breakLogRef.current = [];
-            setBreakStartedAt(null);
-            breakStartedAtRef.current = null;
-            await loadEmpData();
+        } catch (e: any) {
+            if (e?.code === 1) setActionError("Location access denied. Please enable location in browser settings.");
+            else if (e?.code === 2) setActionError("Location unavailable. Please try again.");
+            else if (e?.code === 3) setActionError("Location request timed out.");
+            else setActionError("Check-out failed. Please try again.");
+        } finally {
+            setActionLoading(null);
         }
-        setActionLoading(null);
     }
 
     function confirmEarlyCheckout() {

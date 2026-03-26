@@ -280,23 +280,39 @@ export default function AttendancePage() {
             return;
         }
 
-        const body: Record<string, unknown> = { faceToken };
-        if (reason) body.earlyReason = reason;
+        try {
+            const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+                navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
+            );
+            
+            const body: Record<string, unknown> = { 
+                faceToken,
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude
+            };
+            if (reason) body.earlyReason = reason;
 
-        const res = await apiPost<TodayData>("/api/attendance/checkout", body);
-        if (res.data) {
-            setToday(prev => ({
-                ...prev,
-                checkedIn: false,
-                checkOutTime: res.data!.checkOutTime || new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }),
-            }));
-            localStorage.removeItem(tokenKey);
-            if (intervalRef.current) clearInterval(intervalRef.current);
-            setToast({ message: "✅ Checked out successfully!", type: "success" });
-        } else {
-            setToast({ message: res.error || "Check-out failed", type: "error" });
+            const res = await apiPost<TodayData>("/api/attendance/checkout", body);
+            if (res.data) {
+                setToday(prev => ({
+                    ...prev,
+                    checkedIn: false,
+                    checkOutTime: res.data!.checkOutTime || new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }),
+                }));
+                localStorage.removeItem(tokenKey);
+                if (intervalRef.current) clearInterval(intervalRef.current);
+                setToast({ message: "✅ Checked out successfully!", type: "success" });
+            } else {
+                setToast({ message: res.error || "Check-out failed", type: "error" });
+            }
+        } catch (e: any) {
+            if (e?.code === 1) setToast({ message: "Location access denied. Please enable location in browser settings.", type: "error" });
+            else if (e?.code === 2) setToast({ message: "Location unavailable. Please try again.", type: "error" });
+            else if (e?.code === 3) setToast({ message: "Location request timed out.", type: "error" });
+            else setToast({ message: "Check-out failed. Please try again.", type: "error" });
+        } finally {
+            setActionLoading(false);
         }
-        setActionLoading(false);
     }, [today.checkInTime, elapsed, tokenKey]);
 
     function confirmEarlyCheckout() {
