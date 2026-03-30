@@ -203,7 +203,7 @@ export default function AttendancePage() {
         let latitude = 0, longitude = 0;
         try {
             const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-                navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000 })
+                navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
             );
             latitude = pos.coords.latitude;
             longitude = pos.coords.longitude;
@@ -282,7 +282,7 @@ export default function AttendancePage() {
 
         try {
             const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-                navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
+                navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
             );
             
             const body: Record<string, unknown> = { 

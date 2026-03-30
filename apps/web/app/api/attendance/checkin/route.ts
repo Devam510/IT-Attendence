@@ -100,8 +100,14 @@ async function handleCheckIn(
     const office = user.location;
 
     // 3. Geofence check — must be within office radius
+    // Capture device info early to adjust tolerance for mobile GPS bounce
+    const userAgent = req.headers.get("user-agent") || "Unknown device";
+    const isMobile = /mobile|android|iphone|ipad/i.test(userAgent);
+    
     const distanceM = haversineM(lat, lng, office.latitude, office.longitude);
-    const maxRadius = office.radiusM || 500;
+    const baseRadius = office.radiusM || 500;
+    // Mobile GPS can bounce by ~50-100m indoors; give 50% leniency
+    const maxRadius = isMobile ? Math.floor(baseRadius * 1.5) : baseRadius;
 
     if (distanceM > maxRadius) {
         return error("GEOFENCE_FAILED",
@@ -115,13 +121,12 @@ async function handleCheckIn(
     const sessionToken = crypto.randomUUID();
 
     // Capture device info from request headers
-    const userAgent = req.headers.get("user-agent") || "Unknown device";
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
         || req.headers.get("x-real-ip")
         || "Unknown IP";
 
-    // Detect device type from user agent
-    const deviceType = /mobile|android|iphone|ipad/i.test(userAgent) ? "Mobile" : "Desktop/Browser";
+    // Detect device type from user agent computed above
+    const deviceType = isMobile ? "Mobile" : "Desktop/Browser";
 
     // 5. Create attendance record — store session token + device info in anomalyFlags JSON
     const record = await prisma.attendanceRecord.create({

@@ -69,7 +69,7 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess, mode = "chec
 
                 const detection = await faceapi.detectSingleFace(
                     video,
-                    new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.85 })
+                    new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
                 ).withFaceLandmarks().withFaceDescriptor();
 
                 if (!detection) {
@@ -77,7 +77,7 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess, mode = "chec
                     return;
                 }
 
-                if (detection.detection.score < 0.85) return;
+                if (detection.detection.score < 0.5) return;
 
                 hasVerifiedRef.current = true;
                 cleanup();
@@ -310,6 +310,7 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess, mode = "chec
                                 ref={webcamRef}
                                 audio={false}
                                 mirrored={true}
+                                videoConstraints={{ facingMode: "user" }}
                                 onUserMedia={() => setIsCameraReady(true)}
                                 onUserMediaError={() => {
                                     setPhase("error");

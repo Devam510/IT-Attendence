@@ -572,6 +572,15 @@ export default function DashboardPage() {
             try {
                 const parsed = JSON.parse(breakState);
                 const log: BreakEntry[] = parsed.log ?? [];
+                // Bug fix: only restore break log if it was saved TODAY in IST.
+                // Stale break data from a previous day causes phantom breaks.
+                const todayIst = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); // "YYYY-MM-DD"
+                const savedDate = parsed.date as string | undefined;
+                if (savedDate !== todayIst) {
+                    // Stale data from a different day — clear it and bail
+                    localStorage.removeItem(`dash_break_${user.id}`);
+                    return;
+                }
                 setBreakLog(log);
                 breakLogRef.current = log;
                 const last = log[log.length - 1];
@@ -641,8 +650,9 @@ export default function DashboardPage() {
         setActionError(null);
         setActionLoading("checkin");
         try {
+            // Bug fix: always use high-accuracy GPS with no cached position for reliable mobile geo
             const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-                navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
+                navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
             );
             const res = await apiPost<any>("/api/attendance/checkin", {
                 lat: pos.coords.latitude,
@@ -712,8 +722,9 @@ export default function DashboardPage() {
         }
         setActionLoading("checkout");
         try {
+            // Bug fix: high-accuracy GPS for checkout too — consistent with check-in
             const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-                navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
+                navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
             );
             const body: Record<string, unknown> = { 
                 faceToken,
@@ -765,7 +776,10 @@ export default function DashboardPage() {
         onBreakRef.current = true;
         setBreakStartedAt(now);
         breakStartedAtRef.current = now;
-        if (user?.id) localStorage.setItem(`dash_break_${user.id}`, JSON.stringify({ log: newLog }));
+        // Bug fix: store today's IST date alongside the log so stale data from yesterday
+        // can be detected and cleared on next mount (prevents phantom breaks)
+        const todayIst = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+        if (user?.id) localStorage.setItem(`dash_break_${user.id}`, JSON.stringify({ log: newLog, date: todayIst }));
         // Persist to DB (fire-and-forget)
         apiPost("/api/attendance/break", { action: "start" }).catch(() => null);
     }
@@ -781,7 +795,8 @@ export default function DashboardPage() {
         onBreakRef.current = false;
         setBreakStartedAt(null);
         breakStartedAtRef.current = null;
-        if (user?.id) localStorage.setItem(`dash_break_${user.id}`, JSON.stringify({ log: newLog }));
+        const todayIst = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+        if (user?.id) localStorage.setItem(`dash_break_${user.id}`, JSON.stringify({ log: newLog, date: todayIst }));
         // Persist to DB (fire-and-forget)
         apiPost("/api/attendance/break", { action: "end" }).catch(() => null);
     }

@@ -204,25 +204,34 @@ export async function checkAndEscalateExpired(): Promise<number> {
 export async function getPendingApprovalsForUser(
     userId: string
 ): Promise<{ id: string; entityType: string; entityId: string; requesterId: string; currentStep: number; slaDeadline: Date | null; createdAt: Date }[]> {
-    const workflows = await prisma.approvalWorkflow.findMany({
-        where: {
-            status: { in: ["PENDING", "IN_PROGRESS", "DELEGATED"] },
-        },
-        orderBy: { createdAt: "desc" },
-    });
+    try {
+        const workflows = await prisma.approvalWorkflow.findMany({
+            where: {
+                status: { in: ["PENDING", "IN_PROGRESS", "DELEGATED"] },
+            },
+            orderBy: { createdAt: "desc" },
+        });
 
-    // Filter to those where current step approver matches userId
-    return workflows.filter((w) => {
-        const steps = w.steps as unknown as ApprovalStep[];
-        const step = steps[w.currentStep];
-        return step && (step.approverId === userId || step.delegatedTo === userId);
-    }).map((w) => ({
-        id: w.id,
-        entityType: w.entityType,
-        entityId: w.entityId,
-        requesterId: w.requesterId,
-        currentStep: w.currentStep,
-        slaDeadline: w.slaDeadline,
-        createdAt: w.createdAt,
-    }));
+        // Filter to those where current step approver matches userId
+        return workflows.filter((w) => {
+            try {
+                const steps = w.steps as unknown as ApprovalStep[];
+                const step = steps[w.currentStep];
+                return step && (step.approverId === userId || step.delegatedTo === userId);
+            } catch {
+                return false;
+            }
+        }).map((w) => ({
+            id: w.id,
+            entityType: w.entityType,
+            entityId: w.entityId,
+            requesterId: w.requesterId,
+            currentStep: w.currentStep,
+            slaDeadline: w.slaDeadline,
+            createdAt: w.createdAt,
+        }));
+    } catch {
+        // Fallback to prevent 500 errors on the dashboard if DB or JSON parsing fails
+        return [];
+    }
 }
