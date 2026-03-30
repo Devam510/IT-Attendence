@@ -15,6 +15,7 @@ import {
     HeartPulse,
     ShieldCheck,
     UsersRound,
+    BarChart2,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -46,6 +47,7 @@ export default function Sidebar() {
     const isAdmin = Boolean(user && (user.role === "SADM" || user.role === "SEC" || user.role === "ITA"));
     const canManageUsers = user?.role === "SADM" || user?.role === "HRA" || user?.role === "HRBP";
     const isSuperAdmin = user?.role === "SADM";
+    const isSales = user?.departmentName?.toLowerCase() === "sales";
 
     // Admins don't have personal attendance — hide that link for them
     const visibleNavItems = isSuperAdmin
@@ -96,6 +98,24 @@ export default function Sidebar() {
                         {label}
                     </Link>
                 ))}
+
+                {/* CRM — visible to Sales team members only */}
+                {isSales && (
+                    <>
+                        <div className="sidebar-section">Sales</div>
+                        <a
+                            href="https://vibetechlabs.com/crm/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="sidebar-link"
+                        >
+                            <span className="sidebar-link-icon">
+                                <BarChart2 size={18} strokeWidth={1.8} />
+                            </span>
+                            CRM
+                        </a>
+                    </>
+                )}
 
 
                 {canManageUsers && !isAdmin && (

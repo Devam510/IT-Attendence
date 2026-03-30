@@ -11,6 +11,7 @@ interface User {
     employeeId: string;
     entityId: string;
     departmentId: string;
+    departmentName?: string;
     mfaEnabled: boolean;
 }
 
@@ -52,7 +53,23 @@ function jwtToUser(payload: Record<string, any>): User | null {
         employeeId: payload.employeeId ?? "",
         entityId: payload.entityId ?? "",
         departmentId: payload.departmentId ?? "",
+        departmentName: payload.departmentName,
         mfaEnabled: payload.mfaEnabled ?? false,
+    };
+}
+
+/** Normalise API-returned user objects (login / session) → User shape. */
+function apiUserToUser(raw: Record<string, any>): User {
+    return {
+        id: raw.id ?? "",
+        email: raw.email ?? "",
+        fullName: raw.fullName ?? "",
+        role: raw.role ?? "",
+        employeeId: raw.employeeId ?? "",
+        entityId: raw.entityId ?? "",
+        departmentId: raw.departmentId ?? (raw.department?.id ?? ""),
+        departmentName: raw.departmentName ?? raw.department?.name,
+        mfaEnabled: raw.mfaEnabled ?? false,
     };
 }
 
@@ -163,9 +180,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                 // Background validation to ensure token isn't revoked server-side
                 // Only logout on explicit 401 — ignore 500/network errors to avoid false logouts
-                const res = await apiGet<{ user: User }>("/api/auth/session");
+                const res = await apiGet<{ user: Record<string, any> }>("/api/auth/session");
                 if (res.data?.user) {
-                    setUser(res.data.user);
+                    setUser(apiUserToUser(res.data.user));
                 } else if (res.code === "UNAUTHORIZED" && res.error) {
                     // Confirmed server-side rejection — log out
                     setAccessToken(null);
@@ -246,7 +263,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 localStorage.setItem("nexus-refresh-token", res.data.refreshToken);
             }
             if (res.data.user) {
-                setUser(res.data.user);
+                setUser(apiUserToUser(res.data.user as Record<string, any>));
             }
             // Register for Web Push notifications after login
             registerPush();
@@ -280,7 +297,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (res.data?.accessToken) {
             setAccessToken(res.data.accessToken);
             localStorage.setItem("nexus-refresh-token", res.data.refreshToken);
-            setUser(res.data.user);
+            setUser(apiUserToUser(res.data.user as Record<string, any>));
             sessionStorage.removeItem("nexus-mfa-token");
             // Register for Web Push notifications after MFA
             registerPush();
