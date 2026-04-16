@@ -99,9 +99,22 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess, mode = "chec
             }, 250);
 
         } catch (e: any) {
+            // Detect Next.js ChunkLoadError — happens when a new deployment is live
+            // and the browser tries to load an old asset hash that no longer exists.
+            // Retrying startVerification will fail again (same missing chunk).
+            // The ONLY fix is a full page reload to fetch the new chunk manifest.
+            const isChunkError =
+                e?.name === "ChunkLoadError" ||
+                (typeof e?.message === "string" && e.message.toLowerCase().includes("failed to load chunk"));
+
             setPhase("error");
-            setErrorMsg(e.message || "Failed to start face verification.");
+            if (isChunkError) {
+                setErrorMsg("__CHUNK_ERROR__");
+            } else {
+                setErrorMsg(e.message || "Failed to start face verification.");
+            }
         }
+
     }, [cleanup, onSuccess]);
 
     // Countdown auto-close for the security alert
@@ -346,7 +359,11 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess, mode = "chec
 
                 {/* Status */}
                 <p style={{ fontSize: 14, color: phase === "error" ? "#f87171" : phase === "success" ? "#4ade80" : "#94a3b8", marginBottom: 24, minHeight: 20 }}>
-                    {phase === "error" ? errorMsg : statusMsg}
+                    {phase === "error"
+                        ? (errorMsg === "__CHUNK_ERROR__"
+                            ? "New version deployed — your app is outdated. Refresh to continue."
+                            : errorMsg)
+                        : statusMsg}
                 </p>
 
                 {/* Buttons */}
@@ -355,18 +372,27 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess, mode = "chec
                         Cancel
                     </button>
                     {phase === "error" && (
-                        <button
-                            onClick={() => {
-                                hasVerifiedRef.current = false;
-                                setPhase("loading_models");
-                                setStatusMsg("Loading AI…");
-                                setErrorMsg("");
-                                setIsCameraReady(false);
-                            }}
-                            style={{ flex: 1, padding: "12px 0", borderRadius: 10, border: "none", background: "#3b82f6", color: "white", fontWeight: 600, cursor: "pointer", fontSize: 14 }}
-                        >
-                            Retry
-                        </button>
+                        errorMsg === "__CHUNK_ERROR__" ? (
+                            <button
+                                onClick={() => window.location.reload()}
+                                style={{ flex: 1, padding: "12px 0", borderRadius: 10, border: "none", background: "#3b82f6", color: "white", fontWeight: 700, cursor: "pointer", fontSize: 14 }}
+                            >
+                                🔄 Refresh Page
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => {
+                                    hasVerifiedRef.current = false;
+                                    setPhase("loading_models");
+                                    setStatusMsg("Loading AI…");
+                                    setErrorMsg("");
+                                    setIsCameraReady(false);
+                                }}
+                                style={{ flex: 1, padding: "12px 0", borderRadius: 10, border: "none", background: "#3b82f6", color: "white", fontWeight: 600, cursor: "pointer", fontSize: 14 }}
+                            >
+                                Retry
+                            </button>
+                        )
                     )}
                 </div>
             </div>
