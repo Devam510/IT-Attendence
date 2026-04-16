@@ -471,6 +471,8 @@ export default function DashboardPage() {
     const [onBreak, setOnBreak] = useState(false);
     const [breakStartedAt, setBreakStartedAt] = useState<Date | null>(null);
     const [breakElapsed, setBreakElapsed] = useState(0); // live current break secs
+    const [breakLoading, setBreakLoading] = useState(false); // prevent double-tap
+    const [breakError, setBreakError] = useState<string | null>(null); // shown in widget
 
     // Refs so ticker closure never reads stale values
     const breakLogRef = useRef<BreakEntry[]>([]);
@@ -767,38 +769,104 @@ export default function DashboardPage() {
     }
 
     async function handleBreakStart() {
+        if (breakLoading) return; // prevent double-tap
+        setBreakLoading(true);
+        setBreakError(null);
+
         const now = new Date();
+        const todayIst = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
         const newEntry: BreakEntry = { start: now.toISOString(), end: null };
         const newLog = [...breakLog, newEntry];
+
+        // Optimistic UI update
         setBreakLog(newLog);
         breakLogRef.current = newLog;
         setOnBreak(true);
         onBreakRef.current = true;
         setBreakStartedAt(now);
         breakStartedAtRef.current = now;
-        // Bug fix: store today's IST date alongside the log so stale data from yesterday
-        // can be detected and cleared on next mount (prevents phantom breaks)
-        const todayIst = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
         if (user?.id) localStorage.setItem(`dash_break_${user.id}`, JSON.stringify({ log: newLog, date: todayIst }));
-        // Persist to DB (fire-and-forget)
-        apiPost("/api/attendance/break", { action: "start" }).catch(() => null);
+
+        try {
+            const res = await apiPost("/api/attendance/break", { action: "start" });
+            if (res.error) {
+                // API rejected — rollback
+                const prevLog = breakLog; // before the push
+                setBreakLog(prevLog);
+                breakLogRef.current = prevLog;
+                setOnBreak(false);
+                onBreakRef.current = false;
+                setBreakStartedAt(null);
+                breakStartedAtRef.current = null;
+                if (user?.id) localStorage.setItem(`dash_break_${user.id}`, JSON.stringify({ log: prevLog, date: todayIst }));
+                setBreakError(res.error || "Failed to start break. Please try again.");
+            }
+        } catch {
+            // Network error — rollback
+            const prevLog = breakLog;
+            setBreakLog(prevLog);
+            breakLogRef.current = prevLog;
+            setOnBreak(false);
+            onBreakRef.current = false;
+            setBreakStartedAt(null);
+            breakStartedAtRef.current = null;
+            if (user?.id) localStorage.setItem(`dash_break_${user.id}`, JSON.stringify({ log: prevLog, date: todayIst }));
+            setBreakError("Network error — break not saved. Check your connection and try again.");
+        } finally {
+            setBreakLoading(false);
+        }
     }
 
     async function handleBreakEnd() {
+        if (breakLoading) return; // prevent double-tap
+        setBreakLoading(true);
+        setBreakError(null);
+
         const now = new Date();
+        const todayIst = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
         const newLog = breakLog.map((b, i) =>
             i === breakLog.length - 1 && !b.end ? { ...b, end: now.toISOString() } : b
         );
+
+        // Optimistic UI update
         setBreakLog(newLog);
         breakLogRef.current = newLog;
         setOnBreak(false);
         onBreakRef.current = false;
         setBreakStartedAt(null);
         breakStartedAtRef.current = null;
-        const todayIst = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
         if (user?.id) localStorage.setItem(`dash_break_${user.id}`, JSON.stringify({ log: newLog, date: todayIst }));
-        // Persist to DB (fire-and-forget)
-        apiPost("/api/attendance/break", { action: "end" }).catch(() => null);
+
+        try {
+            const res = await apiPost("/api/attendance/break", { action: "end" });
+            if (res.error) {
+                // API rejected — rollback: restore open break
+                setBreakLog(breakLog); // original log (open break intact)
+                breakLogRef.current = breakLog;
+                setOnBreak(true);
+                onBreakRef.current = true;
+                if (breakStartedAtRef.current === null && breakLog.length > 0) {
+                    const last = breakLog[breakLog.length - 1];
+                    if (!last.end) {
+                        const s = new Date(last.start);
+                        setBreakStartedAt(s);
+                        breakStartedAtRef.current = s;
+                    }
+                }
+                if (user?.id) localStorage.setItem(`dash_break_${user.id}`, JSON.stringify({ log: breakLog, date: todayIst }));
+                setBreakError(res.error || "Failed to end break. Please tap \"Resume Work\" again.");
+            }
+        } catch {
+            // Network error — rollback
+            setBreakLog(breakLog);
+            breakLogRef.current = breakLog;
+            setOnBreak(true);
+            onBreakRef.current = true;
+            if (user?.id) localStorage.setItem(`dash_break_${user.id}`, JSON.stringify({ log: breakLog, date: todayIst }));
+            setBreakError("Network error — break not ended in system. Check your connection and tap \"Resume Work\" again.");
+        } finally {
+            setBreakLoading(false);
+        }
     }
 
     const now = new Date();
@@ -1049,10 +1117,34 @@ export default function DashboardPage() {
                         )}
                     </div>
 
-                    {/* Error message */}
+                    {/* Attendance action error */}
                     {actionError && (
                         <div style={{ margin: "0 20px 10px", padding: "8px 12px", borderRadius: 8, background: "rgba(0,0,0,0.25)", color: "#fecaca", fontSize: 12 }}>
                             ⚠️ {actionError}
+                        </div>
+                    )}
+
+                    {/* Break-specific error — separate so it survives actionError clearing */}
+                    {breakError && (
+                        <div
+                            role="alert"
+                            style={{
+                                margin: "0 20px 10px", padding: "10px 14px", borderRadius: 8,
+                                background: "rgba(239,68,68,0.85)", color: "white", fontSize: 13,
+                                fontWeight: 600, display: "flex", alignItems: "center", gap: 8,
+                                boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+                            }}
+                        >
+                            <span style={{ fontSize: 16 }}>⚠️</span>
+                            <span style={{ flex: 1 }}>{breakError}</span>
+                            <button
+                                onClick={() => setBreakError(null)}
+                                style={{
+                                    background: "none", border: "none", cursor: "pointer",
+                                    color: "white", fontSize: 16, padding: 0, lineHeight: 1,
+                                }}
+                                aria-label="Dismiss break error"
+                            >×</button>
                         </div>
                     )}
 
@@ -1080,24 +1172,30 @@ export default function DashboardPage() {
                                 {onBreak ? (
                                     <button
                                         onClick={handleBreakEnd}
+                                        disabled={breakLoading}
                                         style={{
                                             flex: 1, padding: "10px 0", borderRadius: 10, border: "1.5px solid rgba(255,255,255,0.5)",
                                             background: "rgba(255,255,255,0.15)", color: "white",
-                                            fontWeight: 700, fontSize: 14, cursor: "pointer",
+                                            fontWeight: 700, fontSize: 14,
+                                            cursor: breakLoading ? "not-allowed" : "pointer",
+                                            opacity: breakLoading ? 0.6 : 1,
                                         }}
                                     >
-                                        ▶ Resume Work
+                                        {breakLoading ? "Saving…" : "▶ Resume Work"}
                                     </button>
                                 ) : (
                                     <button
                                         onClick={handleBreakStart}
+                                        disabled={breakLoading}
                                         style={{
                                             flex: 1, padding: "10px 0", borderRadius: 10, border: "1.5px solid rgba(255,255,255,0.5)",
                                             background: "rgba(255,255,255,0.15)", color: "white",
-                                            fontWeight: 700, fontSize: 14, cursor: "pointer",
+                                            fontWeight: 700, fontSize: 14,
+                                            cursor: breakLoading ? "not-allowed" : "pointer",
+                                            opacity: breakLoading ? 0.6 : 1,
                                         }}
                                     >
-                                        ☕ Break
+                                        {breakLoading ? "Saving…" : "☕ Break"}
                                     </button>
                                 )}
                                 <button
