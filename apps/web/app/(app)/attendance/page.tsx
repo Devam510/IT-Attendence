@@ -77,6 +77,12 @@ export default function AttendancePage() {
     const [showComplianceModal, setShowComplianceModal] = useState(false);
     const [showCheckoutFaceModal, setShowCheckoutFaceModal] = useState(false);
     const [pendingCheckoutReason, setPendingCheckoutReason] = useState("");
+
+    // Fix (Puja — attendance page): Cache geolocation at button-tap time so both
+    // check-in and check-out geolocation calls run in the user-gesture activation
+    // context. Chrome Android denies geolocation inside async callback chains.
+    const [cachedCheckInPos, setCachedCheckInPos] = useState<GeolocationPosition | null>(null);
+    const [cachedCheckoutPos, setCachedCheckoutPos] = useState<GeolocationPosition | null>(null);
     
     // Regularization Modal State
     const [showRegModal, setShowRegModal] = useState(false);
@@ -194,21 +200,28 @@ export default function AttendancePage() {
     const countdownPct = Math.max(0, Math.min(100, (countdownSecs / WORKDAY_SECS) * 100));
     const countdownColor = countdownPct > 50 ? "#16a34a" : countdownPct > 20 ? "#d97706" : "#dc2626";
 
-    const handleCheckIn = useCallback(async (faceToken: string) => {
+    // Fix (Puja): Accept pre-cached position acquired at button-tap time.
+    // Geolocation inside an async callback chain (after face modal closes) may
+    // be denied by Chrome Android — pre-caching solves this.
+    const handleCheckIn = useCallback(async (faceToken: string, prePos?: GeolocationPosition | null) => {
         setActionLoading(true);
         setToast(null);
         setShowFaceModal(false);
 
-        // Get real browser location
         let latitude = 0, longitude = 0;
         try {
-            const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+            // Use pre-cached position if available, otherwise request fresh (fallback)
+            const pos = prePos ?? await new Promise<GeolocationPosition>((resolve, reject) =>
                 navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
             );
+            setCachedCheckInPos(null); // clear after use
             latitude = pos.coords.latitude;
             longitude = pos.coords.longitude;
-        } catch {
-            setToast({ message: "📍 Location access required for check-in", type: "error" });
+        } catch (e: any) {
+            if (e?.code === 1) setToast({ message: "📍 Location access denied. Please enable location in browser settings.", type: "error" });
+            else if (e?.code === 2) setToast({ message: "📍 Location unavailable. Please check your GPS signal.", type: "error" });
+            else if (e?.code === 3) setToast({ message: "📍 Location request timed out. Please try again.", type: "error" });
+            else setToast({ message: "📍 Location access required for check-in.", type: "error" });
             setActionLoading(false);
             return;
         }
@@ -240,7 +253,26 @@ export default function AttendancePage() {
 
     const handleCheckOutClick = async () => {
         setActionLoading(true);
-        // Check compliance first
+
+        // Fix (Puja): Pre-acquire geolocation NOW inside the button tap handler, before
+        // any awaits, so Chrome Android preserves the user-activation context. Re-requesting
+        // inside async callback chains (after face modal) causes silent permission denial.
+        let prefetchedPos: GeolocationPosition | null = null;
+        try {
+            prefetchedPos = await new Promise<GeolocationPosition>((resolve, reject) =>
+                navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
+            );
+            setCachedCheckoutPos(prefetchedPos);
+        } catch (e: any) {
+            setActionLoading(false);
+            if (e?.code === 1) setToast({ message: "Location access denied. Please enable location in browser settings.", type: "error" });
+            else if (e?.code === 2) setToast({ message: "Location unavailable. Please check your GPS signal and try again.", type: "error" });
+            else if (e?.code === 3) setToast({ message: "Location request timed out. Please try again.", type: "error" });
+            else setToast({ message: "Could not get your location. Please try again.", type: "error" });
+            return;
+        }
+
+        // Check compliance
         try {
             const compRes = await apiGet<{ hasSubmittedToday: boolean }>("/api/updates/check-compliance");
             if (compRes.data && !compRes.data.hasSubmittedToday) {
@@ -249,14 +281,16 @@ export default function AttendancePage() {
                 return;
             }
         } catch {
-            // If it fails, we let them proceed to checkout anyway
+            // If compliance check fails, let them proceed to checkout anyway
         }
         setActionLoading(false);
-        // Proceed to early-check then face verification
-        handleCheckOut();
+        handleCheckOut(false, "", "", prefetchedPos);
     };
 
-    const handleCheckOut = useCallback(async (force = false, reason = "", faceToken = "") => {
+    // Fix (Puja): Accept pre-cached position from handleCheckOutClick.
+    // Avoids re-requesting geolocation inside async callback chains where Chrome
+    // Android may deny it due to lost user-activation context.
+    const handleCheckOut = useCallback(async (force = false, reason = "", faceToken = "", prePos: GeolocationPosition | null = null) => {
         setActionLoading(true);
         setToast(null);
 
@@ -281,10 +315,13 @@ export default function AttendancePage() {
         }
 
         try {
-            const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+            // Use pre-cached position (acquired at button-tap time). Fall back to fresh
+            // request only if unavailable — covers direct calls without pre-cache.
+            const pos = prePos ?? cachedCheckoutPos ?? await new Promise<GeolocationPosition>((resolve, reject) =>
                 navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
             );
-            
+            setCachedCheckoutPos(null); // clear after use
+
             const body: Record<string, unknown> = { 
                 faceToken,
                 lat: pos.coords.latitude,
@@ -313,13 +350,13 @@ export default function AttendancePage() {
         } finally {
             setActionLoading(false);
         }
-    }, [today.checkInTime, elapsed, tokenKey]);
+    }, [today.checkInTime, elapsed, tokenKey, cachedCheckoutPos]);
 
     function confirmEarlyCheckout() {
         if (!earlyReason.trim()) { setEarlyReasonError(true); return; }
         setShowEarlyModal(false);
-        // Pass reason, let face modal open next
-        handleCheckOut(true, earlyReason.trim());
+        // Pass reason + cached position (if available), let face modal open next
+        handleCheckOut(true, earlyReason.trim(), "", cachedCheckoutPos);
     }
 
     async function submitRegularization() {
@@ -460,10 +497,15 @@ export default function AttendancePage() {
             <FaceVerificationModal
                 isOpen={showCheckoutFaceModal}
                 mode="checkout"
-                onClose={() => setShowCheckoutFaceModal(false)}
+                onClose={() => {
+                    setShowCheckoutFaceModal(false);
+                    // Clear cached position on cancel — don't reuse a potentially stale one
+                    setCachedCheckoutPos(null);
+                }}
                 onSuccess={(faceToken) => {
                     setShowCheckoutFaceModal(false);
-                    handleCheckOut(true, pendingCheckoutReason, faceToken);
+                    // Pass pre-cached position acquired at button-tap time
+                    handleCheckOut(true, pendingCheckoutReason, faceToken, cachedCheckoutPos);
                 }}
             />
 
@@ -827,8 +869,24 @@ export default function AttendancePage() {
                                     </div>
                                     <button
                                         className="btn btn-primary btn-full"
-                                        onClick={() => {
+                                        onClick={async () => {
+                                            // Fix (Puja): Pre-fetch geolocation at button-tap time
+                                            // so it's available in the user-gesture context before
+                                            // the face modal opens. Chrome Android may deny
+                                            // geolocation inside the modal's async onSuccess chain.
                                             setPendingRemark(lateRemark);
+                                            try {
+                                                const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+                                                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
+                                                );
+                                                setCachedCheckInPos(pos);
+                                            } catch (e: any) {
+                                                if (e?.code === 1) setToast({ message: "📍 Location access denied. Please enable location in browser settings.", type: "error" });
+                                                else if (e?.code === 2) setToast({ message: "📍 Location unavailable. Please check your GPS signal.", type: "error" });
+                                                else if (e?.code === 3) setToast({ message: "📍 Location request timed out. Please try again.", type: "error" });
+                                                else setToast({ message: "📍 Could not get your location.", type: "error" });
+                                                return; // Don't open face modal if location fails
+                                            }
                                             setShowFaceModal(true);
                                         }}
                                         disabled={actionLoading}
@@ -952,8 +1010,11 @@ export default function AttendancePage() {
 
             <FaceVerificationModal
                 isOpen={showFaceModal}
-                onClose={() => setShowFaceModal(false)}
-                onSuccess={handleCheckIn}
+                onClose={() => {
+                    setShowFaceModal(false);
+                    setCachedCheckInPos(null); // clear on cancel
+                }}
+                onSuccess={(faceToken) => handleCheckIn(faceToken, cachedCheckInPos)}
             />
         </div>
     );

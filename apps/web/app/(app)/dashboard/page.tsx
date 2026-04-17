@@ -459,6 +459,12 @@ export default function DashboardPage() {
     const [showCheckoutFaceModal, setShowCheckoutFaceModal] = useState(false);
     const [pendingCheckoutReason, setPendingCheckoutReason] = useState("");
 
+    // Fix (Puja): Cache location before opening face modal so the geolocation request
+    // runs in the original user-gesture activation context (Chrome Android requires this).
+    // Without this, the request happens inside an async callback chain after the modal
+    // closes — at which point Chrome considers the user gesture consumed and may deny it.
+    const [cachedCheckoutPosition, setCachedCheckoutPosition] = useState<GeolocationPosition | null>(null);
+
     // 8-hour countdown (in seconds)
     const WORK_SECS = 8 * 3600;
     const [countdown, setCountdown] = useState(WORK_SECS);
@@ -511,6 +517,14 @@ export default function DashboardPage() {
             checkOutTime: checkOutAt ? fmt(checkOutAt.toISOString()) : undefined,
             pendingItems: d.pendingItems ?? [],
         });
+
+        // Fix (Divya): If DB confirms user is still checked in, a stale actionError
+        // from a previous failed checkout attempt is misleading. Clear it.
+        // This handles the case where the checkout API returned NO_CHECKIN for a
+        // previously completed/corrupted record, but the dashboard still shows CHECKED_IN.
+        if (checkedIn) {
+            setActionError(null);
+        }
 
         // Sync break state from API
         if (info.breaks && Array.isArray(info.breaks)) {
@@ -684,7 +698,28 @@ export default function DashboardPage() {
     async function handleCheckOutClick() {
         setActionError(null);
         setActionLoading("checkout");
-        // Check compliance first
+
+        // Fix (Puja): Pre-acquire geolocation NOW while we are still in the user-gesture
+        // activation context (direct button tap). Android Chrome may deny geolocation
+        // requests that happen inside async callback chains after the face modal closes,
+        // because the browser considers the user-gesture "consumed" after the first await.
+        // By caching the position here, we avoid a second geolocation call later.
+        let prefetchedPos: GeolocationPosition | null = null;
+        try {
+            prefetchedPos = await new Promise<GeolocationPosition>((resolve, reject) =>
+                navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
+            );
+            setCachedCheckoutPosition(prefetchedPos);
+        } catch (e: any) {
+            setActionLoading(null);
+            if (e?.code === 1) setActionError("Location access denied. Please enable location in browser settings.");
+            else if (e?.code === 2) setActionError("Location unavailable. Please check your GPS signal and try again.");
+            else if (e?.code === 3) setActionError("Location request timed out. Please try again.");
+            else setActionError("Could not get your location. Please try again.");
+            return;
+        }
+
+        // Check compliance
         try {
             const compRes = await apiGet<{ hasSubmittedToday: boolean }>("/api/updates/check-compliance");
             if (compRes.data && !compRes.data.hasSubmittedToday) {
@@ -693,14 +728,17 @@ export default function DashboardPage() {
                 return;
             }
         } catch {
-            // If it fails, we let them proceed to checkout anyway
+            // If compliance check fails, let them proceed to checkout anyway
         }
         setActionLoading(null);
         // Proceed to early-check then face verification
-        handleCheckOut();
+        handleCheckOut(false, "", "", prefetchedPos);
     }
 
-    async function handleCheckOut(force = false, reason = "", faceToken = "") {
+    // Fix (Puja): Accept an optional pre-cached position from handleCheckOutClick.
+    // This avoids a second geolocation call inside async callback chains where
+    // Chrome Android may deny the request due to lost user-activation context.
+    async function handleCheckOut(force = false, reason = "", faceToken = "", prePos: GeolocationPosition | null = null) {
         setActionError(null);
         // Skip early-checkout check if already in overtime — no need to ask for a reason
         if (!force && empData.checkInAt && overtimeSecs === 0) {
@@ -724,10 +762,13 @@ export default function DashboardPage() {
         }
         setActionLoading("checkout");
         try {
-            // Bug fix: high-accuracy GPS for checkout too — consistent with check-in
-            const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+            // Use pre-cached position if available (from handleCheckOutClick, acquired at tap time).
+            // Fall back to fresh request only if no cache — this covers early-checkout and retry paths.
+            const pos = prePos ?? cachedCheckoutPosition ?? await new Promise<GeolocationPosition>((resolve, reject) =>
                 navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
             );
+            // Clear cached position after use so it's not reused for future checkouts
+            setCachedCheckoutPosition(null);
             const body: Record<string, unknown> = { 
                 faceToken,
                 lat: pos.coords.latitude,
@@ -764,8 +805,8 @@ export default function DashboardPage() {
     function confirmEarlyCheckout() {
         if (!earlyReason.trim()) { setEarlyReasonError(true); return; }
         setShowEarlyModal(false);
-        // Pass reason, let face modal open next
-        handleCheckOut(true, earlyReason.trim());
+        // Pass reason + cached position (if available), let face modal open next
+        handleCheckOut(true, earlyReason.trim(), "", cachedCheckoutPosition);
     }
 
     async function handleBreakStart() {
@@ -846,7 +887,7 @@ export default function DashboardPage() {
                 setOnBreak(true);
                 onBreakRef.current = true;
                 if (breakStartedAtRef.current === null && breakLog.length > 0) {
-                    const last = breakLog[breakLog.length - 1];
+                    const last = breakLog[breakLog.length - 1]!;
                     if (!last.end) {
                         const s = new Date(last.start);
                         setBreakStartedAt(s);
@@ -986,10 +1027,15 @@ export default function DashboardPage() {
             <FaceVerificationModal
                 isOpen={showCheckoutFaceModal}
                 mode="checkout"
-                onClose={() => setShowCheckoutFaceModal(false)}
+                onClose={() => {
+                    setShowCheckoutFaceModal(false);
+                    // Clear cached position if user cancels — don't reuse a potentially stale one
+                    setCachedCheckoutPosition(null);
+                }}
                 onSuccess={(faceToken) => {
                     setShowCheckoutFaceModal(false);
-                    handleCheckOut(true, pendingCheckoutReason, faceToken);
+                    // Pass pre-cached position acquired at button-tap time (user gesture context)
+                    handleCheckOut(true, pendingCheckoutReason, faceToken, cachedCheckoutPosition);
                 }}
             />
 
