@@ -53,11 +53,7 @@ export function withErrorHandler(handler: AsyncHandler): AsyncHandler {
             }
 
             logger.error({ err }, "Unhandled API error");
-            // TEMP: expose real error for debugging
-            const errMsg = err instanceof Error ? err.message : String(err);
-            const errStack = err instanceof Error ? err.stack?.split("\n").slice(0, 5).join(" | ") : "";
-            const errCode = (err as any)?.code ?? "";
-            return error("INTERNAL_ERROR", `[DEBUG] ${errMsg} | CODE:${errCode}`, 500, { stack: errStack });
+            return error("INTERNAL_ERROR", "An unexpected error occurred", 500);
         }
     };
 }
