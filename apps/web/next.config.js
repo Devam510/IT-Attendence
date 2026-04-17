@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    // Transpile workspace packages that expose TypeScript source directly
+    transpilePackages: ["@vibetech/db", "@vibetech/shared"],
+
     // Security headers
     async headers() {
         return [
