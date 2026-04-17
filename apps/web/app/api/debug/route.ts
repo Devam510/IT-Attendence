@@ -1,38 +1,51 @@
-// TEMPORARY DEBUG ENDPOINT - DELETE AFTER FIXING
-import { NextResponse } from "next/server";
+// TEMP DEBUG - no imports at all
+export const runtime = "nodejs";
 
 export async function GET() {
-    const results: Record<string, unknown> = {};
+    const { NextResponse } = await import("next/server");
 
-    // 1. Check env vars
-    results.DATABASE_URL_SET = !!process.env.DATABASE_URL;
-    results.DATABASE_URL_PREFIX = process.env.DATABASE_URL?.substring(0, 40) + "...";
-    results.JWT_SECRET_SET = !!process.env.JWT_SECRET;
-    results.REDIS_URL_SET = !!process.env.REDIS_URL;
-    results.NODE_ENV = process.env.NODE_ENV;
+    const info: Record<string, unknown> = {
+        node_version: process.version,
+        DATABASE_URL: process.env.DATABASE_URL
+            ? process.env.DATABASE_URL.replace(/:([^:@]+)@/, ":***@").substring(0, 60) + "..."
+            : "NOT SET",
+        JWT_SECRET: process.env.JWT_SECRET ? "SET" : "NOT SET",
+        NODE_ENV: process.env.NODE_ENV,
+    };
 
-    // 2. Test DB connection
+    // Test DB with raw pg (no prisma)
     try {
-        const { prisma } = await import("@vibetech/db");
-        const count = await prisma.$queryRaw`SELECT 1 as test`;
-        results.DB_CONNECTION = "SUCCESS";
-        results.DB_QUERY = count;
-    } catch (err: unknown) {
-        results.DB_CONNECTION = "FAILED";
-        results.DB_ERROR = err instanceof Error ? err.message : String(err);
-        results.DB_ERROR_CODE = (err as any)?.code;
-        results.DB_ERROR_STACK = err instanceof Error ? err.stack?.split("\n").slice(0, 5).join(" | ") : "";
+        const { default: pg } = await import("pg").catch(() => ({ default: null }));
+        if (pg) {
+            const client = new (pg as any).Client({ connectionString: process.env.DATABASE_URL });
+            await client.connect();
+            const res = await client.query("SELECT 1 as ok");
+            await client.end();
+            info.RAW_PG = "SUCCESS: " + JSON.stringify(res.rows);
+        } else {
+            info.RAW_PG = "pg module not available";
+        }
+    } catch (e: unknown) {
+        info.RAW_PG_ERROR = e instanceof Error ? e.message : String(e);
     }
 
-    // 3. Test Redis
+    // Test prisma import
     try {
-        const { getRedis } = await import("@/lib/redis");
-        const redis = await getRedis();
-        results.REDIS_CONNECTION = redis ? "SUCCESS" : "NOT_AVAILABLE_GRACEFUL";
-    } catch (err: unknown) {
-        results.REDIS_CONNECTION = "FAILED";
-        results.REDIS_ERROR = err instanceof Error ? err.message : String(err);
+        const mod = await import("@vibetech/db");
+        info.PRISMA_IMPORT = "SUCCESS";
+        try {
+            const result = await Promise.race([
+                (mod.prisma as any).$queryRaw`SELECT 1 as ok`,
+                new Promise((_, reject) => setTimeout(() => reject(new Error("5s timeout")), 5000))
+            ]);
+            info.PRISMA_QUERY = "SUCCESS: " + JSON.stringify(result);
+        } catch (qe: unknown) {
+            info.PRISMA_QUERY_ERROR = qe instanceof Error ? qe.message : String(qe);
+        }
+    } catch (e: unknown) {
+        info.PRISMA_IMPORT_ERROR = e instanceof Error ? e.message : String(e);
+        info.PRISMA_IMPORT_STACK = e instanceof Error ? e.stack?.split("\n").slice(0, 8).join(" | ") : "";
     }
 
-    return NextResponse.json(results);
+    return NextResponse.json(info, { status: 200 });
 }
