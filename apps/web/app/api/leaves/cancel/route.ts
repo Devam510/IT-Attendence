@@ -24,6 +24,11 @@ async function handleCancel(
         return error("VALIDATION_ERROR", "leaveId is required", 422);
     }
 
+    // M3 fix: validate UUID format to prevent malformed DB queries
+    if (!/^[0-9a-f-]{36}$/.test(leaveId)) {
+        return error("VALIDATION_ERROR", "Invalid leave ID format", 422);
+    }
+
     // Find the leave request to ensure it belongs to the user
     const leave = await prisma.leaveRequest.findUnique({
         where: { id: leaveId },
@@ -94,7 +99,7 @@ async function handleCancel(
     if (previousStatus === "PENDING") {
         await prisma.approvalWorkflow.updateMany({
             where: { entityType: "leave", entityId: leaveId, status: "PENDING" },
-            data: { status: "CANCELLED" },
+            data: { status: "REJECTED" }, // ApprovalStatus enum doesn't have CANCELLED, REJECTED removes it from pending queue
         });
     }
 

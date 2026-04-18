@@ -1,18 +1,16 @@
 // Vibe Tech Labs — POST /api/auth/login
-// Authenticates user via username (employeeId) or email + password, returns JWT pair
+// H1 fix: Uses bcrypt for password verification (was SHA-256 — too weak)
+// H2 fix: Removed first-login auto-set. Users with no password must use the initial
+//         password set by HR at account creation time (always bcrypt-hashed now).
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@vibetech/db";
-import { createHash } from "crypto";
+import bcrypt from "bcryptjs";
 import { generateAccessToken, generateRefreshToken } from "@/lib/auth";
 import { setSession, checkRateLimit } from "@/lib/redis";
 import { logAuditEvent } from "@/lib/audit";
 import { verifyTotp } from "@/lib/mfa";
 import { success, error, withErrorHandler, logger } from "@/lib/errors";
-
-function hashPassword(password: string): string {
-    return createHash("sha256").update(password).digest("hex");
-}
 
 async function handleLogin(req: NextRequest): Promise<NextResponse> {
     const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
@@ -70,20 +68,38 @@ async function handleLogin(req: NextRequest): Promise<NextResponse> {
         return error("ACCOUNT_INACTIVE", `Account is ${user.status.toLowerCase()}`, 403);
     }
 
-    // Verify password
-    // SECURITY: If passwordHash is null (first login / SSO-only user),
-    // set the hash from the provided password (first-time password setup).
-    // In production, this would be a separate /set-password endpoint.
-    const expectedHash = hashPassword(password);
+    // H2 fix: Removed auto-set for first login. If passwordHash is null, the account
+    // was created incorrectly (HR must set initial password using bcrypt at creation time).
     if (!user.passwordHash) {
-        // First login: set the password hash
-        await prisma.user.update({
-            where: { id: user.id },
-            data: { passwordHash: expectedHash },
-        });
-        logger.info({ userId: user.id }, "First-time password set on login");
-    } else if (user.passwordHash !== expectedHash) {
-        // Password mismatch
+        logger.warn({ userId: user.id }, "Login attempt on account with no password set — rejected");
+        return error("AUTH_FAILED", "Invalid credentials", 401);
+    }
+
+    // H1 fix: Use bcrypt.compare() instead of SHA-256.
+    // If the stored hash still uses old SHA-256 format, migrate it on successful login.
+    let passwordValid = false;
+
+    if (user.passwordHash.startsWith("$2")) {
+        // Modern bcrypt hash — compare directly
+        passwordValid = await bcrypt.compare(password, user.passwordHash);
+    } else {
+        // Legacy SHA-256 hash (hex string, 64 chars) — migrate transparently on the
+        // first successful login so we don't force all users to reset passwords at once.
+        const { createHash } = await import("crypto");
+        const legacyHash = createHash("sha256").update(password).digest("hex");
+        if (user.passwordHash === legacyHash) {
+            // Password is correct — upgrade to bcrypt (12 rounds)
+            const bcryptHash = await bcrypt.hash(password, 12);
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { passwordHash: bcryptHash },
+            });
+            logger.info({ userId: user.id }, "Password hash migrated from SHA-256 to bcrypt");
+            passwordValid = true;
+        }
+    }
+
+    if (!passwordValid) {
         // Fire-and-forget audit — don't slow down login
         logAuditEvent({
             actorId: user.id,

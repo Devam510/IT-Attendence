@@ -6,9 +6,11 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
     try {
-        // Vercel Cron Security Check
+        // Security: always require CRON_SECRET — do NOT make this conditional.
+        // If CRON_SECRET env var is missing, reject ALL requests to prevent open access.
         const authHeader = req.headers.get('authorization');
-        if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+        const cronSecret = process.env.CRON_SECRET;
+        if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
             logger.warn({ ip: req.headers.get("x-forwarded-for") }, "Unauthorized cron trigger attempt");
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }

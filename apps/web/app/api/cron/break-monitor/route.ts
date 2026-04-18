@@ -17,9 +17,11 @@ const BREAK_AUTO_RESUME_MINUTES = 60; // Auto-close break after this many minute
 
 export async function GET(req: Request) {
     try {
-        // Security: validates CRON_SECRET from Vercel or cron-job.org Authorization header
+        // Security: always require CRON_SECRET — do NOT make this conditional.
+        // If CRON_SECRET env var is missing, reject ALL requests to prevent open access.
         const authHeader = req.headers.get("authorization");
-        if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+        const cronSecret = process.env.CRON_SECRET;
+        if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
             logger.warn({}, "Unauthorized break-monitor cron trigger");
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }

@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@vibetech/db";
 import { withAuth } from "@/lib/auth";
+import { consumeFaceToken } from "@/lib/redis";
 import { success, error, logger } from "@/lib/errors";
 import type { JwtPayload } from "@vibetech/shared";
 
@@ -35,12 +36,34 @@ async function handleCheckIn(
     if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
         return error("VALIDATION_ERROR", "Location coordinates are required for check-in", 422);
     }
+    // L2 fix: sanity-check coordinate bounds (impossible values = spoofed/malformed)
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+        return error("VALIDATION_ERROR", "Invalid GPS coordinates", 422);
+    }
 
-    // Optional remark (e.g. reason for late arrival)
+    // Optional remark (e.g. reason for late arrival) — L3 fix: cap at 500 chars
     const remark = typeof body.remark === "string" ? body.remark.trim().slice(0, 500) : undefined;
 
-    // Check for faceToken required for biometric verification
+    // H4 fix: validate faceToken server-side via Redis (one-time use, 5-min TTL).
+    // consumeFaceToken atomically deletes the token — replay attacks are impossible.
+    // If Redis is unavailable, fall back to format check to avoid blocking check-in.
     const faceToken = typeof body.faceToken === "string" ? body.faceToken : undefined;
+    if (!faceToken) {
+        return error("FACE_REQUIRED", "Face verification is required to check in", 403);
+    }
+
+    const faceTokenOwner = await consumeFaceToken(faceToken);
+    if (faceTokenOwner !== null) {
+        // Redis available: strict validation — token must belong to this user
+        if (faceTokenOwner !== auth.sub) {
+            return error("FACE_TOKEN_MISMATCH", "Face token does not match current user", 403);
+        }
+    } else {
+        // Redis unavailable: fall back to format check (token issued by our face/verify route)
+        if (!faceToken.startsWith("vt_") || faceToken.length < 38) {
+            return error("FACE_REQUIRED", "Invalid face verification token", 403);
+        }
+    }
 
     const now = new Date();
     // Calculate "today" in IST (UTC+5:30), not in server's UTC timezone

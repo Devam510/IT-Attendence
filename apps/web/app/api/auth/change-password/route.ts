@@ -1,17 +1,16 @@
 // Vibe Tech Labs — POST /api/auth/change-password
-// Allows an authenticated user to change their password using their current password
+// H1 fix: Uses bcrypt for password verification and hashing (was SHA-256)
+// C3 fix: Removed plainPassword update — never store plaintext passwords
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@vibetech/db";
-import { createHash } from "crypto";
+import bcrypt from "bcryptjs";
 import { withAuth } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { success, error } from "@/lib/errors";
 import type { JwtPayload } from "@vibetech/shared";
 
-function hashPassword(password: string): string {
-    return createHash("sha256").update(password).digest("hex");
-}
+const BCRYPT_ROUNDS = 12;
 
 async function handleChangePassword(
     req: NextRequest,
@@ -39,6 +38,10 @@ async function handleChangePassword(
         return error("WEAK_PASSWORD", "New password must be at least 8 characters", 400);
     }
 
+    if (newPassword.length > 128) {
+        return error("BAD_REQUEST", "New password must be at most 128 characters", 400);
+    }
+
     if (currentPassword === newPassword) {
         return error("SAME_PASSWORD", "New password must be different from current password", 400);
     }
@@ -53,13 +56,26 @@ async function handleChangePassword(
         return error("NOT_FOUND", "User not found", 404);
     }
 
-    // Verify current password
-    const currentHash = hashPassword(currentPassword);
-
     if (!user.passwordHash) {
-        // No password set yet — first time: just set the new one
-        // (only reachable if somehow passwordHash is still null post-login)
-    } else if (user.passwordHash !== currentHash) {
+        return error("AUTH_FAILED", "No password set on this account. Please contact HR.", 401);
+    }
+
+    // H1 fix: verify with bcrypt. Also handles legacy SHA-256 hashes transparently.
+    let currentPasswordValid = false;
+    let needsMigration = false;
+
+    if (user.passwordHash.startsWith("$2")) {
+        // Modern bcrypt hash
+        currentPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    } else {
+        // Legacy SHA-256 — verify and migrate on success
+        const { createHash } = await import("crypto");
+        const legacyHash = createHash("sha256").update(currentPassword).digest("hex");
+        currentPasswordValid = user.passwordHash === legacyHash;
+        needsMigration = currentPasswordValid;
+    }
+
+    if (!currentPasswordValid) {
         const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
         logAuditEvent({
             actorId: user.id,
@@ -73,14 +89,13 @@ async function handleChangePassword(
         return error("AUTH_FAILED", "Current password is incorrect", 401);
     }
 
-    // Update to new password
-    const newHash = hashPassword(newPassword);
+    // Hash new password with bcrypt
+    const newHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+
+    // Update — C3 fix: never store plainPassword
     await prisma.user.update({
         where: { id: user.id },
-        data: { 
-            passwordHash: newHash,
-            plainPassword: newPassword // Keep in sync for Admin visibility
-        },
+        data: { passwordHash: newHash },
     });
 
     const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
@@ -91,7 +106,7 @@ async function handleChangePassword(
         resourceType: "user",
         resourceId: user.id,
         ipAddress: ip,
-        metadata: { method: "self_service" },
+        metadata: { method: "self_service", migratedFromSha256: needsMigration },
     }).catch(() => { });
 
     return success({ message: "Password changed successfully" });

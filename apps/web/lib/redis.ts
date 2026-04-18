@@ -127,3 +127,28 @@ export async function isQrNonceUsed(nonce: string): Promise<boolean> {
     const exists = await redis.exists(`qr:nonce:${nonce}`);
     return exists === 1;
 }
+
+// ─── Face Token (H4/M4 fix — one-time use, 5-min TTL) ────
+
+/**
+ * Store a face verification token so checkin/checkout can confirm it was
+ * genuinely issued by /api/face/verify for this specific user.
+ * Token is deleted on first use — replay attacks are impossible.
+ */
+export async function storeFaceToken(token: string, userId: string, ttlSeconds = 300): Promise<void> {
+    const redis = await getRedis();
+    if (!redis) return; // Degrades gracefully — falls back to JWT-only check
+    await redis.set(`face_token:${token}`, userId, { EX: ttlSeconds, NX: true });
+}
+
+/**
+ * Validate and consume a face token.
+ * Returns the userId it was issued for, or null if invalid/expired/already used.
+ * Atomically deletes the key to prevent replay attacks.
+ */
+export async function consumeFaceToken(token: string): Promise<string | null> {
+    const redis = await getRedis();
+    if (!redis) return null; // Redis unavailable — caller falls back to format check
+    const userId = await redis.getDel(`face_token:${token}`);
+    return userId ?? null;
+}

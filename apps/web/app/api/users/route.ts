@@ -1,20 +1,18 @@
 // Vibe Tech Labs — /api/users
-// Handles fetching all users and creating new users (Admin/HR only)
+// H1 fix: bcrypt password hashing (was SHA-256)
+// C3 fix: removed plainPassword field — no more plaintext passwords in DB or API responses
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@vibetech/db";
 import { withRole } from "@/lib/auth";
-import { success, error } from "@/lib/errors";
-import { createHash } from "crypto";
+import { success, error, logger } from "@/lib/errors";
+import bcrypt from "bcryptjs";
 import type { JwtPayload } from "@vibetech/shared";
 
-function hashPassword(password: string): string {
-    return createHash("sha256").update(password).digest("hex");
-}
+const BCRYPT_ROUNDS = 12;
 
 // GET: Fetch all active users for the HR/Admin's entity
 async function getUsers(req: NextRequest, ctx: { auth: JwtPayload }): Promise<NextResponse> {
-    const userRole = ctx.auth.role;
     const userEntityId = ctx.auth.entityId;
 
     const users = await prisma.user.findMany({
@@ -31,7 +29,7 @@ async function getUsers(req: NextRequest, ctx: { auth: JwtPayload }): Promise<Ne
             role: true,
             status: true,
             dateOfJoining: true,
-            plainPassword: userRole === "SADM" || userRole === "HRA" || userRole === "HRBP" ? true : false,
+            // C3 fix: plainPassword is never returned — admins use "Reset Password" flow
             faceProfile: {
                 select: { id: true }
             },
@@ -53,12 +51,20 @@ async function getUsers(req: NextRequest, ctx: { auth: JwtPayload }): Promise<Ne
 // POST: Add a new employee
 async function createUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<NextResponse> {
     const userEntityId = ctx.auth.entityId;
-    
+
     const body = await req.json().catch(() => ({}));
     const { fullName, email, phone, employeeId, role, departmentId, managerId, dateOfJoining, password } = body;
 
     if (!fullName || !email || !employeeId || !role || !password) {
         return error("BAD_REQUEST", "Missing required fields (fullName, email, employeeId, role, password)");
+    }
+
+    // L3 fix: length limits on string inputs
+    if (password.length < 8) {
+        return error("WEAK_PASSWORD", "Password must be at least 8 characters", 400);
+    }
+    if (password.length > 128) {
+        return error("BAD_REQUEST", "Password must be at most 128 characters", 400);
     }
 
     try {
@@ -69,6 +75,10 @@ async function createUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
             });
             defaultLocationId = defaultLoc?.id || (await prisma.location.findFirst({ where: { entityId: userEntityId } }))?.id;
         }
+
+        // H1 fix: hash with bcrypt (12 rounds) — never store plaintext
+        const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+
         const newUser = await prisma.user.create({
             data: {
                 fullName,
@@ -81,8 +91,8 @@ async function createUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
                 managerId: managerId || null,
                 locationId: defaultLocationId || null,
                 dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : new Date(),
-                passwordHash: hashPassword(password),
-                plainPassword: password, // As requested by user for admin visibility
+                passwordHash,
+                // C3 fix: plainPassword field removed — never store plaintext passwords
             },
             select: {
                 id: true,
@@ -101,12 +111,13 @@ async function createUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
             }
         });
 
+        logger.info({ adminId: ctx.auth.sub, newUserId: newUser.id }, "New employee created");
         return success(newUser, 201);
     } catch (e: any) {
         if (e.code === 'P2002') {
             return error("CONFLICT", "A user with this email or employee ID already exists", 409);
         }
-        console.error(e);
+        logger.error({ err: e }, "Failed to create user"); // L1 fix: use structured logger
         return error("INTERNAL_ERROR", "Failed to create user", 500);
     }
 }
@@ -127,6 +138,11 @@ async function updateUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
         return error("BAD_REQUEST", "User ID is required for updating");
     }
 
+    // M3 fix: validate UUID format
+    if (!/^[0-9a-f-]{36}$/.test(id)) {
+        return error("VALIDATION_ERROR", "Invalid user ID format", 422);
+    }
+
     try {
         // Ensure user belongs to this entity
         const existingUser = await prisma.user.findFirst({
@@ -137,7 +153,7 @@ async function updateUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
             return error("NOT_FOUND", "User not found or you don't have permission to edit them", 404);
         }
 
-        const updateData: any = {};
+        const updateData: Record<string, unknown> = {};
         if (fullName) updateData.fullName = fullName;
         if (email) updateData.email = email.toLowerCase();
         if (phone !== undefined) updateData.phone = phone || null;
@@ -146,11 +162,14 @@ async function updateUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
         if (departmentId !== undefined) updateData.departmentId = departmentId || null;
         if (managerId !== undefined) updateData.managerId = managerId || null;
         if (dateOfJoining) updateData.dateOfJoining = new Date(dateOfJoining);
-        
-        // If password is provided, re-hash it and update the plainPassword record
+
+        // H1 fix: if password is provided, hash with bcrypt (12 rounds)
+        // C3 fix: never store plainPassword
         if (password) {
-            updateData.passwordHash = hashPassword(password);
-            updateData.plainPassword = password;
+            if (typeof password !== "string" || password.length < 8) {
+                return error("WEAK_PASSWORD", "Password must be at least 8 characters", 400);
+            }
+            updateData.passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
         }
 
         const updatedUser = await prisma.user.update({
@@ -170,17 +189,18 @@ async function updateUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
             }
         });
 
+        logger.info({ adminId: ctx.auth.sub, updatedUserId: id }, "Employee updated");
         return success(updatedUser);
     } catch (e: any) {
         if (e.code === 'P2002') {
             return error("CONFLICT", "A user with this email or employee ID already exists", 409);
         }
-        console.error("Update User Error:", e);
+        logger.error({ err: e }, "Failed to update user"); // L1 fix: structured logger
         return error("INTERNAL_ERROR", "Failed to update user", 500);
     }
 }
 
-// DELETE: Remove a user (soft delete by setting status to INACTIVE)
+// DELETE: Soft delete (set status to INACTIVE)
 async function deleteUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<NextResponse> {
     const userRole = ctx.auth.role;
     const userEntityId = ctx.auth.entityId;
@@ -196,13 +216,14 @@ async function deleteUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
         return error("BAD_REQUEST", "User ID is required");
     }
 
+    // M3 fix: validate UUID format
+    if (!/^[0-9a-f-]{36}$/.test(userId)) {
+        return error("VALIDATION_ERROR", "Invalid user ID format", 422);
+    }
+
     try {
-        // Fetch the user first to ensure they exist and we can get their current email/id
         const user = await prisma.user.findFirst({
-            where: {
-                id: userId,
-                entityId: userEntityId,
-            }
+            where: { id: userId, entityId: userEntityId },
         });
 
         if (!user) {
@@ -210,7 +231,6 @@ async function deleteUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
         }
 
         const timestamp = Date.now();
-        // Soft delete user by setting status to INACTIVE, and mangling unique fields
         await prisma.user.update({
             where: { id: userId },
             data: {
@@ -220,15 +240,14 @@ async function deleteUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
             }
         });
 
+        logger.info({ adminId: ctx.auth.sub, deletedUserId: userId }, "Employee soft-deleted");
         return success({ message: "User successfully removed" });
     } catch (e) {
-        console.error(e);
+        logger.error({ err: e }, "Failed to delete user"); // L1 fix: structured logger
         return error("INTERNAL_ERROR", "Failed to delete user", 500);
     }
 }
 
-// Export auth-wrapped handlers
-// Only SADM, HRA, HRBP can view or manage users
 export const GET = withRole("SADM", "HRA", "HRBP")(getUsers);
 export const POST = withRole("SADM", "HRA", "HRBP")(createUser);
 export const PATCH = withRole("SADM", "HRA", "HRBP")(updateUser);

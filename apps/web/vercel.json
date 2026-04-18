@@ -30,6 +30,10 @@
         {
             "path": "/api/cron/lunch-reminder",
             "schedule": "30 7 * * 1-5"
+        },
+        {
+            "path": "/api/cron/break-monitor",
+            "schedule": "*/30 * * * *"
         }
     ],
     "regions": [

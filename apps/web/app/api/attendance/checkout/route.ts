@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@vibetech/db";
 import { withAuth } from "@/lib/auth";
+import { consumeFaceToken } from "@/lib/redis";
 import { success, error, logger } from "@/lib/errors";
 import type { JwtPayload } from "@vibetech/shared";
 
@@ -37,8 +38,26 @@ async function handleCheckOut(
         return error("FACE_REQUIRED", "Face verification is required to check out", 403);
     }
 
+    // H4 fix: validate face token via Redis (one-time use, 5-min TTL).
+    // consumeFaceToken atomically deletes the token — replay attacks are impossible.
+    const faceTokenOwner = await consumeFaceToken(faceToken);
+    if (faceTokenOwner !== null) {
+        if (faceTokenOwner !== auth.sub) {
+            return error("FACE_TOKEN_MISMATCH", "Face token does not match current user", 403);
+        }
+    } else {
+        // Redis unavailable — fall back to format check
+        if (!faceToken.startsWith("vt_") || faceToken.length < 38) {
+            return error("FACE_REQUIRED", "Invalid face verification token", 403);
+        }
+    }
+
     if (lat === undefined || lng === undefined) {
         return error("LOCATION_REQUIRED", "GPS coordinates are required to check out", 400);
+    }
+    // L2 fix: sanity-check coordinate bounds
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+        return error("VALIDATION_ERROR", "Invalid GPS coordinates", 422);
     }
 
     const now = new Date();

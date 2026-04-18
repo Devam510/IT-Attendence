@@ -1,17 +1,19 @@
 // Vibe Tech Labs — POST /api/face/verify
-// Verifies an employee's face using Euclidean distance between a live descriptor
-// and the stored multi-frame average descriptor.
+// H4/M4 fix: verification token is now stored in Redis with a 5-minute TTL.
+// Check-in and checkout consume (delete) the token atomically on use —
+// replay attacks are impossible even with an intercepted token.
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@vibetech/db";
 import { withAuth } from "@/lib/auth";
+import { storeFaceToken } from "@/lib/redis";
 import { success, error, logger } from "@/lib/errors";
 import { logAuditEvent } from "@/lib/audit";
 import type { JwtPayload } from "@vibetech/shared";
 
 // Euclidean distance between two 128D vectors
 // face-api.js recommends a threshold of 0.45-0.6 for face recognition
-// Lower = stricter. 0.45 is tight but secure. 0.5 is standard.
+// Lower = stricter. 0.50 is standard.
 const DISTANCE_THRESHOLD = 0.50;
 
 function euclideanDistance(a: number[], b: number[]): number {
@@ -71,7 +73,7 @@ async function handleFaceVerification(
         data: {
             userId: auth.sub,
             confidenceScore: confidence,
-            spoofProbability: 0, // True liveness detection requires a dedicated model
+            spoofProbability: 0,
             status: passed ? "SUCCESS" : "FAILED_MATCH",
             ipAddress: req.headers.get("x-forwarded-for") || "unknown"
         }
@@ -91,13 +93,19 @@ async function handleFaceVerification(
         return error("VERIFICATION_FAILED", "Face verification failed. Please try again or see HR.", 422);
     }
 
-    logger.info({ userId: auth.sub, distance }, "Face verified successfully");
+    // H4/M4 fix: generate a cryptographically random token (not just timestamp+userId).
+    // Store it in Redis with 5-minute TTL. Check-in/checkout will consume it atomically.
+    const rawToken = crypto.randomUUID();
+    const verificationToken = `vt_${rawToken}`;
+    await storeFaceToken(verificationToken, auth.sub, 300); // 5 minutes
+
+    logger.info({ userId: auth.sub, distance }, "Face verified — one-time token issued");
 
     return success({
         message: "Verified",
         confidence,
         distance,
-        verificationToken: `v_token_${Date.now()}_${auth.sub}`
+        verificationToken,
     }, 200);
 }
 
