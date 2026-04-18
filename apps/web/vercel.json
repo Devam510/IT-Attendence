@@ -33,7 +33,7 @@
         },
         {
             "path": "/api/cron/break-monitor",
-            "schedule": "*/30 * * * *"
+            "schedule": "30 0 * * *"
         }
     ],
     "regions": [
