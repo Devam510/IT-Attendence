@@ -36,7 +36,7 @@ const MANAGER_NAV_ITEMS = [
     { href: "/team-attendance", Icon: UsersRound, label: "Team Attendance" },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ isMobileOpen, onMobileClose }: { isMobileOpen?: boolean; onMobileClose?: () => void }) {
     const pathname = usePathname();
     const { user } = useAuth();
     const { theme } = useTheme();
@@ -55,90 +55,82 @@ export default function Sidebar() {
         : NAV_ITEMS;
 
     return (
-        <aside className="sidebar" role="navigation" aria-label="Main navigation">
-            <div className="sidebar-header">
-                <Link href="/dashboard" className="sidebar-logo">
-                    <Image
-                        src={theme === "dark" ? "/logo-white-2.png" : "/logo-black.webp"}
-                        alt="Vibe Tech Labs"
-                        width={140}
-                        height={40}
-                        className="sidebar-logo-img"
-                        style={{ objectFit: "contain" }}
-                        priority
-                    />
-                </Link>
-            </div>
-
-            <nav className="sidebar-nav">
-                <div className="sidebar-section">Main</div>
-                {visibleNavItems.map(({ href, Icon, label }) => (
-                    <Link
-                        key={href}
-                        href={href}
-                        className={`sidebar-link ${pathname === href || pathname.startsWith(href + "/") ? "active" : ""}`}
-                    >
-                        <span className="sidebar-link-icon">
-                            <Icon size={18} strokeWidth={1.8} />
-                        </span>
-                        {label}
+        <>
+            {isMobileOpen && (
+                <div className="sidebar-mobile-overlay" onClick={onMobileClose} />
+            )}
+            <aside className={`sidebar ${isMobileOpen ? "mobile-open" : ""}`} role="navigation" aria-label="Main navigation">
+                <div className="sidebar-header">
+                    <Link href="/dashboard" className="sidebar-logo" onClick={onMobileClose}>
+                        <Image
+                            src={theme === "dark" ? "/logo-white-2.png" : "/logo-black.webp"}
+                            alt="Vibe Tech Labs"
+                            width={140}
+                            height={40}
+                            className="sidebar-logo-img"
+                            style={{ objectFit: "contain" }}
+                            priority
+                        />
                     </Link>
-                ))}
+                </div>
 
-                {/* Team Attendance - visible to HR/Manager/Admin */}
-                {isManager && MANAGER_NAV_ITEMS.map(({ href, Icon, label }) => (
-                    <Link
-                        key={href}
-                        href={href}
-                        className={`sidebar-link ${pathname === href ? "active" : ""}`}
-                    >
-                        <span className="sidebar-link-icon">
-                            <Icon size={18} strokeWidth={1.8} />
-                        </span>
-                        {label}
-                    </Link>
-                ))}
-
-                {/* CRM — visible to Sales team members only */}
-                {isSales && (
-                    <>
-                        <div className="sidebar-section">Sales</div>
-                        <a
-                            href="https://vibetechlabs.com/crm/"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="sidebar-link"
-                        >
-                            <span className="sidebar-link-icon">
-                                <BarChart2 size={18} strokeWidth={1.8} />
-                            </span>
-                            CRM
-                        </a>
-                    </>
-                )}
-
-
-                {canManageUsers && !isAdmin && (
-                    <>
-                        <div className="sidebar-section">Admin</div>
+                <nav className="sidebar-nav">
+                    <div className="sidebar-section">Main</div>
+                    {visibleNavItems.map(({ href, Icon, label }) => (
                         <Link
-                            href="/users"
-                            className={`sidebar-link ${pathname === "/users" ? "active" : ""}`}
+                            key={href}
+                            href={href}
+                            onClick={onMobileClose}
+                            className={`sidebar-link ${pathname === href || pathname.startsWith(href + "/") ? "active" : ""}`}
                         >
                             <span className="sidebar-link-icon">
-                                <UsersRound size={18} strokeWidth={1.8} />
+                                <Icon size={18} strokeWidth={1.8} />
                             </span>
-                            Users
+                            {label}
                         </Link>
-                    </>
-                )}
+                    ))}
 
-                {isAdmin && (
-                    <>
-                        <div className="sidebar-section">System Administration</div>
-                        {canManageUsers && (
+                    {/* Team Attendance - visible to HR/Manager/Admin */}
+                    {isManager && MANAGER_NAV_ITEMS.map(({ href, Icon, label }) => (
+                        <Link
+                            key={href}
+                            href={href}
+                            onClick={onMobileClose}
+                            className={`sidebar-link ${pathname === href ? "active" : ""}`}
+                        >
+                            <span className="sidebar-link-icon">
+                                <Icon size={18} strokeWidth={1.8} />
+                            </span>
+                            {label}
+                        </Link>
+                    ))}
+
+                    {/* CRM — visible to Sales team members only */}
+                    {isSales && (
+                        <>
+                            <div className="sidebar-section">Sales</div>
+                            <a
+                                href="https://vibetechlabs.com/crm/"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={onMobileClose}
+                                className="sidebar-link"
+                            >
+                                <span className="sidebar-link-icon">
+                                    <BarChart2 size={18} strokeWidth={1.8} />
+                                </span>
+                                CRM
+                            </a>
+                        </>
+                    )}
+
+
+                    {canManageUsers && !isAdmin && (
+                        <>
+                            <div className="sidebar-section">Admin</div>
                             <Link
                                 href="/users"
+                                onClick={onMobileClose}
                                 className={`sidebar-link ${pathname === "/users" ? "active" : ""}`}
                             >
                                 <span className="sidebar-link-icon">
@@ -146,22 +138,41 @@ export default function Sidebar() {
                                 </span>
                                 Users
                             </Link>
-                        )}
-                        {ADMIN_ITEMS.map(({ href, Icon, label }) => (
-                            <Link
-                                key={href}
-                                href={href}
-                                className={`sidebar-link ${pathname === href ? "active" : ""}`}
-                            >
-                                <span className="sidebar-link-icon">
-                                    <Icon size={18} strokeWidth={1.8} />
-                                </span>
-                                {label}
-                            </Link>
-                        ))}
-                    </>
-                )}
-            </nav>
-        </aside>
+                        </>
+                    )}
+
+                    {isAdmin && (
+                        <>
+                            <div className="sidebar-section">System Administration</div>
+                            {canManageUsers && (
+                                <Link
+                                    href="/users"
+                                    onClick={onMobileClose}
+                                    className={`sidebar-link ${pathname === "/users" ? "active" : ""}`}
+                                >
+                                    <span className="sidebar-link-icon">
+                                        <UsersRound size={18} strokeWidth={1.8} />
+                                    </span>
+                                    Users
+                                </Link>
+                            )}
+                            {ADMIN_ITEMS.map(({ href, Icon, label }) => (
+                                <Link
+                                    key={href}
+                                    href={href}
+                                    onClick={onMobileClose}
+                                    className={`sidebar-link ${pathname === href ? "active" : ""}`}
+                                >
+                                    <span className="sidebar-link-icon">
+                                        <Icon size={18} strokeWidth={1.8} />
+                                    </span>
+                                    {label}
+                                </Link>
+                            ))}
+                        </>
+                    )}
+                </nav>
+            </aside>
+        </>
     );
 }

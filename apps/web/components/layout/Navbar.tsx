@@ -8,7 +8,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api-client";
 
-export default function Navbar() {
+export default function Navbar({ onMenuClick }: { onMenuClick?: () => void }) {
     const { theme, toggleTheme } = useTheme();
     const { user, logout } = useAuth();
     const pathname = usePathname();
@@ -58,6 +58,14 @@ export default function Navbar() {
     return (
         <nav className="navbar" role="navigation" aria-label="Top navigation">
             <div className="navbar-left">
+                {/* Mobile menu toggle */}
+                <button
+                    className="mobile-menu-btn"
+                    onClick={onMenuClick}
+                    aria-label="Open Sidebar Menu"
+                >
+                    ☰
+                </button>
                 <Link href="/dashboard" className="navbar-logo">
                     <Image
                         src={theme === "dark" ? "/logo-white-2.png" : "/logo-black.webp"}

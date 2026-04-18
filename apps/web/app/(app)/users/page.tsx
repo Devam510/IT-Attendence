@@ -225,8 +225,8 @@ export default function UsersPage() {
             </div>
 
             {/* Users Table */}
-            <div style={{ background: "var(--bg-card)", borderRadius: "12px", border: "1px solid var(--border-light)", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+            <div style={{ background: "var(--bg-card)", borderRadius: "12px", border: "1px solid var(--border-light)", overflowX: "auto", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
+                <table style={{ width: "100%", minWidth: "800px", borderCollapse: "collapse", textAlign: "left" }}>
                     <thead>
                         <tr style={{ background: "var(--bg-secondary)", borderBottom: "1px solid var(--border-light)", color: "var(--text-secondary)", fontSize: "var(--text-xs)", textTransform: "uppercase" }}>
                             <th style={{ padding: "16px 20px" }}>Employee</th>
@@ -367,30 +367,30 @@ export default function UsersPage() {
 
                         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                             
-                            <div style={{ display: "flex", gap: 16 }}>
-                                <div style={{ flex: 1 }}>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+                                <div style={{ flex: "1 1 200px" }}>
                                     <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Full Name</label>
                                     <input required type="text" className="input" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
                                 </div>
-                                <div style={{ flex: 1 }}>
+                                <div style={{ flex: "1 1 200px" }}>
                                     <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Employee ID</label>
                                     <input required type="text" className="input" value={formData.employeeId} onChange={e => setFormData({...formData, employeeId: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
                                 </div>
                             </div>
 
-                            <div style={{ display: "flex", gap: 16 }}>
-                                <div style={{ flex: 1 }}>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+                                <div style={{ flex: "1 1 200px" }}>
                                     <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Email Address</label>
                                     <input required type="email" className="input" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
                                 </div>
-                                <div style={{ flex: 1 }}>
+                                <div style={{ flex: "1 1 200px" }}>
                                     <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Phone Number</label>
                                     <input required type="tel" className="input" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
                                 </div>
                             </div>
 
-                            <div style={{ display: "flex", gap: 16 }}>
-                                <div style={{ flex: 1 }}>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+                                <div style={{ flex: "1 1 200px" }}>
                                     <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Role</label>
                                     <select required className="input" value={formData.role} onChange={e => {
                                         const newRole = e.target.value;
@@ -408,7 +408,7 @@ export default function UsersPage() {
                                     </select>
                                 </div>
                                 {formData.role !== "SADM" && (
-                                <div style={{ flex: 1 }}>
+                                <div style={{ flex: "1 1 200px" }}>
                                     <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Department</label>
                                     <select className="input" value={formData.departmentId} onChange={e => setFormData({...formData, departmentId: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }}>
                                         <option value="">Unassigned</option>
@@ -420,9 +420,9 @@ export default function UsersPage() {
                                 )}
                             </div>
 
-                            <div style={{ display: "flex", gap: 16 }}>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
                                 {formData.role !== "SADM" && (
-                                <div style={{ flex: 1 }}>
+                                <div style={{ flex: "1 1 200px" }}>
                                     <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Reports To (Manager / Superior)</label>
                                     <select className="input" value={formData.managerId} onChange={e => setFormData({...formData, managerId: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827", cursor: "pointer" }}>
                                         <option value="">Select Superior</option>
@@ -435,7 +435,7 @@ export default function UsersPage() {
                                     </select>
                                 </div>
                                 )}
-                                <div style={{ flex: 1 }}>
+                                <div style={{ flex: "1 1 200px" }}>
                                     <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Date of Joining</label>
                                     <input required type="date" className="input" value={formData.dateOfJoining} onChange={e => setFormData({...formData, dateOfJoining: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #d1d5db", backgroundColor: "#f9fafb", color: "#111827" }} />
                                 </div>

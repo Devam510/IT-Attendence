@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import Navbar from "@/components/layout/Navbar";
 import Sidebar from "@/components/layout/Sidebar";
-import BottomNav from "@/components/layout/BottomNav";
 import "@/styles/layout.css";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     const { isAuthenticated, isLoading } = useAuth();
     const router = useRouter();
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
     useEffect(() => {
         if (!isLoading && !isAuthenticated) {
@@ -46,14 +46,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     return (
         <div className="app-shell">
-            <Sidebar />
-            <Navbar />
+            <Sidebar 
+                isMobileOpen={isMobileSidebarOpen} 
+                onMobileClose={() => setIsMobileSidebarOpen(false)} 
+            />
+            <Navbar onMenuClick={() => setIsMobileSidebarOpen(true)} />
             <div className="app-main">
                 <div className="app-content">
                     {children}
                 </div>
             </div>
-            <BottomNav />
         </div>
     );
 }
