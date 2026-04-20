@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Webcam from "react-webcam";
-import { apiPost } from "@/lib/api-client";
+import { apiPost, apiGet } from "@/lib/api-client";
 
 interface Props {
     isOpen: boolean;
@@ -50,9 +50,32 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess, mode = "chec
 
     const startVerification = useCallback(async () => {
         setPhase("loading_models");
-        setStatusMsg("Loading AI models…");
+        setStatusMsg("Checking face profile…");
 
         try {
+            // ── Preflight: check face profile exists before loading heavy AI models ──
+            const statusRes = await apiGet<{
+                enrolled: boolean;
+                valid: boolean;
+                descriptorLength: number;
+                message: string;
+            }>("/api/face/status");
+
+            if (!statusRes.data?.enrolled) {
+                setErrorCode("NO_FACE_REGISTERED");
+                setErrorMsg("No face profile found. Please ask HR to enroll your face.");
+                setPhase("error");
+                return;
+            }
+            if (!statusRes.data.valid) {
+                setErrorCode("INVALID_DATA");
+                setErrorMsg(`Face profile corrupted (${statusRes.data.descriptorLength} dims). Please re-enroll.`);
+                setPhase("error");
+                return;
+            }
+
+            setStatusMsg("Loading AI models…");
+
             const faceapi = await loadFaceApi();
             const MODEL_URL = "/models";
             await Promise.all([
