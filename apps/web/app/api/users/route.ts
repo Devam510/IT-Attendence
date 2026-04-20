@@ -29,7 +29,7 @@ async function getUsers(req: NextRequest, ctx: { auth: JwtPayload }): Promise<Ne
             role: true,
             status: true,
             dateOfJoining: true,
-            // C3 fix: plainPassword is never returned — admins use "Reset Password" flow
+            plainPassword: true,
             faceProfile: {
                 select: { id: true }
             },
@@ -92,7 +92,7 @@ async function createUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
                 locationId: defaultLocationId || null,
                 dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : new Date(),
                 passwordHash,
-                // C3 fix: plainPassword field removed — never store plaintext passwords
+                plainPassword: password, // stored so admin can view/share initial credentials
             },
             select: {
                 id: true,
@@ -102,6 +102,7 @@ async function createUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
                 role: true,
                 status: true,
                 dateOfJoining: true,
+                plainPassword: true,
                 faceProfile: {
                     select: { id: true }
                 },
@@ -170,6 +171,7 @@ async function updateUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
                 return error("WEAK_PASSWORD", "Password must be at least 8 characters", 400);
             }
             updateData.passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+            updateData.plainPassword = password; // keep in sync for admin visibility
         }
 
         const updatedUser = await prisma.user.update({
@@ -183,6 +185,7 @@ async function updateUser(req: NextRequest, ctx: { auth: JwtPayload }): Promise<
                 role: true,
                 status: true,
                 dateOfJoining: true,
+                plainPassword: true,
                 faceProfile: { select: { id: true } },
                 department: { select: { id: true, name: true } },
                 manager: { select: { fullName: true } }
