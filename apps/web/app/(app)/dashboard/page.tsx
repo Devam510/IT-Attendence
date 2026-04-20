@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { apiGet, apiPost } from "@/lib/api-client";
+import { getRobustLocation } from "@/lib/geo";
 import { FaceVerificationModal } from "@/components/attendance/FaceVerificationModal";
 
 /* ─── Types ──────────────────────────────────────────────────── */
@@ -666,10 +667,8 @@ export default function DashboardPage() {
         setActionError(null);
         setActionLoading("checkin");
         try {
-            // Bug fix: always use high-accuracy GPS with no cached position for reliable mobile geo
-            const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-                navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
-            );
+            // Bug fix: use robust location utility with automatic fallback for reliable mobile geo
+            const pos = await getRobustLocation();
             const res = await apiPost<any>("/api/attendance/checkin", {
                 lat: pos.coords.latitude,
                 lng: pos.coords.longitude,
@@ -764,9 +763,7 @@ export default function DashboardPage() {
         try {
             // Use pre-cached position if available (from handleCheckOutClick, acquired at tap time).
             // Fall back to fresh request only if no cache — this covers early-checkout and retry paths.
-            const pos = prePos ?? cachedCheckoutPosition ?? await new Promise<GeolocationPosition>((resolve, reject) =>
-                navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
-            );
+            const pos = prePos ?? cachedCheckoutPosition ?? await getRobustLocation();
             // Clear cached position after use so it's not reused for future checkouts
             setCachedCheckoutPosition(null);
             const body: Record<string, unknown> = { 
