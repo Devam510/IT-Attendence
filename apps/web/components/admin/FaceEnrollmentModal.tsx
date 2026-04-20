@@ -76,7 +76,7 @@ export function FaceEnrollmentModal({ isOpen, onClose, userId, userName, onEnrol
 
                 const detection = await faceapi.detectSingleFace(
                     video,
-                    new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.80 })
+                    new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.50 })
                 ).withFaceLandmarks().withFaceDescriptor();
 
                 if (!detection) {
@@ -85,7 +85,7 @@ export function FaceEnrollmentModal({ isOpen, onClose, userId, userName, onEnrol
                 }
 
                 const score = detection.detection.score;
-                if (score < 0.85) {
+                if (score < 0.50) {
                     setStatusMsg(`Low confidence (${Math.round(score * 100)}%) — hold still…`);
                     return;
                 }
@@ -215,6 +215,7 @@ export function FaceEnrollmentModal({ isOpen, onClose, userId, userName, onEnrol
                                 ref={webcamRef}
                                 audio={false}
                                 mirrored={true}
+                                videoConstraints={{ facingMode: "user" }}
                                 onUserMedia={() => setIsCameraReady(true)}
                                 onUserMediaError={() => {
                                     setPhase("error");
