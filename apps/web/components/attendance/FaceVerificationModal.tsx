@@ -25,6 +25,7 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess, mode = "chec
     const [phase, setPhase] = useState<Phase>("loading_models");
     const [statusMsg, setStatusMsg] = useState("Loading AI…");
     const [errorMsg, setErrorMsg] = useState("");
+    const [errorCode, setErrorCode] = useState("");
     const [isCameraReady, setIsCameraReady] = useState(false);
     const [alertCountdown, setAlertCountdown] = useState(10);
 
@@ -41,6 +42,7 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess, mode = "chec
         setPhase("loading_models");
         setStatusMsg("Loading AI…");
         setErrorMsg("");
+        setErrorCode("");
         setIsCameraReady(false);
         setAlertCountdown(10);
         onClose();
@@ -112,7 +114,9 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess, mode = "chec
                     setStatusMsg("Identity confirmed ✅");
                     setTimeout(() => onSuccess(res.data!.verificationToken), 800);
                 } else {
-                    // Face did not match — show Security Alert
+                    // Face did not match or profile missing — show Security Alert with real error
+                    setErrorCode(res.code || "VERIFICATION_FAILED");
+                    setErrorMsg(res.error || "Face verification failed.");
                     setPhase("security_alert");
                     setAlertCountdown(10);
                 }
@@ -195,7 +199,15 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess, mode = "chec
                         Unauthorized Access Attempt
                     </h2>
                     <p style={{ color: "#fca5a5", fontSize: 14, marginBottom: 6, lineHeight: 1.6 }}>
-                        The face scanned does <strong>not match</strong> the registered face profile for this account.
+                        {errorCode === "NO_FACE_REGISTERED"
+                            ? <><strong>No face profile found.</strong> Please ask HR to enroll your face first.</>  
+                            : errorCode === "INVALID_DATA"
+                            ? <><strong>Face profile is corrupted.</strong> Please ask HR to re-enroll your face.</>
+                            : <>The face scanned does <strong>not match</strong> the registered face profile for this account.</>
+                        }
+                    </p>
+                    <p style={{ color: "#94a3b8", fontSize: 11, marginBottom: 6, lineHeight: 1.6, fontFamily: "monospace", background: "rgba(255,255,255,0.05)", padding: "4px 8px", borderRadius: 4 }}>
+                        Error: {errorCode || "VERIFICATION_FAILED"}
                     </p>
                     <p style={{ color: "#94a3b8", fontSize: 12, marginBottom: 28, lineHeight: 1.6 }}>
                         This attempt has been logged and reported to your HR administrator.
@@ -260,6 +272,7 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess, mode = "chec
                                 setPhase("loading_models");
                                 setStatusMsg("Loading AI…");
                                 setErrorMsg("");
+                                setErrorCode("");
                                 setIsCameraReady(false);
                                 setAlertCountdown(10);
                             }}
