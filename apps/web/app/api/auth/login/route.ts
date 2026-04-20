@@ -61,7 +61,7 @@ async function handleLogin(req: NextRequest): Promise<NextResponse> {
 
     if (!user) {
         logger.warn({ loginId }, "Login attempt for non-existent user");
-        return error("AUTH_FAILED", "Invalid credentials", 401);
+        return error("EMAIL_NOT_FOUND", "No account found with this email or Employee ID.", 401);
     }
 
     if (user.status !== "ACTIVE") {
@@ -110,7 +110,7 @@ async function handleLogin(req: NextRequest): Promise<NextResponse> {
             ipAddress: ip,
             metadata: { reason: "invalid_password" },
         }).catch(() => { });
-        return error("AUTH_FAILED", "Invalid credentials", 401);
+        return error("WRONG_PASSWORD", "Incorrect password. Please try again.", 401);
     }
 
     // Check MFA

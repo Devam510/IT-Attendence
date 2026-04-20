@@ -14,12 +14,14 @@ export default function LoginPage() {
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
+    const [errorField, setErrorField] = useState<"identifier" | "password" | null>(null);
     const [loading, setLoading] = useState(false);
     const { theme } = useTheme();
 
     async function handleSubmit(e: FormEvent) {
         e.preventDefault();
         setError("");
+        setErrorField(null);
         setLoading(true);
 
         const result = await login(identifier, password);
@@ -29,7 +31,16 @@ export default function LoginPage() {
         } else if (result.success) {
             router.push("/dashboard");
         } else {
-            setError(result.error || "Invalid credentials");
+            const msg = result.error || "Invalid credentials";
+            // Field-level targeting: highlight the specific broken input
+            if (msg.toLowerCase().includes("email") || msg.toLowerCase().includes("account") || msg.toLowerCase().includes("employee id")) {
+                setErrorField("identifier");
+            } else if (msg.toLowerCase().includes("password") || msg.toLowerCase().includes("incorrect")) {
+                setErrorField("password");
+            } else {
+                setErrorField(null); // generic top banner (rate limit, account inactive, etc.)
+            }
+            setError(msg);
             setLoading(false);
         }
     }
@@ -60,7 +71,8 @@ export default function LoginPage() {
                     </p>
 
                     <form onSubmit={handleSubmit}>
-                        {error && (
+                        {/* General error banner — only for non-field errors */}
+                        {error && !errorField && (
                             <div
                                 style={{
                                     padding: "var(--space-3) var(--space-4)",
@@ -86,11 +98,17 @@ export default function LoginPage() {
                                 className="input"
                                 placeholder="e.g. VTL001 or name@company.com"
                                 value={identifier}
-                                onChange={(e) => setIdentifier(e.target.value)}
+                                onChange={(e) => { setIdentifier(e.target.value); if (errorField === "identifier") { setErrorField(null); setError(""); } }}
                                 required
                                 autoComplete="username"
                                 autoFocus
+                                style={errorField === "identifier" ? { borderColor: "var(--color-danger)", background: "var(--color-danger-light)" } : undefined}
                             />
+                            {errorField === "identifier" && (
+                                <div className="animate-shake" style={{ color: "var(--color-danger)", fontSize: "var(--text-xs)", marginTop: "4px", display: "flex", alignItems: "center", gap: 4 }}>
+                                    ⚠️ {error}
+                                </div>
+                            )}
                         </div>
 
                         <div className="input-group" style={{ marginBottom: "var(--space-5)" }}>
@@ -104,9 +122,10 @@ export default function LoginPage() {
                                     className="input"
                                     placeholder="Enter your password"
                                     value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
+                                    onChange={(e) => { setPassword(e.target.value); if (errorField === "password") { setErrorField(null); setError(""); } }}
                                     required
                                     autoComplete="current-password"
+                                    style={errorField === "password" ? { borderColor: "var(--color-danger)", background: "var(--color-danger-light)" } : undefined}
                                 />
                                 <span
                                     className="input-icon"
@@ -119,6 +138,11 @@ export default function LoginPage() {
                                     {showPassword ? "🙈" : "👁️"}
                                 </span>
                             </div>
+                            {errorField === "password" && (
+                                <div className="animate-shake" style={{ color: "var(--color-danger)", fontSize: "var(--text-xs)", marginTop: "4px", display: "flex", alignItems: "center", gap: 4 }}>
+                                    ⚠️ {error}
+                                </div>
+                            )}
                         </div>
 
                         <div

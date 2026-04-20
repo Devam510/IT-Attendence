@@ -26,6 +26,8 @@ interface UserData {
     faceProfile?: { id: string } | null;
     department?: Department | null;
     manager?: { fullName: string } | null;
+    // Populated from today's attendance check
+    isCheckedInToday?: boolean;
 }
 
 export default function UsersPage() {
@@ -75,22 +77,41 @@ export default function UsersPage() {
     const [leaveUserId, setLeaveUserId] = useState<string | null>(null);
     const [leaveUserName, setLeaveUserName] = useState<string>("");
 
+    // Force Checkout state
+    const [checkoutTarget, setCheckoutTarget] = useState<UserData | null>(null);
+    const [checkoutReason, setCheckoutReason] = useState("");
+    const [isCheckingOut, setIsCheckingOut] = useState(false);
+    const [checkoutToast, setCheckoutToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+    // Auto-dismiss toast
+    useEffect(() => {
+        if (checkoutToast) {
+            const t = setTimeout(() => setCheckoutToast(null), 4000);
+            return () => clearTimeout(t);
+        }
+    }, [checkoutToast]);
+
     const fetchUsersAndStaticData = async () => {
         setLoading(true);
-        const [usersRes, deptRes, mgrsRes] = await Promise.all([
+        const [usersRes, deptRes, mgrsRes, attendanceRes] = await Promise.all([
             apiGet<UserData[]>("/api/users"),
             apiGet<Department[]>("/api/departments"),
-            apiGet<{ managers: any[] }>("/api/users/managers")
+            apiGet<{ managers: any[] }>("/api/users/managers"),
+            apiGet<{ records: { userId: string; status: string }[] }>("/api/attendance/team"),
         ]);
+
+        // Build a set of user IDs who are CHECKED_IN today
+        const checkedInToday = new Set<string>(
+            (attendanceRes.data?.records ?? [])
+                .filter(r => r.status === "CHECKED_IN")
+                .map(r => r.userId)
+        );
+
         if (usersRes.data) {
-            setUsers(usersRes.data);
+            setUsers(usersRes.data.map(u => ({ ...u, isCheckedInToday: checkedInToday.has(u.id) })));
         }
-        if (deptRes.data) {
-            setDepartments(deptRes.data);
-        }
-        if (mgrsRes.data?.managers) {
-            setManagers(mgrsRes.data.managers);
-        }
+        if (deptRes.data) setDepartments(deptRes.data);
+        if (mgrsRes.data?.managers) setManagers(mgrsRes.data.managers);
         setLoading(false);
     };
 
@@ -171,6 +192,24 @@ export default function UsersPage() {
         setFormData(prev => ({ ...prev, password: retVal }));
     };
 
+    async function handleAdminCheckout() {
+        if (!checkoutTarget) return;
+        setIsCheckingOut(true);
+        const res = await apiPost<any>("/api/attendance/admin-checkout", {
+            userId: checkoutTarget.id,
+            reason: checkoutReason.trim() || "Admin override",
+        });
+        setIsCheckingOut(false);
+        setCheckoutTarget(null);
+        setCheckoutReason("");
+        if (res.error) {
+            setCheckoutToast({ message: res.error, type: "error" });
+        } else {
+            setCheckoutToast({ message: `${checkoutTarget.fullName} checked out successfully.`, type: "success" });
+            await fetchUsersAndStaticData(); // refresh to update checked-in status
+        }
+    }
+
     if (loading) {
         return (
             <div style={{ padding: "20px" }}>
@@ -182,6 +221,20 @@ export default function UsersPage() {
 
     return (
         <div style={{ padding: "0" }}>
+
+            {/* Force Checkout Toast */}
+            {checkoutToast && (
+                <div style={{
+                    position: "fixed", top: 80, left: "50%", transform: "translateX(-50%)",
+                    zIndex: 99999, padding: "12px 24px", borderRadius: "12px",
+                    background: checkoutToast.type === "error" ? "#dc2626" : "#16a34a",
+                    color: "white", fontSize: "var(--text-sm)", fontWeight: 600,
+                    boxShadow: "0 8px 30px rgba(0,0,0,0.3)", maxWidth: 420, textAlign: "center",
+                    cursor: "pointer",
+                }} onClick={() => setCheckoutToast(null)}>
+                    {checkoutToast.message}
+                </div>
+            )}
             
             {/* Header */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-6)" }}>
@@ -297,16 +350,26 @@ export default function UsersPage() {
                                     )}
                                 </td>
                                 <td style={{ padding: "16px 20px", textAlign: "right", minWidth: 200 }}>
-                                    <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                                    <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", flexWrap: "wrap" }}>
+                                        {/* Force Checkout — only show if employee is checked in today */}
+                                        {u.isCheckedInToday && (
+                                            <button
+                                                onClick={() => { setCheckoutTarget(u); setCheckoutReason(""); }}
+                                                style={{ background: "#fee2e2", border: "none", color: "#991b1b", cursor: "pointer", fontSize: "13px", fontWeight: 600, padding: "8px 12px", borderRadius: "6px", display: "flex", alignItems: "center", gap: 4 }}
+                                                title="Force check out this employee"
+                                            >
+                                                ⏹ Force Out
+                                            </button>
+                                        )}
                                         {u.faceProfile ? (
-                                            <span 
+                                            <span
                                                 style={{ padding: "8px 12px", background: "#dcfce7", color: "#16a34a", fontSize: "13px", fontWeight: 600, borderRadius: "6px", display: "flex", alignItems: "center", gap: 4 }}
                                                 title="Face biometric registered"
                                             >
                                                 <CheckCircle size={14} /> Enrolled
                                             </span>
                                         ) : (
-                                            <button 
+                                            <button
                                                 onClick={() => {
                                                     setFaceUserId(u.id);
                                                     setFaceUserName(u.fullName);
@@ -317,7 +380,7 @@ export default function UsersPage() {
                                                 <User size={14} /> Add Face
                                             </button>
                                         )}
-                                        <button 
+                                        <button
                                             onClick={() => handleEditClick(u)}
                                             style={{ background: "none", border: "none", color: "var(--color-primary)", cursor: "pointer", fontSize: "14px", fontWeight: 600, padding: "8px", borderRadius: "6px" }}
                                         >
@@ -328,7 +391,7 @@ export default function UsersPage() {
                                                 onClick={() => setUserToDelete(u)}
                                                 style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "14px", fontWeight: 600, padding: "8px", borderRadius: "6px" }}
                                                 title="Delete User"
-                                                disabled={u.id === currentUser?.id} // Prevent self-deletion
+                                                disabled={u.id === currentUser?.id}
                                             >
                                                 Delete
                                             </button>
@@ -562,6 +625,64 @@ export default function UsersPage() {
                     userId={leaveUserId}
                     userName={leaveUserName}
                 />,
+                document.body
+            )}
+
+            {/* Force Checkout Confirmation Modal */}
+            {checkoutTarget && mounted && createPortal(
+                <div style={{
+                    position: "fixed", inset: 0, zIndex: 99999,
+                    background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
+                    display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+                }}>
+                    <div className="animate-slideUp" style={{
+                        background: "var(--bg-primary)", borderRadius: 16, padding: "32px",
+                        maxWidth: 420, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+                        border: "1.5px solid #d97706",
+                    }}>
+                        <div style={{ fontSize: 32, textAlign: "center", marginBottom: 8 }}>⏹</div>
+                        <h2 style={{ fontSize: "var(--text-xl)", fontWeight: "var(--font-bold)", margin: "0 0 8px", color: "#92400e", textAlign: "center" }}>
+                            Admin Force Check-Out
+                        </h2>
+                        <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", lineHeight: 1.5, marginBottom: 20, textAlign: "center" }}>
+                            You are about to force check out <strong>{checkoutTarget.fullName}</strong>. No face scan or location is required. This action will be logged in the audit trail.
+                        </p>
+                        <div style={{ marginBottom: 20 }}>
+                            <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>
+                                Reason (optional)
+                            </label>
+                            <textarea
+                                value={checkoutReason}
+                                onChange={e => setCheckoutReason(e.target.value)}
+                                placeholder="e.g. Emergency, End of shift, System correction..."
+                                rows={2}
+                                style={{
+                                    width: "100%", padding: "10px 12px", borderRadius: 8,
+                                    border: "1px solid var(--border-light)", background: "var(--bg-secondary)",
+                                    color: "var(--text-primary)", fontSize: "var(--text-sm)", resize: "none",
+                                }}
+                            />
+                        </div>
+                        <div style={{ display: "flex", gap: 12 }}>
+                            <button
+                                type="button"
+                                onClick={() => { setCheckoutTarget(null); setCheckoutReason(""); }}
+                                disabled={isCheckingOut}
+                                style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "1px solid var(--border-light)", background: "var(--bg-card)", color: "var(--text-primary)", fontWeight: 600, cursor: "pointer" }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleAdminCheckout}
+                                disabled={isCheckingOut}
+                                style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "none", background: "#d97706", color: "white", fontWeight: 700, cursor: isCheckingOut ? "not-allowed" : "pointer", opacity: isCheckingOut ? 0.7 : 1 }}
+                            >
+                                {isCheckingOut ? "Checking out…" : "Confirm Force Out"}
+                            </button>
+                        </div>
+                    </div>
+                </div>,
                 document.body
             )}
         </div>
