@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@vibetech/db";
 import { withAuth } from "@/lib/auth";
 import { storeFaceToken } from "@/lib/redis";
-import { success, error, logger } from "@/lib/errors";
+import { success, error, logger, withErrorHandler } from "@/lib/errors";
 import { logAuditEvent } from "@/lib/audit";
 import type { JwtPayload } from "@vibetech/shared";
 
@@ -92,16 +92,22 @@ async function handleFaceVerification(
 
     logger.info({ userId: auth.sub, distance, passed }, "Face verification attempt");
 
-    // Log verification attempt
-    await prisma.faceVerificationLog.create({
-        data: {
-            userId: auth.sub,
-            confidenceScore: confidence,
-            spoofProbability: 0,
-            status: passed ? "SUCCESS" : "FAILED_MATCH",
-            ipAddress: req.headers.get("x-forwarded-for") || "unknown"
-        }
-    });
+    // Log verification attempt — wrapped in try/catch because this is informational only.
+    // If face_verification_logs table is missing or has a schema issue in Supabase,
+    // it must NOT crash the core verification flow.
+    try {
+        await prisma.faceVerificationLog.create({
+            data: {
+                userId: auth.sub,
+                confidenceScore: confidence,
+                spoofProbability: 0,
+                status: passed ? "SUCCESS" : "FAILED_MATCH",
+                ipAddress: req.headers.get("x-forwarded-for") || "unknown"
+            }
+        });
+    } catch (logErr) {
+        logger.warn({ err: logErr, userId: auth.sub }, "faceVerificationLog.create failed — table may be missing in Supabase. Continuing.");
+    }
 
     if (!passed) {
         logger.warn({ userId: auth.sub, distance, threshold: DISTANCE_THRESHOLD }, "Face verification FAILED — distance too large");
@@ -137,4 +143,4 @@ async function handleFaceVerification(
     }, 200);
 }
 
-export const POST = withAuth(handleFaceVerification);
+export const POST = withErrorHandler(withAuth(handleFaceVerification) as any) as any;

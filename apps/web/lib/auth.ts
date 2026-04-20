@@ -92,7 +92,15 @@ export function withAuth(handler: RouteHandler): (req: NextRequest, ctx?: unknow
             parsedParams = rawParams instanceof Promise ? await rawParams : rawParams;
         }
 
-        return handler(req, { auth, params: parsedParams });
+        try {
+            return await handler(req, { auth, params: parsedParams });
+        } catch (err) {
+            console.error("[withAuth] Unhandled route error:", err);
+            return NextResponse.json(
+                { success: false, error: { code: "INTERNAL_ERROR", message: "An unexpected server error occurred" } } satisfies ApiResponse,
+                { status: 500 }
+            );
+        }
     };
 }
 
