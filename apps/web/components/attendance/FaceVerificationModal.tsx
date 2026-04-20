@@ -62,6 +62,10 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess, mode = "chec
             setPhase("scanning");
             setStatusMsg("Look at the camera…");
 
+            // Collect multiple frames and average the descriptors for stability
+            const FRAMES_NEEDED = 5;
+            const descriptorFrames: Float32Array[] = [];
+
             intervalRef.current = setInterval(async () => {
                 if (hasVerifiedRef.current) return;
                 const video = webcamRef.current?.video;
@@ -72,19 +76,35 @@ export function FaceVerificationModal({ isOpen, onClose, onSuccess, mode = "chec
                     new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
                 ).withFaceLandmarks().withFaceDescriptor();
 
-                if (!detection) {
+                if (!detection || detection.detection.score < 0.5) {
                     setStatusMsg("Looking for your face…");
                     return;
                 }
 
-                if (detection.detection.score < 0.5) return;
+                descriptorFrames.push(detection.descriptor);
+                const collected = descriptorFrames.length;
+                setStatusMsg(`Hold still… (${collected}/${FRAMES_NEEDED})`);
 
+                if (collected < FRAMES_NEEDED) return;
+
+                // Got enough frames — average them for a stable descriptor
                 hasVerifiedRef.current = true;
                 cleanup();
                 setPhase("verifying");
                 setStatusMsg("Verifying identity…");
 
-                const descriptor = Array.from(detection.descriptor);
+                // Average all collected descriptors element-wise
+                const avgDescriptor = new Float32Array(128);
+                for (const frame of descriptorFrames) {
+                    for (let i = 0; i < 128; i++) {
+                        avgDescriptor[i] = (avgDescriptor[i] ?? 0) + (frame[i] ?? 0);
+                    }
+                }
+                for (let i = 0; i < 128; i++) {
+                    avgDescriptor[i] = (avgDescriptor[i] ?? 0) / FRAMES_NEEDED;
+                }
+
+                const descriptor = Array.from(avgDescriptor);
                 const res = await apiPost<{ verificationToken: string }>("/api/face/verify", { descriptor });
 
                 if (res.data?.verificationToken) {

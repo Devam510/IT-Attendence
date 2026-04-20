@@ -12,9 +12,10 @@ import { logAuditEvent } from "@/lib/audit";
 import type { JwtPayload } from "@vibetech/shared";
 
 // Euclidean distance between two 128D vectors
-// face-api.js recommends a threshold of 0.45-0.6 for face recognition
-// Lower = stricter. 0.50 is standard.
-const DISTANCE_THRESHOLD = 0.50;
+// face-api.js recommends a threshold of 0.6 ± 0.05 for real-world mobile use.
+// 0.50 is too strict when enrollment and verification happen on different devices/lighting.
+// Supabase Postgres JSONB returns numeric-keyed objects, not plain arrays — see parseDescriptor().
+const DISTANCE_THRESHOLD = 0.60;
 
 function euclideanDistance(a: number[], b: number[]): number {
     if (a.length !== b.length) return Infinity;
@@ -24,6 +25,26 @@ function euclideanDistance(a: number[], b: number[]): number {
         sum += diff * diff;
     }
     return Math.sqrt(sum);
+}
+
+/**
+ * Parse the stored face descriptor safely.
+ * Supabase/Postgres JSONB can return numeric-keyed objects {"0":0.1,"1":-0.2,...}
+ * instead of a plain JS array [0.1, -0.2, ...] depending on how the data was stored.
+ * This function normalises both formats into a proper number[].
+ */
+function parseDescriptor(raw: unknown): number[] {
+    if (Array.isArray(raw)) {
+        // Standard case: stored as JSON array
+        return raw.map(Number);
+    }
+    if (raw && typeof raw === "object") {
+        // Supabase JSONB edge case: numeric-keyed object
+        const obj = raw as Record<string, unknown>;
+        const keys = Object.keys(obj).map(Number).sort((a, b) => a - b);
+        return keys.map(k => Number(obj[String(k)]));
+    }
+    return [];
 }
 
 async function handleFaceVerification(
@@ -53,12 +74,15 @@ async function handleFaceVerification(
         return error("NO_FACE_REGISTERED", "You do not have a registered face. Please see HR.", 403);
     }
 
-    const storedDescriptor = Array.isArray(profile.embeddingVector)
-        ? profile.embeddingVector as number[]
-        : [];
+    // parseDescriptor handles both plain arrays AND Supabase JSONB numeric-keyed objects
+    const storedDescriptor = parseDescriptor(profile.embeddingVector);
 
     if (storedDescriptor.length !== 128) {
-        return error("INVALID_DATA", "Stored face profile is corrupted or from an old system. Please re-enroll.", 500);
+        return error(
+            "INVALID_DATA",
+            `Stored face profile is corrupted (got ${storedDescriptor.length} dimensions, expected 128). Please re-enroll.`,
+            500
+        );
     }
 
     // ── Core Step: Euclidean Distance Comparison ──────────────────────
