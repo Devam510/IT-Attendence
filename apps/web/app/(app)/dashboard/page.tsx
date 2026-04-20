@@ -951,7 +951,7 @@ export default function DashboardPage() {
                         style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "1.5px solid var(--border-primary)", background: "var(--bg-secondary)", color: "var(--text-primary)", fontWeight: 600, cursor: "pointer" }}>
                         Cancel Check Out
                     </button>
-                    <Link href="/updates"
+                    <Link href="/updates?from=checkout"
                         style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "none", background: "#d97706", color: "white", fontWeight: 700, cursor: "pointer", textAlign: "center", textDecoration: "none", display: "inline-block" }}>
                         Go to Updates
                     </Link>

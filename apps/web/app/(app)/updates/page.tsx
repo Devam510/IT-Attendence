@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { apiGet, apiPost } from "@/lib/api-client";
 import { useAuth } from "@/context/AuthContext";
 // import "@/styles/tasks.css"; // We'll just reuse task styles for buttons/loaders or inline styles for feed
@@ -39,8 +40,12 @@ function timeAgo(dateStr: string) {
     return new Date(dateStr).toLocaleDateString();
 }
 
-export default function UpdatesPage() {
+function UpdatesPageInner() {
     const { user } = useAuth();
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const fromCheckout = searchParams.get("from") === "checkout";
+
     const [updates, setUpdates] = useState<DailyUpdate[]>([]);
     const [loading, setLoading] = useState(true);
     const [myUpdate, setMyUpdate] = useState("");
@@ -90,9 +95,13 @@ export default function UpdatesPage() {
         if (res.error) {
             setToast({ message: res.error, type: "error" });
         } else if (res.data) {
-            setToast({ message: "Update posted successfully!", type: "success" });
+            setToast({ message: fromCheckout ? "Update posted! Returning to dashboard…" : "Update posted successfully!", type: "success" });
             // Refresh to put it in the list (or update if edited)
             await loadUpdates(selectedDate);
+            // If user came from checkout flow, redirect back to dashboard after a short delay
+            if (fromCheckout) {
+                setTimeout(() => router.push("/dashboard"), 1500);
+            }
         }
         setIsSubmitting(false);
     }
@@ -260,5 +269,13 @@ export default function UpdatesPage() {
                 )}
             </div>
         </div>
+    );
+}
+
+export default function UpdatesPage() {
+    return (
+        <Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: "var(--text-secondary)" }}>Loading…</div>}>
+            <UpdatesPageInner />
+        </Suspense>
     );
 }
