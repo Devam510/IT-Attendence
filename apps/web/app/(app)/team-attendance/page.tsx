@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { apiFetch, apiGet } from "@/lib/api-client";
+import { apiFetch, apiGet, apiPost } from "@/lib/api-client";
+import { useAuth } from "@/context/AuthContext";
 import { ChevronLeft, ChevronRight, Users, UserCheck, UserX, CalendarDays, Download, RefreshCw, Eye } from "lucide-react";
 
 type Status = "PRESENT" | "ABSENT" | "ON_LEAVE";
@@ -534,6 +535,18 @@ export default function TeamAttendancePage() {
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const [showExportModal, setShowExportModal] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+    const [mounted, setMounted] = useState(false);
+
+    // Force Checkout State
+    const [checkoutTarget, setCheckoutTarget] = useState<StaffMember | null>(null);
+    const [checkoutReason, setCheckoutReason] = useState("");
+    const [isCheckingOut, setIsCheckingOut] = useState(false);
+    const { user: currentUser } = useAuth();
+    const isAdmin = ["SADM", "HRA"].includes(currentUser?.role ?? "");
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     useEffect(() => {
         if (!toast) return;
@@ -552,6 +565,25 @@ export default function TeamAttendancePage() {
         if (silent) setRefreshing(false);
         else setLoading(false);
     }, []);
+
+    async function handleAdminCheckout() {
+        if (!checkoutTarget) return;
+        setIsCheckingOut(true);
+        const res = await apiPost<any>("/api/attendance/admin-checkout", {
+            userId: checkoutTarget.id,
+            reason: checkoutReason.trim() || "Admin override",
+        });
+        setIsCheckingOut(false);
+        const name = checkoutTarget.fullName;
+        setCheckoutTarget(null);
+        setCheckoutReason("");
+        if (res.error) {
+            setToast({ message: res.error, type: "error" });
+        } else {
+            setToast({ message: `${name} has been checked out.`, type: "success" });
+            loadData(selectedDate, true); // silent refresh
+        }
+    }
 
     // Initial load + auto-refresh every 30s when viewing today
     useEffect(() => {
@@ -873,12 +905,29 @@ export default function TeamAttendancePage() {
                                                 })()}
                                             </td>
                                             <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>
-                                                <span
-                                                    title={m.earlyReason ? `Early checkout: ${m.earlyReason}` : "No remark"}
-                                                    style={{ cursor: "help" }}
-                                                >
-                                                    {fmtTime(m.checkOutAt)}
-                                                </span>
+                                                {/* Force Out button: only for PRESENT employees with no checkout, viewing today, and admin only */}
+                                                {isAdmin && isToday && m.status === "PRESENT" && !m.checkOutAt ? (
+                                                    <button
+                                                        onClick={() => { setCheckoutTarget(m); setCheckoutReason(""); }}
+                                                        style={{
+                                                            background: "#fee2e2", border: "none", color: "#991b1b",
+                                                            cursor: "pointer", fontSize: "12px", fontWeight: 700,
+                                                            padding: "5px 10px", borderRadius: "6px",
+                                                            display: "inline-flex", alignItems: "center", gap: 4,
+                                                            whiteSpace: "nowrap",
+                                                        }}
+                                                        title="Admin force checkout — no face or location needed"
+                                                    >
+                                                        ⏹ Force Out
+                                                    </button>
+                                                ) : (
+                                                    <span
+                                                        title={m.earlyReason ? `Early checkout: ${m.earlyReason}` : "No remark"}
+                                                        style={{ cursor: "help" }}
+                                                    >
+                                                        {fmtTime(m.checkOutAt)}
+                                                    </span>
+                                                )}
                                             </td>
                                             <td style={{ padding: "11px 14px", color: "var(--text-secondary)" }}>
                                                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -952,6 +1001,65 @@ export default function TeamAttendancePage() {
                     />
                 )
             }
+
+            {/* Force Checkout Confirmation Modal */}
+            {checkoutTarget && mounted && createPortal(
+                <div style={{
+                    position: "fixed", inset: 0, zIndex: 99999,
+                    background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
+                    display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+                }}>
+                    <div className="animate-slideUp" style={{
+                        background: "var(--bg-primary)", borderRadius: 16, padding: "32px",
+                        maxWidth: 420, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+                        border: "1.5px solid #d97706",
+                    }}>
+                        <div style={{ fontSize: 32, textAlign: "center", marginBottom: 8 }}>⏹</div>
+                        <h2 style={{ fontSize: "var(--text-xl)", fontWeight: 700, margin: "0 0 8px", color: "#92400e", textAlign: "center" }}>
+                            Admin Force Check-Out
+                        </h2>
+                        <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", lineHeight: 1.5, marginBottom: 20, textAlign: "center" }}>
+                            You are about to force check out <strong>{checkoutTarget.fullName}</strong>. No face scan or location is required. This action will be logged in the audit trail.
+                        </p>
+                        <div style={{ marginBottom: 20 }}>
+                            <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>
+                                Reason (optional)
+                            </label>
+                            <textarea
+                                value={checkoutReason}
+                                onChange={e => setCheckoutReason(e.target.value)}
+                                placeholder="e.g. Emergency, End of shift, System correction..."
+                                rows={2}
+                                style={{
+                                    width: "100%", padding: "10px 12px", borderRadius: 8,
+                                    border: "1px solid var(--border-light)", background: "var(--bg-secondary)",
+                                    color: "var(--text-primary)", fontSize: "var(--text-sm)", resize: "none",
+                                    boxSizing: "border-box",
+                                }}
+                            />
+                        </div>
+                        <div style={{ display: "flex", gap: 12 }}>
+                            <button
+                                type="button"
+                                onClick={() => { setCheckoutTarget(null); setCheckoutReason(""); }}
+                                disabled={isCheckingOut}
+                                style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "1px solid var(--border-light)", background: "var(--bg-card)", color: "var(--text-primary)", fontWeight: 600, cursor: "pointer" }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleAdminCheckout}
+                                disabled={isCheckingOut}
+                                style={{ flex: 1, padding: "12px 0", borderRadius: 8, border: "none", background: "#d97706", color: "white", fontWeight: 700, cursor: isCheckingOut ? "not-allowed" : "pointer", opacity: isCheckingOut ? 0.7 : 1 }}
+                            >
+                                {isCheckingOut ? "Checking out…" : "Confirm Force Out"}
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
         </div >
     );
 }
