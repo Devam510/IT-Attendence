@@ -13,9 +13,9 @@ import type { JwtPayload } from "@vibetech/shared";
 
 // Euclidean distance between two 128D vectors
 // face-api.js recommends a threshold of 0.6 ± 0.05 for real-world mobile use.
-// 0.50 is too strict when enrollment and verification happen on different devices/lighting.
+// Raised to 0.65 to handle day-to-day variation in lighting, angle and mobile cameras.
 // Supabase Postgres JSONB returns numeric-keyed objects, not plain arrays — see parseDescriptor().
-const DISTANCE_THRESHOLD = 0.60;
+const DISTANCE_THRESHOLD = 0.65;
 
 function euclideanDistance(a: number[], b: number[]): number {
     if (a.length !== b.length) return Infinity;
@@ -104,17 +104,21 @@ async function handleFaceVerification(
     });
 
     if (!passed) {
-        logger.warn({ userId: auth.sub, distance }, "Face verification FAILED — distance too large");
+        logger.warn({ userId: auth.sub, distance, threshold: DISTANCE_THRESHOLD }, "Face verification FAILED — distance too large");
         await logAuditEvent({
             actorId: auth.sub,
             actorRole: auth.role,
             action: "face.verify",
             resourceType: "attendance",
             ipAddress: req.headers.get("x-forwarded-for") || "unknown",
-            metadata: { success: false, reason: "distance_mismatch", distance }
+            metadata: { success: false, reason: "distance_mismatch", distance, threshold: DISTANCE_THRESHOLD }
         }).catch(() => {});
 
-        return error("VERIFICATION_FAILED", "Face verification failed. Please try again or see HR.", 422);
+        return error(
+            "VERIFICATION_FAILED",
+            `Face verification failed (distance: ${distance.toFixed(3)}, threshold: ${DISTANCE_THRESHOLD}). Please re-enroll or try again.`,
+            422
+        );
     }
 
     // H4/M4 fix: generate a cryptographically random token (not just timestamp+userId).

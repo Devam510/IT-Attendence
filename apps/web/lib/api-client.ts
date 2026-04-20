@@ -156,7 +156,14 @@ export async function api<T = unknown>(
         if (!res.ok) {
             return {
                 error: json.error?.message || (typeof json.error === "string" ? json.error : null) || json.message || `Request failed (${res.status})`,
-                code: json.error?.code || (res.status === 403 ? "FORBIDDEN" : res.status === 401 ? "UNAUTHORIZED" : res.status === 409 ? "CONFLICT" : "UNKNOWN"),
+                code: json.error?.code || (
+                    res.status === 403 ? "FORBIDDEN" :
+                    res.status === 401 ? "UNAUTHORIZED" :
+                    res.status === 409 ? "CONFLICT" :
+                    res.status === 422 ? "UNPROCESSABLE" :
+                    res.status === 500 ? "SERVER_ERROR" :
+                    "UNKNOWN"
+                ),
             };
         }
 
