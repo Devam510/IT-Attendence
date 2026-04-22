@@ -1,7 +1,7 @@
 {
     "version": 2,
     "framework": "nextjs",
-    "installCommand": "cd ../.. && npm install",
+    "installCommand": "cd ../.. && npm install --legacy-peer-deps",
     "headers": [
         {
             "source": "/api/(.*)",
