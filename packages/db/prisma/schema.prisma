@@ -433,7 +433,7 @@ model FaceVerificationLog {
   confidenceScore  Float    @map("confidence_score")
   status           VerificationStatus
   spoofProbability Float?   @map("spoof_probability")
-  ipAddress        String?
+  ipAddress        String?  @map("ip_address")
   timestamp        DateTime @default(now())
 
   user             User               @relation(fields: [userId], references: [id])
